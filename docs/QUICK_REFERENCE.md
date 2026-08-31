@@ -121,6 +121,21 @@ sudo ./setup-edge.sh --install --password MyPass123 --apikey MyApiKey
 sudo ./setup-edge.sh --install && sudo /usr/local/bin/update-blacklist.sh
 ```
 
+### Cluster / Multi-source
+```bash
+# Atur daftar sumber CDB (central + mirror + peer)
+sudo ./setup-edge.sh --set-cdb-sources "http://central/trust.db,http://mirror/trust.db"
+
+# Force sync (failover otomatis ke sumber berikutnya)
+sudo /usr/local/bin/update-blacklist.sh --force-update
+
+# Lihat manifest DB aktif
+cat /var/lib/dnsdist/blacklist.db.manifest.json
+
+# Probe peer CDB (dari panel atau curl)
+curl -H "X-CDB-Token: TOKEN" http://PEER_IP:8084/cdb/manifest.json
+```
+
 ### Sync modes
 ```bash
 # Normal sync (checks cache, skips if recent)

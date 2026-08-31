@@ -139,6 +139,66 @@ sudo /usr/local/bin/update-blacklist.sh --force-update
 
 Status page available at: `http://YOUR_SERVER_IP/status/`
 
+## 🌐 CDB Cluster & Redundancy (v3.x)
+
+Sejak `update-blacklist.sh` v3.0.0, node mendukung **multi-source failover**:
+central + mirror + peer. Jika satu sumber mati, otomatis pindah ke berikutnya.
+
+### Konfigurasi Sumber CDB
+
+```bash
+# Daftar sumber dipisah koma (central + mirror + peer)
+sudo ./setup-edge.sh --set-cdb-sources \
+  "http://central-manager/trust.db,http://mirror-01/trust.db,http://peer-02:8084/cdb/blacklist.db"
+```
+
+Atau langsung edit `/etc/dnsdist/node.conf`:
+
+```ini
+SAVED_CDB_SOURCES="http://central-manager/trust.db,http://mirror-01/trust.db"
+```
+
+### Content-Addressed Storage
+
+Setiap DB disimpan sebagai `blacklist.<sha256>.db` + symlink `blacklist.db`
+(swap atomic, tanpa copy besar). Manifest sidecar di `blacklist.db.manifest.json`:
+
+```json
+{"version": 3, "sha256": "abc...", "source": "http://mirror-01/trust.db", "built_at": "2026-08-31T..."}
+```
+
+### Peer Publisher (di panel :8084)
+
+Node yang menjalankan panel mempublikasikan CDB-nya di `/cdb/*`:
+
+| Endpoint | Deskripsi |
+|----------|-----------|
+| `GET /cdb/healthz` | Status DB (`X-CDB-Token`) |
+| `GET /cdb/manifest.json` | Metadata versi/hash/sumber |
+| `GET /cdb/blacklist.db` | DB aktif (symlink resolved) |
+| `GET /cdb/blacklist.<sha>.db` | DB versi tertentu (immutable) |
+
+Set `CDB_TOKEN` di systemd unit panel agar peer harus menyertakan
+header `X-CDB-Token` saat menarik DB.
+
+### Kelola Peer via Panel
+
+Halaman **Cluster** di panel (`/cluster`):
+- Tambah/hapus peer (name, URL, token)
+- Tombol **Probe**: cek `reachable` + `health` + manifest peer
+- Lihat manifest lokal (version, sha256, source, built_at)
+
+### Urutan Failover
+
+```
+1. Coba sumber 1 (central)   — HTTP check + download
+2. Coba sumber 2 (mirror)    — bila source 1 gagal/404
+3. Coba sumber 3 (peer)      — bila source 2 gagal
+4. Semua gagal               — DB lama dipertahankan (tidak patah)
+```
+
+Setiap file yang berhasil diunduh diverifikasi ukuran ≥ 2KB sebelum dipasang.
+
 ## 🆙 Upgrade Script
 
 Untuk update ke versi terbaru tanpa kehilangan konfigurasi:
