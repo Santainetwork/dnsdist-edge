@@ -1,14 +1,14 @@
 #!/bin/bash
 # ============================================================
 # DNSDist Edge Node - Auto Setup Script (Native OS)
-# Versi: 2.1.0
+# Versi: 2.2.0
 # Terinspirasi dari proyek Trust-NG
 # ============================================================
 
 set -e
 
 # --- Versi Script ---
-SCRIPT_VERSION="2.1.0"
+SCRIPT_VERSION="2.2.0"
 
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---
 CONF_DIR="/etc/dnsdist"
