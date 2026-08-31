@@ -8,6 +8,7 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 ## [Unreleased]
 
 ### Changed
+- `update-blacklist.sh` v3.0.0: multi-URL failover (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
 - `setup/` dibuat **self-contained**: cukup 3 file inti (`setup-edge.sh`, `dnsdist.conf`, `update-blacklist.sh`) untuk deploy node
 - Modul opsional (top-stats, build-asn-db, asn-toolkit) dipindah ke `addons/`
 - `setup-edge.sh` mendeteksi addon di `addons/`; jika tidak ada, lewati (client butuh file seminimal mungkin)
@@ -22,9 +23,10 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - `SECURITY.md`: kebijakan keamanan & panduan pelaporan kerentanan
 
 ### Changed
+- `update-blacklist.sh` v3.0.0: multi-URL failover (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
 - Dedupe: `scripts/asn-toolkit/` hanya menyimpan data (`ipinfo_lite.csv`, `asn-db.bin`, `dnsdist.conf`); source script tunggal di `scripts/`
 - Path resolver di `setup-edge.sh` diarahkan ke `../scripts/` (single source of truth)
-- Versi script `setup-edge.sh` & `update-blacklist.sh` -> 2.1.0
+- Versi script `setup-edge.sh` 2.1.0 & `update-blacklist.sh` 3.0.0
 
 ## [2.0.0] - 2026-08-31
 
@@ -39,6 +41,7 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   dan `SAVED_INSTALL_DATE` via Ansible
 
 ### Changed
+- `update-blacklist.sh` v3.0.0: multi-URL failover (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
 - `config/deploy-edge.yml` disesuaikan dengan struktur baru (path repo root, `setup/` folder,
   dukungan `--password`/`--apikey` opsional)
 - README & dokumen lain: URL repo diperbarui ke `Santainetwork/dnsdist-edge`
