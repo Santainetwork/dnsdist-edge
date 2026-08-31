@@ -21,8 +21,8 @@ sudo su -  # Atau gunakan sudo untuk setiap command
 ### 1. Download Repositori
 ```bash
 cd /tmp
-git clone https://github.com/trust-ng-replica/dnsdist-edge.git
-cd dnsdist-edge
+git clone https://github.com/Santainetwork/dnsdist-edge.git
+cd dnsdist-edge/setup
 ```
 
 ### 2. Jalankan Installer
@@ -143,7 +143,7 @@ Status page available at: `http://YOUR_SERVER_IP/status/`
 
 Untuk update ke versi terbaru tanpa kehilangan konfigurasi:
 ```bash
-cd /root/trust-ng-replica/dnsdist-edge
+cd /root/trust-ng-replica/dnsdist-edge/setup
 sudo ./setup-edge.sh --upgrade
 ```
 

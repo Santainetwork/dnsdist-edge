@@ -705,23 +705,33 @@ do_install() {
     chown -R "${DNSDIST_USER}:${DNSDIST_USER}" "$CONF_DIR"
     [ -f "$CERTS_DIR/server.key" ] && chmod 600 "$CERTS_DIR/server.key" || true
     
+    # Resolve path file top-stats.lua dan build-asn-db.sh jika dijalankan dari subfolder setup/
+    local top_stats_src="$EDGE_DIR/top-stats.lua"
+    [ ! -f "$top_stats_src" ] && [ -f "$EDGE_DIR/../scripts/top-stats.lua" ] && top_stats_src="$EDGE_DIR/../scripts/top-stats.lua"
+
+    local build_asn_src="$EDGE_DIR/build-asn-db.sh"
+    [ ! -f "$build_asn_src" ] && [ -f "$EDGE_DIR/../scripts/build-asn-db.sh" ] && build_asn_src="$EDGE_DIR/../scripts/build-asn-db.sh"
+
+    local ipinfo_src="$EDGE_DIR/ipinfo_lite.csv"
+    [ ! -f "$ipinfo_src" ] && [ -f "$EDGE_DIR/../scripts/asn-toolkit/ipinfo_lite.csv" ] && ipinfo_src="$EDGE_DIR/../scripts/asn-toolkit/ipinfo_lite.csv"
+
     echo -e "\n${CYAN}=== [2.5/5] Top Stats Module (Top Queries, Top Clients, Top ASN) ===${NC}"
-    if [ -f "$EDGE_DIR/top-stats.lua" ]; then
-        cp "$EDGE_DIR/top-stats.lua" "$CONF_DIR/top-stats.lua"
+    if [ -f "$top_stats_src" ]; then
+        cp "$top_stats_src" "$CONF_DIR/top-stats.lua"
         chmod 644 "$CONF_DIR/top-stats.lua"
         echo -e "  ${GREEN}[✓] top-stats.lua terinstall di $CONF_DIR/${NC}"
     else
-        echo -e "  ${YELLOW}[!] top-stats.lua tidak ditemukan di $EDGE_DIR, modul top-stats dilewati.${NC}"
+        echo -e "  ${YELLOW}[!] top-stats.lua tidak ditemukan, modul top-stats dilewati.${NC}"
     fi
-    if [ -f "$EDGE_DIR/build-asn-db.sh" ]; then
-        cp "$EDGE_DIR/build-asn-db.sh" /usr/local/bin/build-asn-db.sh
+    if [ -f "$build_asn_src" ]; then
+        cp "$build_asn_src" /usr/local/bin/build-asn-db.sh
         chmod +x /usr/local/bin/build-asn-db.sh
         echo -e "  ${GREEN}[✓] build-asn-db.sh terinstall di /usr/local/bin/${NC}"
         # Auto-build database jika ipinfo_lite.csv tersedia
-        if [ -f "$EDGE_DIR/ipinfo_lite.csv" ] || [ -f "$CONF_DIR/ipinfo_lite.csv" ]; then
+        if [ -f "$ipinfo_src" ] || [ -f "$CONF_DIR/ipinfo_lite.csv" ]; then
             echo "[*] ipinfo_lite.csv terdeteksi, mengompilasi database ASN..."
-            if [ -f "$EDGE_DIR/ipinfo_lite.csv" ]; then
-                cp "$EDGE_DIR/ipinfo_lite.csv" "$CONF_DIR/ipinfo_lite.csv"
+            if [ -f "$ipinfo_src" ]; then
+                cp "$ipinfo_src" "$CONF_DIR/ipinfo_lite.csv"
             fi
             cd "$CONF_DIR" && sh /usr/local/bin/build-asn-db.sh || echo -e "  ${YELLOW}[!] Gagal mengompilasi asn-db.bin, lewati.${NC}"
             cd - >/dev/null 2>&1 || true

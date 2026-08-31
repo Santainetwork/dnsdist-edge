@@ -25,10 +25,11 @@ Project ini menyediakan solusi **DNS filtering edge node** dengan fitur-fitur ad
 ### Instalasi Otomatis
 ```bash
 # Clone repository
-git clone https://github.com/trust-ng-replica/dnsdist-edge.git
+git clone https://github.com/Santainetwork/dnsdist-edge.git
 cd dnsdist-edge
 
-# Jalankan installer (sebagai root)
+# Jalankan installer dari folder setup (sebagai root)
+cd setup
 sudo ./setup-edge.sh --install --url http://central-manager.local:8080/files/trust.db
 ```
 
@@ -42,10 +43,10 @@ Untuk command-finding cepat dan troubleshooting, lihat:
 
 | Dokumentasi | Deskripsi |
 |-------------|-----------|
-| [**SETUP.md**](docs/SETUP.md) | Panduan instalasi lengkap dari awal sampai production |
-| [**QUICK_REFERENCE.md**](docs/QUICK_REFERENCE.md) | Command cheatsheet & troubleshooting tips |
-| [**EDGE-README.md**](docs/EDGE-README.md) | Architecture overview & konsep pemisahan beban Central vs Edge |
-| [**TOPSTATS-README.md**](docs/TOPSTATS-README.md) | Dokumentasi Top Stats module untuk monitoring |
+| [**SETUP.md](docs/SETUP.md)** | Panduan instalasi lengkap dari awal sampai production |
+| [**QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** | Command cheatsheet & troubleshooting tips |
+| [**EDGE-README.md](EDGE-README.md)** | Architecture overview & konsep pemisahan beban Central vs Edge |
+| [**TOPSTATS-README.md](TOPSTATS-README.md)** | Dokumentasi Top Stats module untuk monitoring |
 
 ## 🏗️ Arsitektur Sistem
 
@@ -123,36 +124,39 @@ Untuk command-finding cepat dan troubleshooting, lihat:
 
 | File | Fungsi | Criticality |
 |------|--------|-------------|
-| `setup-edge.sh` | Master installer untuk deployment penuh | 🔴 CRITICAL |
-| `update-blacklist.sh` | Sync otomatis blacklist dari central manager | 🔴 CRITICAL |
-| `build-asn-db.sh` | Compile ASN database dari CSV | 🟡 MODERATE |
+| `setup/setup-edge.sh` | Master installer untuk deployment penuh | 🔴 CRITICAL |
+| `setup/update-blacklist.sh` | Sync otomatis blacklist dari central manager | 🔴 CRITICAL |
+| `scripts/build-asn-db.sh` | Compile ASN database dari CSV | 🟡 MODERATE |
 
 ## 📦 Struktur Folder
 
 ```
 dnsdist-edge/
-├── config/                      # Main configuration files
-│   ├── dnsdist.conf            # DNSDist core config
-│   ├── setup-edge.sh           # Setup/installer script
-│   └── deploy-edge.yml         # Ansible deployment
-├── scripts/                     # Executable scripts & modules
+├── setup/                       # Master installer & sync script
+│   ├── setup-edge.sh           # Main installer script
 │   ├── update-blacklist.sh     # Database sync script
+│   └── dnsdist.conf            # Baseline DNSDist config
+├── config/                      # Additional configuration files
+│   └── deploy-edge.yml         # Ansible deployment playbook
+├── scripts/                     # Executable scripts & modules
 │   ├── build-asn-db.sh         # ASN compiler
-│   └── top-stats.lua           # Statistics tracking module
+│   ├── top-stats.lua           # Statistics tracking module
+│   └── asn-toolkit/            # ASN toolkit bundle
 ├── certs/                       # SSL/TLS certificates
 ├── templates/                   # Jinja2/Ansible templates
+│   └── node.conf.j2
 ├── monitoring/                  # Grafana & Prometheus configs
 │   ├── grafana/provisioning/
 │   └── prometheus/
 ├── tools/                       # Utility scripts
 ├── docs/                        # Documentation
 │   ├── SETUP.md                # Full setup guide
-│   ├── QUICK_REFERENCE.md      # Command cheatsheet
-│   ├── EDGE-README.md          # Edge architecture docs
-│   └── TOPSTATS-README.md      # Top stats module docs
+│   └── QUICK_REFERENCE.md      # Command cheatsheet
+├── EDGE-README.md               # Edge architecture docs
+├── TOPSTATS-README.md           # Top stats module docs
 ├── .gitignore                   # Git exclusion rules
-├── README.md                    # This file
-└── CHANGELOG.md                 # Version history
+├── README.md                    # Main documentation
+```
 ```
 
 ## 🧪 Testing & Validation
