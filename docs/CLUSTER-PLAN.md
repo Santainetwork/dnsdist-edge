@@ -46,9 +46,9 @@ manifest.json         = metadata versi & sumber
 
 ---
 
-## 3. Topologi Pendukung
+## 3. Topologi (KEPUTUSAN: T1 dulu)
 
-### T1. Central + Mirrors (Hub-Spoke) — *start*
+### T1. Central + Mirrors (Hub-Spoke) — *START*
 ```
         Central Manager (build utama)
            │ HTTP
@@ -110,7 +110,7 @@ Panel jadi koordinator:
 ### Komponen baru
 | Komponen | Lokasi | Fungsi |
 |----------|--------|--------|
-| `cdb-publisher` | `tools/` (Go) | HTTP kecil: serve `blacklist.<hash>.db` + `manifest.json` (port 8091) |
+| `cdb-publisher` (embedded) | **di dalam panel** (port 8084) | Serve `blacklist.<hash>.db` + `manifest.json` + `healthz` — bukan binary terpisah |
 | `update-blacklist.sh` v3 | `setup/` | Multi-URL failover + SHA256 verify + symlink swap |
 | `manifest.json` | `/var/lib/dnsdist/manifest.json` | Metadata versi & sumber DB saat ini |
 | `node.conf` ext | `/etc/dnsdist/node.conf` | `SAVED_CDB_SOURCES="central,mirror1,peer-a"` |
@@ -155,8 +155,8 @@ GET /healthz                          → 200 jika sehat, 500 jika DB rusak
 GET /peers.json                       → daftar peer node ini (untuk discovery)
 ```
 
-Dibuat dalam **Go** (satu binary kecil, embed di panel atau berdiri sendiri),
-mirip trust-builder. Tidak perlu nginx tambahan.
+Dibuat **ter-embed di dalam panel** (Go, satu binary), serve di port panel (8084)
+pada route `/cdb/*` — tidak perlu proses/port tambahan.
 
 ---
 
@@ -179,8 +179,11 @@ Halaman baru di panel:
 ## 8. Keamanan
 
 - Publisher hanya serve file yang sudah diverifikasi (whitelist path hash)
-- Akses publisher dibatasi: bind `0.0.0.0:8091` tapi token opsional antar node
-  (`CDB_PEER_TOKEN` di node.conf, dibandingkan header `X-CDB-Token`)
+- Akses publisher embedded di panel (port 8084, bind `127.0.0.1` atau admin network)
+- **Auth antar node:** `X-CDB-Token` (shared secret di `node.conf`), atau **link-by-OTP**:
+  - Panel generate OTP (one-time pairing code)
+  - Node B masukkan OTP → panel beri token + peer URL
+  - OTP expired setelah 5 menit / sekali pakai
 - Verifikasi SHA256 wajib — node tidak pernah pasang DB yang gagal verifikasi
 - Symlink swap atomic (`mv` di direktori yang sama)
 
@@ -192,18 +195,20 @@ Halaman baru di panel:
 |------|-----|----------|
 | **1. Multi-URL failover** | `update-blacklist.sh` v3: daftar sumber + failover (tanpa cluster) | ½ hari |
 | **2. SHA256 + symlink** | Verifikasi hash, simpan `<hash>.db`, swap symlink, `manifest.json` | ½ hari |
-| **3. CDB Publisher** | Go HTTP :8091 serve DB + manifest + healthz | ½ hari |
+| **3. CDB Publisher** | Embed di panel (Go): route `/cdb/*` serve DB + manifest + healthz | ½ hari |
 | **4. Peer & Cluster** | `node.conf` sumber peer, failover antar peer | ½ hari |
 | **5. Panel cluster view** | Node list, hash consensus, trigger sync, peer mgmt | 1 hari |
 
 ---
 
-## 10. Keputusan yang Perlu Diambil
+## 10. Keputusan (FINAL)
 
-1. **Topologi awal:** T1 (central+mirror) dulu, atau langsung T2 (mesh)?
-2. **Kriteria "terbaru":** version integer, atau cukup hash berbeda?
-3. **Publisher:** standalone binary (`tools/cdb-publisher`) atau di-embed ke panel?
-4. **Auth antar node:** token opsional, atau internal network trust saja?
+| Variabel | Keputusan |
+|----------|-----------|
+| **Topologi awal** | T1 (central + mirrors) — hub-spoke dulu |
+| **Kriteria terbaru** | Version integer (standar, ascending) |
+| **Publisher** | Embed di panel (Go, route `/cdb/*`, port 8084) |
+| **Auth antar node** | Token (`X-CDB-Token`) + link-by-OTP (panel generate pairing code 5 menit) |
 
 ---
 
