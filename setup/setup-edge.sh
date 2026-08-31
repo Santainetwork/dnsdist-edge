@@ -65,6 +65,7 @@ show_help() {
     echo "  -f, --force-update    Sama seperti sinkronisasi manual, tetapi melewati cache"
     echo "      --set-upstream    Ubah upstream DNS tanpa install ulang"
     echo "      --set-rpz         Ubah IP Sinkhole RPZ"
+    echo "      --set-cdb-sources   Ubah daftar sumber CDB (central, mirror, peer) dipisah koma"
     echo "  -c, --check-config    Periksa status dan validitas konfigurasi saat ini"
     echo "      --update-config   Perbarui setting Mode, RPZ, dan Upstream secara interaktif"
     echo "      --upgrade         Upgrade script dan config ke versi terbaru (migrasi otomatis)"
@@ -97,6 +98,7 @@ save_config() {
 # Jangan edit manual kecuali Anda tahu apa yang Anda lakukan.
 SAVED_VERSION="$SCRIPT_VERSION"
 SAVED_CENTRAL_DB_URL="$CENTRAL_DB_URL"
+SAVED_CDB_SOURCES="${CDB_SOURCES:-}"
 SAVED_UPSTREAM_DNS="$UPSTREAM_DNS"
 SAVED_BLOCK_MODE="${CHOSEN_MODE:-rpz}"
 SAVED_RPZ_IPS="$RPZ_IPS"
@@ -124,6 +126,7 @@ load_config() {
             # shellcheck source=/dev/null
             source "$CONFIG_SAVE_FILE"
             [ -n "$SAVED_CENTRAL_DB_URL" ] && [ "$URL_EXPLICIT" != true ] && CENTRAL_DB_URL="$SAVED_CENTRAL_DB_URL"
+            [ -n "$SAVED_CDB_SOURCES" ] && CDB_SOURCES="$SAVED_CDB_SOURCES"
             [ -n "$SAVED_UPSTREAM_DNS" ] && UPSTREAM_DNS="$SAVED_UPSTREAM_DNS"
             [ -n "$SAVED_BLOCK_MODE" ] && CHOSEN_MODE="$SAVED_BLOCK_MODE"
             [ -n "$SAVED_RPZ_IPS" ] && RPZ_IPS="$SAVED_RPZ_IPS"
@@ -145,6 +148,7 @@ load_config_silent() {
         # shellcheck source=/dev/null
         source "$CONFIG_SAVE_FILE"
         [ -n "$SAVED_CENTRAL_DB_URL" ] && CENTRAL_DB_URL="$SAVED_CENTRAL_DB_URL"
+        [ -n "$SAVED_CDB_SOURCES" ] && CDB_SOURCES="$SAVED_CDB_SOURCES"
         [ -n "$SAVED_UPSTREAM_DNS" ] && UPSTREAM_DNS="$SAVED_UPSTREAM_DNS"
         [ -n "$SAVED_BLOCK_MODE" ] && CHOSEN_MODE="$SAVED_BLOCK_MODE"
         [ -n "$SAVED_RPZ_IPS" ] && RPZ_IPS="$SAVED_RPZ_IPS"
@@ -623,6 +627,23 @@ EOF
     fi
 }
 
+do_set_cdb_sources() {
+    if [ -z "$CDB_SOURCES" ]; then
+        echo -e "${RED}[!] Harap berikan daftar URL dipisah koma, misal: --set-cdb-sources "http://central/trust.db,http://mirror/trust.db,http://peer:8084/cdb/blacklist.db"${NC}"
+        exit 1
+    fi
+    echo -e "${CYAN}[*] Mengatur daftar sumber CDB...${NC}"
+    echo "[*] Sumber: $CDB_SOURCES"
+    # Update/append SAVED_CDB_SOURCES di node.conf
+    if grep -q "^SAVED_CDB_SOURCES=" "$CONFIG_SAVE_FILE" 2>/dev/null; then
+        sed -i "s|^SAVED_CDB_SOURCES=.*|SAVED_CDB_SOURCES=\"$CDB_SOURCES\"|" "$CONFIG_SAVE_FILE"
+    else
+        echo "SAVED_CDB_SOURCES=\"$CDB_SOURCES\"" >> "$CONFIG_SAVE_FILE"
+    fi
+    save_config
+    echo -e "${GREEN}[✓] Sumber CDB disimpan. Jalankan sinkronisasi: update-blacklist.sh --force-update${NC}"
+}
+
 do_install() {
     echo -e "\n${CYAN}=== [1/5] Instalasi DNSDist (Debian/Ubuntu) ===${NC}"
     apt-get update
@@ -886,6 +907,15 @@ while [ "$#" -gt 0 ]; do
             UPSTREAM_DNS=$(echo "$UPSTREAM_DNS" | sed 's/,[[:space:]]*$//;s/,$//')
             SET_UPSTREAM=true
             ;;
+        --set-cdb-sources)
+            if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                echo -e "${RED}[!] Argumen --set-cdb-sources membutuhkan daftar URL dipisah koma.${NC}"
+                exit 1
+            fi
+            CDB_SOURCES="$2"
+            SET_CDB_SOURCES=true
+            shift
+            ;;
         --set-rpz)
             if [ -z "$2" ] || [[ "$2" == -* ]]; then
                 echo -e "${RED}[!] Argumen --set-rpz membutuhkan daftar IP.${NC}"
@@ -992,6 +1022,10 @@ fi
 
 if [ "$SET_RPZ" = true ]; then
     do_set_rpz
+fi
+
+if [ "$SET_CDB_SOURCES" = true ]; then
+    do_set_cdb_sources
 fi
 
 if [ "$SET_CERT" = true ]; then

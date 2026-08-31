@@ -7,6 +7,10 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ## [Unreleased]
 
+### Added
+- `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
+- `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
+
 ### Changed
 - `update-blacklist.sh` v3.1.0: multi-URL failover + content-addressed storage (`blacklist.<sha>.db` + symlink swap) + manifest sidecar (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
 - `setup/` dibuat **self-contained**: cukup 3 file inti (`setup-edge.sh`, `dnsdist.conf`, `update-blacklist.sh`) untuk deploy node
@@ -21,6 +25,10 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - `tools/dnsdist-health.sh`: health check node (service, config, DB, resolusi, port)
 - GitHub Actions CI (`.github/workflows/ci.yml`): shellcheck, yamllint, smoke test CDB
 - `SECURITY.md`: kebijakan keamanan & panduan pelaporan kerentanan
+
+### Added
+- `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
+- `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
 
 ### Changed
 - `update-blacklist.sh` v3.1.0: multi-URL failover + content-addressed storage (`blacklist.<sha>.db` + symlink swap) + manifest sidecar (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
@@ -39,6 +47,10 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   saat `setup-edge.sh` dijalankan dari folder `setup/`
 - `templates/node.conf.j2` diperluas: `SAVED_CERT_MODE`, password/API key webserver opsional,
   dan `SAVED_INSTALL_DATE` via Ansible
+
+### Added
+- `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
+- `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
 
 ### Changed
 - `update-blacklist.sh` v3.1.0: multi-URL failover + content-addressed storage (`blacklist.<sha>.db` + symlink swap) + manifest sidecar (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
