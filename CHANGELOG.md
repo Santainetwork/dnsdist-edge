@@ -8,6 +8,7 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 ## [Unreleased]
 
 ### Added
+- `setup-edge.sh` v2.3.0: flag `--with-panel` (auto-install DNSDist Panel dari GitHub release + systemd unit)
 - `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
 - `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
 
@@ -27,6 +28,7 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - `SECURITY.md`: kebijakan keamanan & panduan pelaporan kerentanan
 
 ### Added
+- `setup-edge.sh` v2.3.0: flag `--with-panel` (auto-install DNSDist Panel dari GitHub release + systemd unit)
 - `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
 - `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
 
@@ -49,6 +51,7 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   dan `SAVED_INSTALL_DATE` via Ansible
 
 ### Added
+- `setup-edge.sh` v2.3.0: flag `--with-panel` (auto-install DNSDist Panel dari GitHub release + systemd unit)
 - `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
 - `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
 

@@ -1,14 +1,14 @@
 #!/bin/bash
 # ============================================================
 # DNSDist Edge Node - Auto Setup Script (Native OS)
-# Versi: 2.2.0
+# Versi: 2.3.0
 # Terinspirasi dari proyek Trust-NG
 # ============================================================
 
 set -e
 
 # --- Versi Script ---
-SCRIPT_VERSION="2.2.0"
+SCRIPT_VERSION="2.3.0"
 
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---
 CONF_DIR="/etc/dnsdist"
@@ -23,6 +23,8 @@ UPSTREAMS_CONF="${CONF_DIR}/upstreams.conf"
 # --- Default Variabel ---
 EDGE_DIR=$(pwd)
 CENTRAL_DB_URL="http://central-manager.local/blacklist.db"
+PANEL_RELEASE_URL="${PANEL_RELEASE_URL:-https://github.com/Santainetwork/dnsdist-panel/releases/latest/download/dnsdist-panel}"
+WITH_PANEL=${WITH_PANEL:-false}
 WEBSERVER_PASSWORD="trust-ng-admin"
 WEBSERVER_APIKEY="trust-ng-apikey-changeme"
 
@@ -66,6 +68,7 @@ show_help() {
     echo "      --set-upstream    Ubah upstream DNS tanpa install ulang"
     echo "      --set-rpz         Ubah IP Sinkhole RPZ"
     echo "      --set-cdb-sources   Ubah daftar sumber CDB (central, mirror, peer) dipisah koma"
+    echo "      --with-panel        Install DNSDist Panel (download binary release + systemd)"
     echo "  -c, --check-config    Periksa status dan validitas konfigurasi saat ini"
     echo "      --update-config   Perbarui setting Mode, RPZ, dan Upstream secara interaktif"
     echo "      --upgrade         Upgrade script dan config ke versi terbaru (migrasi otomatis)"
@@ -644,6 +647,52 @@ do_set_cdb_sources() {
     echo -e "${GREEN}[✓] Sumber CDB disimpan. Jalankan sinkronisasi: update-blacklist.sh --force-update${NC}"
 }
 
+do_install_panel() {
+    echo -e "\n${CYAN}=== [6/6] DNSDist Panel (Opsional) ===${NC}"
+    local panel_bin="/usr/local/bin/dnsdist-panel"
+    if [ "$WITH_PANEL" != "true" ]; then
+        echo -e "  ${YELLOW}[i] Panel dilewati (pakai --with-panel untuk mengaktifkan)${NC}"
+        return
+    fi
+    echo "[*] Mengunduh panel binary dari: $PANEL_RELEASE_URL"
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsSL --connect-timeout 15 -o "$panel_bin" "$PANEL_RELEASE_URL"; then
+            chmod 0755 "$panel_bin"
+            # Install systemd unit (baris Environment dari template)
+            cat > /etc/systemd/system/dnsdist-panel.service <<UNIT
+[Unit]
+Description=DNSDist Management Panel
+Wants=dnsdist.service
+After=network.target dnsdist.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/dnsdist-panel
+Restart=on-failure
+RestartSec=3
+Environment=PANEL_ADDR=127.0.0.1:8084
+Environment=PANEL_DB=/var/lib/dnsdist/panel.db
+Environment=PANEL_USER=admin
+Environment=PANEL_PASS=${WEBSERVER_PASSWORD}
+Environment=DNSDIST_APIKEY=${WEBSERVER_APIKEY}
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+            systemctl daemon-reload
+            systemctl enable dnsdist-panel >/dev/null 2>&1
+            systemctl restart dnsdist-panel || true
+            echo -e "  ${GREEN}[✓] Panel terinstall & aktif: http://127.0.0.1:8084${NC}"
+            echo -e "       Login: admin / ${WEBSERVER_PASSWORD}"
+        else
+            echo -e "  ${YELLOW}[!] Gagal mengunduh panel binary. Panel dilewati.${NC}"
+        fi
+    else
+        echo -e "  ${YELLOW}[!] curl tidak tersedia. Panel dilewati.${NC}"
+    fi
+}
+
 do_install() {
     echo -e "\n${CYAN}=== [1/5] Instalasi DNSDist (Debian/Ubuntu) ===${NC}"
     apt-get update
@@ -907,6 +956,9 @@ while [ "$#" -gt 0 ]; do
             UPSTREAM_DNS=$(echo "$UPSTREAM_DNS" | sed 's/,[[:space:]]*$//;s/,$//')
             SET_UPSTREAM=true
             ;;
+        --with-panel)
+            WITH_PANEL=true
+            ;;
         --set-cdb-sources)
             if [ -z "$2" ] || [[ "$2" == -* ]]; then
                 echo -e "${RED}[!] Argumen --set-cdb-sources membutuhkan daftar URL dipisah koma.${NC}"
@@ -1003,6 +1055,7 @@ fi
 
 if [ "$INSTALL" = true ]; then
     do_install
+    do_install_panel
     exit 0
 fi
 
