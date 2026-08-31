@@ -17,13 +17,13 @@ jobs:
 
       - name: Shellcheck (semua script .sh)
         run: |
-          shellcheck setup/*.sh scripts/*.sh scripts/asn-toolkit/*.sh tools/*.sh 2>/dev/null || \
+          shellcheck setup/*.sh tools/*.sh 2>/dev/null || \
           shellcheck $(find . -name '*.sh' -not -path './.git/*') || true
 
       - name: YAML lint (playbook & monitoring)
         run: |
           yamllint -d "{extends: relaxed, rules: {line-length: disable}}" \
-            config/deploy-edge.yml \
+            setup/deploy-edge.yml \
             monitoring/prometheus/prometheus.yml \
             monitoring/grafana/provisioning/datasources/prometheus.yml \
             monitoring/grafana/provisioning/dashboards/dashboards.yml || true

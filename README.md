@@ -127,41 +127,49 @@ Untuk command-finding cepat dan troubleshooting, lihat:
 |------|--------|-------------|
 | `setup/setup-edge.sh` | Master installer untuk deployment penuh | 🔴 CRITICAL |
 | `setup/update-blacklist.sh` | Sync otomatis blacklist dari central manager | 🔴 CRITICAL |
-| `scripts/build-asn-db.sh` | Compile ASN database dari CSV | 🟡 MODERATE |
+| `addons/build-asn-db.sh` | Compile ASN database dari CSV (opsional) | 🟡 MODERATE |
 
 ## 📦 Struktur Folder
 
 ```
 dnsdist-edge/
-├── setup/                       # Master installer & sync script
+├── setup/                       # ✅ CORE — cukup ini untuk deploy node
 │   ├── setup-edge.sh           # Main installer script
 │   ├── update-blacklist.sh     # Database sync script
-│   └── dnsdist.conf            # Baseline DNSDist config
-├── config/                      # Additional configuration files
-│   └── deploy-edge.yml         # Ansible deployment playbook
-├── scripts/                     # Executable scripts & modules
-│   ├── build-asn-db.sh         # ASN compiler
+│   ├── dnsdist.conf            # Baseline DNSDist config
+│   ├── deploy-edge.yml         # Ansible deployment playbook (opsional)
+│   └── templates/
+│       └── node.conf.j2        # Ansible pre-seed template
+├── addons/                      # ⭐ OPSIONAL — modul tambahan
 │   ├── top-stats.lua           # Statistics tracking module
-│   └── asn-toolkit/            # ASN toolkit bundle
+│   ├── build-asn-db.sh         # ASN compiler
+│   └── asn-toolkit/            # ASN database data (ipinfo, dnsdist.conf)
 ├── certs/                       # SSL/TLS certificates
-├── templates/                   # Jinja2/Ansible templates
-│   └── node.conf.j2
 ├── monitoring/                  # Grafana & Prometheus configs
 │   ├── grafana/provisioning/
 │   └── prometheus/
 ├── tools/                       # Utility scripts
-│   ├── gen-cdb.py           # CDB generator (wire-format)
-│   └── dnsdist-health.sh    # Health check node
+│   ├── gen-cdb.py              # CDB generator (wire-format)
+│   └── dnsdist-health.sh       # Health check node
 ├── docs/                        # Documentation
 │   ├── SETUP.md                # Full setup guide
 │   ├── SETUP-EDGE-COMMANDS.md  # CLI command guide for setup-edge.sh
 │   └── QUICK_REFERENCE.md      # Command cheatsheet
 ├── EDGE-README.md               # Edge architecture docs
 ├── TOPSTATS-README.md           # Top stats module docs
+├── .github/workflows/ci.yml     # GitHub Actions CI
+├── SECURITY.md                  # Security policy
+├── LICENSE                      # MIT license
+├── CHANGELOG.md                 # Version history
 ├── .gitignore                   # Git exclusion rules
-├── README.md                    # Main documentation
+└── README.md                    # Main documentation
 ```
-```
+
+> **💡 Catatan:** Folder `setup/` sudah **self-contained**. Cukup salin 3 file
+> inti (`setup-edge.sh`, `dnsdist.conf`, `update-blacklist.sh`) ke server,
+> jalankan `./setup-edge.sh --install`, dan node siap beroperasi.
+> Modul `addons/` (top-stats, ASN) hanya diinstal jika ada di lokasi yang
+> terdeteksi, jadi client tetap butuh file seminimal mungkin.
 
 ## 🧪 Testing & Validation
 

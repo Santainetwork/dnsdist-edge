@@ -35,7 +35,7 @@
 
     - name: Copy dnsdist-edge repo to remote node
       copy:
-        src: "{{ playbook_dir }}/../"
+        src: "{{ playbook_dir }}/"
         dest: "{{ remote_install_dir }}/"
         mode: '0755'
 
@@ -47,11 +47,11 @@
 
     - name: Pre-seed node.conf using Jinja2 template to bypass interactive prompts
       template:
-        src: "{{ playbook_dir }}/../templates/node.conf.j2"
+        src: "{{ playbook_dir }}/templates/node.conf.j2"
         dest: "/etc/dnsdist/node.conf"
         mode: '0644'
 
-    - name: Run setup-edge.sh installer from setup/ folder
+    - name: Run setup-edge.sh installer
       shell: |
         # Using 'yes ""' pipes an empty string (Enter) to any read commands
         # This auto-accepts the "Gunakan konfigurasi yang tersimpan ini? (Y/n)" prompt
@@ -61,7 +61,7 @@
           {% if webserver_password %}--password "{{ webserver_password }}"{% endif %} \
           {% if webserver_apikey %}--apikey "{{ webserver_apikey }}"{% endif %}
       args:
-        chdir: "{{ remote_install_dir }}/setup"
+        chdir: "{{ remote_install_dir }}"
         executable: /bin/bash
       register: setup_output
       changed_when: true

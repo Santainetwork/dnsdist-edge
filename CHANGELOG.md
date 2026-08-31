@@ -7,6 +7,12 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ## [Unreleased]
 
+### Changed
+- `setup/` dibuat **self-contained**: cukup 3 file inti (`setup-edge.sh`, `dnsdist.conf`, `update-blacklist.sh`) untuk deploy node
+- Modul opsional (top-stats, build-asn-db, asn-toolkit) dipindah ke `addons/`
+- `setup-edge.sh` mendeteksi addon di `addons/`; jika tidak ada, lewati (client butuh file seminimal mungkin)
+- `deploy-edge.yml` & `templates/node.conf.j2` ikut di dalam `setup/`
+
 ## [2.1.0] - 2026-08-31
 
 ### Added
