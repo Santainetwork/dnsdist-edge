@@ -53,34 +53,40 @@ Status: **PLAN — belum implementasi.**
 
 ---
 
-## 3. Pilihan Stack (berikan keputusan)
+## 3. Pilihan Stack (keputusan final)
 
-### A. Go Web Framework
-| Opsi | Kelebihan | Kekurangan |
-|------|-----------|------------|
-| **A1. Stdlib `net/http`** (Go 1.22+ punya method routing) | 0 dependency, paling ringan | Routing manual, middleware manual |
-| **A2. `chi`** (rekomendasi) | Ringan, idiomatic, middleware jalan | Tambah 1 dep |
-| **A3. `gin`** | Populer, banyak contoh, JSON helper | Lebih berat, opinated |
-| **A4. `fiber`** | Express-like, cepat | Non-stdlib ecosystem |
+| Komponen | Pilihan |
+|----------|---------|
+| **Backend** | **Gin** (`gin-gonic/gin`) |
+| **Frontend** | **Vite + React SPA** + Tailwind + **shadcn/ui** |
+| **Storage** | **SQLite** (`modernc.org/sqlite`, pure-Go tanpa cgo) |
+| **Deploy** | **Single binary** (go:embed frontend → systemd) |
 
-### B. Frontend Routing & Build
-| Opsi | Deskripsi |
-|------|-----------|
-| **B1. Vite + React SPA** (rekomendasi) | Build static → `go:embed` → single binary |
-| **B2. Vite + React + TanStack Router** | Butuh routing kompleks (multi-role) |
-| **B3. React + shadcn tanpa router** | Cukup kalau panel sederhana (tab-based) |
+### Integrasi Gen CDB — REUSE `trust-builder` yang sudah ada
 
-### C. Penyimpanan Domain (Mode B)
-| Opsi | Deskripsi |
-|------|-----------|
-| **C1. SQLite** (`modernc.org/sqlite`, pure-Go tanpa cgo) | Query mudah, riwayat import, dedup otomatis |
-| **C2. Plain file** (`domains.txt`) | Paling sederhana, gen-cdb tinggal baca baris |
+> Lokasi: `tools/trust-builder/` (di-copy dari `../dnsdist-manager/golang/`,
+> sudah production-tested). Build via `tools/trust-builder/build.sh`.
 
-### D. Deploy
-| Opsi | Deskripsi |
-|------|-----------|
-| **D1. Single binary + systemd** (rekomendasi) | 1 file, `dnsdist-panel.service`, port 8084 |
-| **D2. Docker** | Kontras dengan filosofi repo (native OS) |
+Panel **tidak menulis ulang** gen CDB. Cukup jalankan binary `trust-builder`
+via executor (seperti memanggil `update-blacklist.sh`):
+
+```
+panel (executor) ──exec──▶ trust-builder -u "URL1,URL2" -w whitelist.txt -o blacklist.db
+                              │
+                              ▼
+                    /var/lib/dnsdist/blacklist.db  (atomic replace)
+                              │
+                              ▼
+              dnsdist hot-reload otomatis (CDB KV store reload 5 detik)
+```
+
+Kelebihan yang otomatis didapat dari `trust-builder`:
+- Download multi-part (8 koneksi) + ETag/Last-Modified cache
+- Streaming ke disk (hemat RAM, untuk jutaan domain)
+- Atomic replace (file hanya diganti bila build sukses)
+- Whitelist exclusion + wire-format key (via `miekg/dns`)
+
+**Fallback:** `tools/gen-cdb.py` (repo ini) tetap dipakai untuk list kecil/manual.
 
 ---
 

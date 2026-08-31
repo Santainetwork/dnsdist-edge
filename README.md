@@ -150,7 +150,8 @@ dnsdist-edge/
 │   ├── grafana/provisioning/
 │   └── prometheus/
 ├── tools/                       # Utility scripts
-│   ├── gen-cdb.py              # CDB generator (wire-format)
+│   ├── trust-builder/           # CDB generator Go (multi-part + ETag cache)
+│   ├── gen-cdb.py              # CDB generator (wire-format, list kecil)
 │   └── dnsdist-health.sh       # Health check node
 ├── docs/                        # Documentation
 │   ├── SETUP.md                # Full setup guide

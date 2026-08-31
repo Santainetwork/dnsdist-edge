@@ -40,3 +40,4 @@ site.yml.swp
 # Build artifacts
 scripts/asn-db.bin
 *.csv
+tools/trust-builder/trust-builder
