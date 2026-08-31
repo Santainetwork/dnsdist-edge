@@ -1,10 +1,10 @@
 #!/bin/bash
 # ============================================================
-# DNSDist Edge Node - DB Sync Script (v3.0.0)
+# DNSDist Edge Node - DB Sync Script (v3.1.0)
 # Konsep: Edge hanya menerima file blacklist.db (pre-compiled)
 # Fitur baru: Multi-URL failover (central + mirror + peer)
 # ============================================================
-SCRIPT_VERSION="3.0.0"
+SCRIPT_VERSION="3.1.0"
 
 # --- Konfigurasi Default ---
 DB_DIR="${DB_DIR:-/var/lib/dnsdist}"
@@ -161,19 +161,29 @@ EOF
 
 # --- Proses hasil ---
 if [ "$success" = "1" ] && [ -f "$TMP_FILE" ]; then
-    echo "[+] Database baru berhasil diunduh dari $success_url"
-    sync_msg="Database baru berhasil diunduh dan dipasang dari $success_url"
-    status_color="success"
-    http_code="200"
-    mv "$TMP_FILE" "$DB_FILE"
-    chown "${DNSDIST_USER}:${DNSDIST_USER}" "$DB_FILE" 2>/dev/null || true
+    # Fase 2: content-addressed — simpan sebagai blacklist.<sha>.db + symlink
+    sha=$(sha256sum "$TMP_FILE" | awk '{print $1}')
+    hashed_file="${DB_DIR}/blacklist.${sha}.db"
 
-    # Manifest sidecar (untuk cluster/panel Fase 2)
-    sha=$(sha256sum "$DB_FILE" | awk '{print $1}')
+    # File identik sudah ada? (re-sync): hanya update symlink, tidak perlu copy
+    if [ -f "$hashed_file" ]; then
+        echo "[=] Konten identik sudah ada ($hashed_file). Swap symlink saja."
+    else
+        mv "$TMP_FILE" "$hashed_file"
+        chown "${DNSDIST_USER}:${DNSDIST_USER}" "$hashed_file" 2>/dev/null || true
+    fi
+
+    # Atomic symlink swap: blacklist.db -> blacklist.<sha>.db
+    ln -sfn "$(basename "$hashed_file")" "${DB_FILE}.tmp-link"
+    mv "${DB_FILE}.tmp-link" "$DB_FILE"
+    chown -h "${DNSDIST_USER}:${DNSDIST_USER}" "$DB_FILE" 2>/dev/null || true
+
+    # Manifest sidecar (version = number of distinct DBs)
+    version=$(ls "${DB_DIR}"/blacklist.*.db 2>/dev/null | wc -l)
     built_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     cat > "${DB_FILE}.manifest.json" <<EOF
 {
-  "version": 1,
+  "version": ${version:-1},
   "sha256": "$sha",
   "source": "$success_url",
   "built_at": "$built_at"

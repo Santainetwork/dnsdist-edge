@@ -194,7 +194,7 @@ Halaman baru di panel:
 | Fase | Isi | Estimasi |
 |------|-----|----------|
 | **1. Multi-URL failover** ✅ Selesai | `update-blacklist.sh` v3.0.0: multi-source failover + manifest sidecar (tested) | ✅ |
-| **2. SHA256 + symlink** | Verifikasi hash, simpan `<hash>.db`, swap symlink, `manifest.json` | ½ hari |
+| **2. SHA256 + symlink** ✅ Selesai | `blacklist.<sha>.db` + symlink swap + manifest (v3.1.0, tested) | ✅ |
 | **3. CDB Publisher** | Embed di panel (Go): route `/cdb/*` serve DB + manifest + healthz | ½ hari |
 | **4. Peer & Cluster** | `node.conf` sumber peer, failover antar peer | ½ hari |
 | **5. Panel cluster view** | Node list, hash consensus, trigger sync, peer mgmt | 1 hari |
