@@ -35,6 +35,9 @@ sudo ./setup-edge.sh --install --url http://central-manager.local:8080/files/tru
 
 # Set password web console
 sudo ./setup-edge.sh --install --password mypassword --apikey myapikey
+
+# Install + aktifkan DNSDist Panel (download binary dari GitHub release)
+sudo ./setup-edge.sh --install --with-panel
 ```
 
 ## 📝 Konfigurasi Manual
