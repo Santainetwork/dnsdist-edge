@@ -196,8 +196,8 @@ Halaman baru di panel:
 | **1. Multi-URL failover** ✅ Selesai | `update-blacklist.sh` v3.0.0: multi-source failover + manifest sidecar (tested) | ✅ |
 | **2. SHA256 + symlink** ✅ Selesai | `blacklist.<sha>.db` + symlink swap + manifest (v3.1.0, tested) | ✅ |
 | **3. CDB Publisher** ✅ Selesai | Panel route `/cdb/*` + `X-CDB-Token` (panel repo v0.2.0, tested) | ✅ |
-| **4. Peer & Cluster** 🔄 In progress | `node.conf` `SAVED_CDB_SOURCES` sudah didukung v3.1.0; tinggal dokumentasi + panel peers | ½ hari |
-| **5. Panel cluster view** | Node list, hash consensus, trigger sync, peer mgmt | 1 hari |
+| **4. Peer & Cluster** ✅ Selesai | `--set-cdb-sources` (setup-edge v2.2.0) + `SAVED_CDB_SOURCES` (update-blacklist v3.1.0) | ✅ |
+| **5. Panel cluster view** ✅ Selesai | `/api/cluster/*` + halaman Cluster (panel v0.3.0, tested) | ✅ |
 
 ---
 
