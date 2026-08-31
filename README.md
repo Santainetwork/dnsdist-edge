@@ -45,6 +45,7 @@ Untuk command-finding cepat dan troubleshooting, lihat:
 |-------------|-----------|
 | [**SETUP.md**](docs/SETUP.md) | Panduan instalasi lengkap dari awal sampai production |
 | [**SETUP-EDGE-COMMANDS.md**](docs/SETUP-EDGE-COMMANDS.md) | Panduan lengkap CLI `setup-edge.sh` & 17 daftar command |
+| [**PANEL-PLAN.md**](docs/PANEL-PLAN.md) | Rencana management panel web (mode central download + local CDB gen) |
 | [**QUICK_REFERENCE.md**](docs/QUICK_REFERENCE.md) | Command cheatsheet & troubleshooting tips |
 | [**EDGE-README.md**](EDGE-README.md) | Architecture overview & konsep pemisahan beban Central vs Edge |
 | [**TOPSTATS-README.md**](TOPSTATS-README.md) | Dokumentasi Top Stats module untuk monitoring |
