@@ -1,10 +1,10 @@
 #!/bin/bash
 # ============================================================
 # DNSDist Edge Node - DB Sync Script
-# Versi: 2.0.0
+# Versi: 2.1.0
 # Konsep: Edge hanya menerima file blacklist.db (pre-compiled)
 # ============================================================
-SCRIPT_VERSION="2.0.0"
+SCRIPT_VERSION="2.1.0"
 
 # --- Konfigurasi Default (Bisa di-override oleh setup-edge.sh) ---
 # Path standar produksi — tidak perlu sed lagi

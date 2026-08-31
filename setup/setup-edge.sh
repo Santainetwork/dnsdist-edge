@@ -1,14 +1,14 @@
 #!/bin/bash
 # ============================================================
 # DNSDist Edge Node - Auto Setup Script (Native OS)
-# Versi: 2.0.0
+# Versi: 2.1.0
 # Terinspirasi dari proyek Trust-NG
 # ============================================================
 
 set -e
 
 # --- Versi Script ---
-SCRIPT_VERSION="2.0.0"
+SCRIPT_VERSION="2.1.0"
 
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---
 CONF_DIR="/etc/dnsdist"
@@ -705,15 +705,15 @@ do_install() {
     chown -R "${DNSDIST_USER}:${DNSDIST_USER}" "$CONF_DIR"
     [ -f "$CERTS_DIR/server.key" ] && chmod 600 "$CERTS_DIR/server.key" || true
     
-    # Resolve path file top-stats.lua dan build-asn-db.sh jika dijalankan dari subfolder setup/
-    local top_stats_src="$EDGE_DIR/top-stats.lua"
-    [ ! -f "$top_stats_src" ] && [ -f "$EDGE_DIR/../scripts/top-stats.lua" ] && top_stats_src="$EDGE_DIR/../scripts/top-stats.lua"
+    # Resolve path file top-stats.lua dan build-asn-db.sh di scripts/
+    local top_stats_src="$EDGE_DIR/../scripts/top-stats.lua"
+    [ ! -f "$top_stats_src" ] && top_stats_src="$EDGE_DIR/top-stats.lua"
 
-    local build_asn_src="$EDGE_DIR/build-asn-db.sh"
-    [ ! -f "$build_asn_src" ] && [ -f "$EDGE_DIR/../scripts/build-asn-db.sh" ] && build_asn_src="$EDGE_DIR/../scripts/build-asn-db.sh"
+    local build_asn_src="$EDGE_DIR/../scripts/build-asn-db.sh"
+    [ ! -f "$build_asn_src" ] && build_asn_src="$EDGE_DIR/build-asn-db.sh"
 
-    local ipinfo_src="$EDGE_DIR/ipinfo_lite.csv"
-    [ ! -f "$ipinfo_src" ] && [ -f "$EDGE_DIR/../scripts/asn-toolkit/ipinfo_lite.csv" ] && ipinfo_src="$EDGE_DIR/../scripts/asn-toolkit/ipinfo_lite.csv"
+    local ipinfo_src="$EDGE_DIR/../scripts/asn-toolkit/ipinfo_lite.csv"
+    [ ! -f "$ipinfo_src" ] && ipinfo_src="$EDGE_DIR/ipinfo_lite.csv"
 
     echo -e "\n${CYAN}=== [2.5/5] Top Stats Module (Top Queries, Top Clients, Top ASN) ===${NC}"
     if [ -f "$top_stats_src" ]; then

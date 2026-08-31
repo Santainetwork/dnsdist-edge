@@ -7,6 +7,19 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-31
+
+### Added
+- `tools/gen-cdb.py`: generator CDB wire-format (dipakai docs, sebelumnya tidak ada)
+- `tools/dnsdist-health.sh`: health check node (service, config, DB, resolusi, port)
+- GitHub Actions CI (`.github/workflows/ci.yml`): shellcheck, yamllint, smoke test CDB
+- `SECURITY.md`: kebijakan keamanan & panduan pelaporan kerentanan
+
+### Changed
+- Dedupe: `scripts/asn-toolkit/` hanya menyimpan data (`ipinfo_lite.csv`, `asn-db.bin`, `dnsdist.conf`); source script tunggal di `scripts/`
+- Path resolver di `setup-edge.sh` diarahkan ke `../scripts/` (single source of truth)
+- Versi script `setup-edge.sh` & `update-blacklist.sh` -> 2.1.0
+
 ## [2.0.0] - 2026-08-31
 
 ### Added

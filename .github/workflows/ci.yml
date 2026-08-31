@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint & validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install linters
+        run: sudo apt-get update && sudo apt-get install -y shellcheck yamllint
+
+      - name: Shellcheck (semua script .sh)
+        run: |
+          shellcheck setup/*.sh scripts/*.sh scripts/asn-toolkit/*.sh tools/*.sh 2>/dev/null || \
+          shellcheck $(find . -name '*.sh' -not -path './.git/*') || true
+
+      - name: YAML lint (playbook & monitoring)
+        run: |
+          yamllint -d "{extends: relaxed, rules: {line-length: disable}}" \
+            config/deploy-edge.yml \
+            monitoring/prometheus/prometheus.yml \
+            monitoring/grafana/provisioning/datasources/prometheus.yml \
+            monitoring/grafana/provisioning/dashboards/dashboards.yml || true
+
+      - name: Python syntax check
+        run: python3 -m py_compile tools/gen-cdb.py
+
+  test-gen-cdb:
+    name: Smoke test gen-cdb.py
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate & verify CDB
+        run: |
+          python3 tools/gen-cdb.py /tmp/blacklist.db evil.com blocked.domain. example.com
+          python3 - <<'EOF'
+          import struct
+          data = open('/tmp/blacklist.db','rb').read()
+          assert len(data) >= 2048
+          for i in range(256):
+              pos, ln = struct.unpack('<II', data[i*8:i*8+8])
+              assert pos <= len(data) and ln % 4 == 0
+          def chash(b):
+              h = 5381
+              for c in b: h = ((h + (h << 5)) & 0xFFFFFFFF) ^ c
+              return h & 0xFFFFFFFF
+          for name in [b'evil.com.', b'blocked.domain.', b'example.com.']:
+              h = chash(name); slot = (h >> 8) & 0xFF
+              pos, ln = struct.unpack('<II', data[slot*8:slot*8+8])
+              hit = False
+              for off in range(pos, pos+ln, 8):
+                  th, tpos = struct.unpack('<II', data[off:off+8])
+                  if th != h: continue
+                  klen, _ = struct.unpack('<II', data[tpos:tpos+8])
+                  if data[tpos+8:tpos+8+klen] == name: hit = True; break
+              assert hit, f"lookup gagal: {name}"
+          print("CDB smoke test PASS")
+          EOF
