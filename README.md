@@ -43,10 +43,11 @@ Untuk command-finding cepat dan troubleshooting, lihat:
 
 | Dokumentasi | Deskripsi |
 |-------------|-----------|
-| [**SETUP.md](docs/SETUP.md)** | Panduan instalasi lengkap dari awal sampai production |
-| [**QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** | Command cheatsheet & troubleshooting tips |
-| [**EDGE-README.md](EDGE-README.md)** | Architecture overview & konsep pemisahan beban Central vs Edge |
-| [**TOPSTATS-README.md](TOPSTATS-README.md)** | Dokumentasi Top Stats module untuk monitoring |
+| [**SETUP.md**](docs/SETUP.md) | Panduan instalasi lengkap dari awal sampai production |
+| [**SETUP-EDGE-COMMANDS.md**](docs/SETUP-EDGE-COMMANDS.md) | Panduan lengkap CLI `setup-edge.sh` & 17 daftar command |
+| [**QUICK_REFERENCE.md**](docs/QUICK_REFERENCE.md) | Command cheatsheet & troubleshooting tips |
+| [**EDGE-README.md**](EDGE-README.md) | Architecture overview & konsep pemisahan beban Central vs Edge |
+| [**TOPSTATS-README.md**](TOPSTATS-README.md) | Dokumentasi Top Stats module untuk monitoring |
 
 ## 🏗️ Arsitektur Sistem
 
@@ -151,6 +152,7 @@ dnsdist-edge/
 ├── tools/                       # Utility scripts
 ├── docs/                        # Documentation
 │   ├── SETUP.md                # Full setup guide
+│   ├── SETUP-EDGE-COMMANDS.md  # CLI command guide for setup-edge.sh
 │   └── QUICK_REFERENCE.md      # Command cheatsheet
 ├── EDGE-README.md               # Edge architecture docs
 ├── TOPSTATS-README.md           # Top stats module docs
