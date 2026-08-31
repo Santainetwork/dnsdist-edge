@@ -27,10 +27,10 @@ Status: **PLAN — belum implementasi.**
 ┌──────────────────────────────────────────────────────────────┐
 │                        PANEL (port 8084)                     │
 │                                                              │
-│  Frontend: index.html + JS (tanpa build step, Tailwind CDN)  │
-│       │ REST API (FastAPI/Flask, auth token)                 │
+│  Frontend: React SPA + Tailwind + shadcn/ui                  │
+│       │ REST API (Go)                                        │
 │       ▼                                                      │
-│  Backend: panel/app.py                                       │
+│  Backend: Go (single binary)                                 │
 │    ├─ orkestrasi: update-blacklist.sh (Mode A)               │
 │    ├─ orkestrasi: gen-cdb.py (Mode B)                        │
 │    ├─ baca status dnsdist (API :8083 /api/v1/*)              │
@@ -38,8 +38,8 @@ Status: **PLAN — belum implementasi.**
 │    └─ control service (reload/restart via systemctl)         │
 │                                                              │
 │  Storage: /etc/dnsdist/panel/                                │
-│    ├─ domains.txt        (daftar domain Mode B)              │
-│    └─ source.conf        (mode aktif + URL central)          │
+│    ├─ domains.txt / panel.db   (daftar domain Mode B)        │
+│    └─ source.conf              (mode aktif + URL central)    │
 └──────────────────────────────────────────────────────────────┘
         │                      │                    │
         ▼                      ▼                    ▼
@@ -47,14 +47,44 @@ Status: **PLAN — belum implementasi.**
    (top-stats API)    (Mode A)                (Mode B, hot-reload)
 ```
 
-- **Backend:** Python (FastAPI atau Flask) — konsisten karena toolchain repo sudah Python (`gen-cdb.py`, `build-asn-db.sh`).
-- **Frontend:** 1 file HTML + JS polos, Tailwind via CDN. **Tanpa npm/build** (lazy).
-- **Port:** 8084 (terpisah dari dnsdist 8083).
-- **Systemd:** `dnsdist-panel.service`.
+- **Backend:** Go — satu binary, tanpa runtime dependency, pas untuk edge node low-RAM.
+- **Frontend:** React + Vite + Tailwind CSS + **shadcn/ui** (komponen copy-paste, tanpa npm bloat).
+- **Packaging:** static frontend di-*embed* ke binary Go via `go:embed` → deploy cukup 1 file binary + systemd.
 
 ---
 
-## 3. Fitur per Halaman
+## 3. Pilihan Stack (berikan keputusan)
+
+### A. Go Web Framework
+| Opsi | Kelebihan | Kekurangan |
+|------|-----------|------------|
+| **A1. Stdlib `net/http`** (Go 1.22+ punya method routing) | 0 dependency, paling ringan | Routing manual, middleware manual |
+| **A2. `chi`** (rekomendasi) | Ringan, idiomatic, middleware jalan | Tambah 1 dep |
+| **A3. `gin`** | Populer, banyak contoh, JSON helper | Lebih berat, opinated |
+| **A4. `fiber`** | Express-like, cepat | Non-stdlib ecosystem |
+
+### B. Frontend Routing & Build
+| Opsi | Deskripsi |
+|------|-----------|
+| **B1. Vite + React SPA** (rekomendasi) | Build static → `go:embed` → single binary |
+| **B2. Vite + React + TanStack Router** | Butuh routing kompleks (multi-role) |
+| **B3. React + shadcn tanpa router** | Cukup kalau panel sederhana (tab-based) |
+
+### C. Penyimpanan Domain (Mode B)
+| Opsi | Deskripsi |
+|------|-----------|
+| **C1. SQLite** (`modernc.org/sqlite`, pure-Go tanpa cgo) | Query mudah, riwayat import, dedup otomatis |
+| **C2. Plain file** (`domains.txt`) | Paling sederhana, gen-cdb tinggal baca baris |
+
+### D. Deploy
+| Opsi | Deskripsi |
+|------|-----------|
+| **D1. Single binary + systemd** (rekomendasi) | 1 file, `dnsdist-panel.service`, port 8084 |
+| **D2. Docker** | Kontras dengan filosofi repo (native OS) |
+
+---
+
+## 4. Fitur per Halaman
 
 ### 📊 Dashboard
 - Status service dnsdist (active/inactive)
@@ -84,22 +114,32 @@ Status: **PLAN — belum implementasi.**
 
 ---
 
-## 4. Layout File (di repo)
+## 5. Layout File (di repo)
 
 ```
 panel/
-├── app.py                 # FastAPI: routes + auth + orkestrasi
-├── core.py                # wrapper: sync, build-cdb, baca dnsdist API
-├── requirements.txt       # fastapi, uvicorn (atau flask)
-├── static/
-│   ├── index.html         # SPA panel
-│   └── app.js             # logika frontend
+├── cmd/
+│   └── server/main.go     # entry point, flag, config, start HTTP
+├── internal/
+│   ├── api/               # handler REST (auth, dashboard, sync, blacklist)
+│   ├── dnsdist/           # client untuk API dnsdist :8083
+│   ├── executor/          # jalankan update-blacklist.sh / gen-cdb.py / systemctl
+│   └── store/             # SQLite / file storage domain Mode B
+├── web/                   # React + Vite + shadcn/ui
+│   ├── src/
+│   │   ├── components/    # shadcn/ui components
+│   │   ├── pages/         # Dashboard, Blacklist, Config, Stats, System
+│   │   └── lib/api.ts     # fetch wrapper
+│   ├── package.json
+│   └── vite.config.ts
+├── go.mod
+├── Makefile               # build (embed web → binary), test
 └── dnsdist-panel.service  # unit systemd (port 8084)
 ```
 
 ---
 
-## 5. API Backend (ringkas)
+## 6. API Backend (ringkas)
 
 ```
 POST /api/login                 → token (panel)
@@ -123,7 +163,7 @@ GET  /api/logs?lines=100        → baca log
 
 ---
 
-## 6. Keamanan
+## 7. Keamanan
 
 - Auth token wajib; bind default `127.0.0.1:8084` (admin via reverse proxy + TLS)
 - Jangan expose :8084 publik; kalau perlu, pakai nginx + Let's Encrypt
@@ -132,7 +172,7 @@ GET  /api/logs?lines=100        → baca log
 
 ---
 
-## 7. Roadmap (bertahap)
+## 8. Roadmap (bertahap)
 
 | Fase | Isi | Estimasi |
 |------|-----|----------|
@@ -143,16 +183,18 @@ GET  /api/logs?lines=100        → baca log
 
 ---
 
-## 8. Keputusan yang Perlu Diambil
+## 9. Keputusan yang Perlu Diambil
 
-1. **Backend:** FastAPI vs Flask? (saya rekomendasikan FastAPI)
-2. **Scope:** single-node saja, atau mau *fleet* (banyak node dikontrol 1 panel)?
-3. **Mode B (local CDB gen):** first-class, atau cukup fallback darurat?
-4. **Frontend:** plain JS + Tailwind CDN cukup, atau mau framework (Vue/React)?
+1. **Go framework:** A1 stdlib / **A2 chi (rekomendasi)** / A3 gin / A4 fiber
+2. **Frontend:** B1 Vite+React SPA / B2 +TanStack Router / B3 tanpa router
+3. **Storage Mode B:** C1 SQLite / **C2 plain file**
+4. **Deploy:** D1 single binary + systemd / D2 Docker
+5. **Scope:** single-node saja, atau mau *fleet* (banyak node dikontrol 1 panel)?
+6. **Mode B (local CDB gen):** first-class, atau cukup fallback darurat?
 
 ---
 
-## 9. Catatan
+## 10. Catatan
 
 - Mode A tetap **default** dan paling ringan — sesuai filosofi "Edge tidak proses TXT ke CDB".
 - `gen-cdb.py` sudah teruji valid (smoke test lookup PASS), siap diintegrasikan untuk Mode B.
