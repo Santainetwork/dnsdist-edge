@@ -3,3 +3,7 @@ SAVED_CENTRAL_DB_URL="{{ central_db_url }}"
 SAVED_UPSTREAM_DNS="{{ upstream_dns }}"
 SAVED_BLOCK_MODE="{{ block_mode }}"
 SAVED_RPZ_IPS="{{ rpz_ips }}"
+SAVED_CERT_MODE="{{ cert_mode }}"
+{% if webserver_password %}SAVED_WEBSERVER_PASSWORD="{{ webserver_password }}"{% endif %}
+{% if webserver_apikey %}SAVED_WEBSERVER_APIKEY="{{ webserver_apikey }}"{% endif %}
+SAVED_INSTALL_DATE="{{ ansible_date_time.iso8601 }}"

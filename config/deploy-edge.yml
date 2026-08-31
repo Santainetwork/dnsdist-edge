@@ -5,22 +5,26 @@
   vars:
     # Directory to store the scripts on the remote edge node
     remote_install_dir: "/opt/dnsdist-edge"
-    
+
     # --- Configuration Variables ---
     # URL of the Central Manager database
     central_db_url: "http://central-manager.local/blacklist.db"
-    
+
     # Upstream DNS servers (comma separated)
     upstream_dns: "1.1.1.1, 8.8.8.8"
-    
+
     # Block mode: 'adguard' (0.0.0.0) or 'rpz' (Sinkhole IP)
-    block_mode: "adguard" 
-    
+    block_mode: "adguard"
+
     # RPZ IP (ignored if block_mode is adguard)
-    rpz_ips: "0.0.0.0"    
-    
+    rpz_ips: "0.0.0.0"
+
     # Cert Mode: 1=Self-Signed, 2=LetsEncrypt, 3=None (Plaintext)
     cert_mode: "3"
+
+    # Web Console & API credentials (optional; uses default if empty)
+    webserver_password: ""
+    webserver_apikey: ""
 
   tasks:
     - name: Ensure target directory exists
@@ -29,9 +33,9 @@
         state: directory
         mode: '0755'
 
-    - name: Copy dnsdist-edge files to remote node
+    - name: Copy dnsdist-edge repo to remote node
       copy:
-        src: "{{ playbook_dir }}/"
+        src: "{{ playbook_dir }}/../"
         dest: "{{ remote_install_dir }}/"
         mode: '0755'
 
@@ -43,17 +47,21 @@
 
     - name: Pre-seed node.conf using Jinja2 template to bypass interactive prompts
       template:
-        src: "templates/node.conf.j2"
+        src: "{{ playbook_dir }}/../templates/node.conf.j2"
         dest: "/etc/dnsdist/node.conf"
         mode: '0644'
 
-    - name: Run setup-edge.sh installer
+    - name: Run setup-edge.sh installer from setup/ folder
       shell: |
         # Using 'yes ""' pipes an empty string (Enter) to any read commands
         # This auto-accepts the "Gunakan konfigurasi yang tersimpan ini? (Y/n)" prompt
-        yes "" | ./setup-edge.sh --install --url "{{ central_db_url }}" --set-cert "{{ cert_mode }}"
+        yes "" | ./setup-edge.sh --install \
+          --url "{{ central_db_url }}" \
+          --set-cert "{{ cert_mode }}" \
+          {% if webserver_password %}--password "{{ webserver_password }}"{% endif %} \
+          {% if webserver_apikey %}--apikey "{{ webserver_apikey }}"{% endif %}
       args:
-        chdir: "{{ remote_install_dir }}"
+        chdir: "{{ remote_install_dir }}/setup"
         executable: /bin/bash
       register: setup_output
       changed_when: true

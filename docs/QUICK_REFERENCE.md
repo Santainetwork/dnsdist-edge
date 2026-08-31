@@ -94,7 +94,7 @@ curl -s "http://localhost:8083/api/v1/top-blocked?n=50" \
 apt-get update && apt-get upgrade -y
 
 # Upgrade dnsdist-edge scripts
-cd /root/trust-ng-replica/dnsdist-edge/setup
+cd /opt/dnsdist-edge/setup
 sudo ./setup-edge.sh --upgrade
 
 # Rebuild ASN database (optional)

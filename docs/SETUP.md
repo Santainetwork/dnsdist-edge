@@ -143,7 +143,7 @@ Status page available at: `http://YOUR_SERVER_IP/status/`
 
 Untuk update ke versi terbaru tanpa kehilangan konfigurasi:
 ```bash
-cd /root/trust-ng-replica/dnsdist-edge/setup
+cd /opt/dnsdist-edge/setup
 sudo ./setup-edge.sh --upgrade
 ```
 
@@ -289,8 +289,8 @@ setUDPTimeout(5)
 
 ## 📞 Support & Resources
 
-- GitHub Repository: https://github.com/trust-ng-replica/dnsdist-edge
-- Documentation: `docs/EDGE-README.md`, `docs/TOPSTATS-README.md`
+- GitHub Repository: https://github.com/Santainetwork/dnsdist-edge
+- Documentation: `EDGE-README.md`, `TOPSTATS-README.md`
 - Community: Trust-NG Discord/Forum (link TBD)
 
 ---

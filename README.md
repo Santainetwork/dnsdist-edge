@@ -211,7 +211,7 @@ curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/stats
 Untuk upgrade ke versi terbaru tanpa kehilangan data:
 
 ```bash
-cd /root/trust-ng-replica/dnsdist-edge
+cd /opt/dnsdist-edge/setup
 sudo ./setup-edge.sh --upgrade
 ```
 
@@ -247,7 +247,7 @@ Lihat **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** untuk troubleshooting le
 
 ## 📞 Support & Resources
 
-- **GitHub Repository**: [trust-ng-replica/dnsdist-edge](https://github.com/trust-ng-replica/dnsdist-edge)
+- **GitHub Repository**: [Santainetwork/dnsdist-edge](https://github.com/Santainetwork/dnsdist-edge)
 - **Issue Tracker**: Submit bugs/suggestions via GitHub Issues
 - **Documentation**: Semua docs ada di folder `docs/`
 
