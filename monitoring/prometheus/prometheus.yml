@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'dnsdist'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['dnsdist:8083']
+    # DNSDist menerima Bearer token sebagai pengganti X-API-Key
+    authorization:
+      type: Bearer
+      credentials: 'trust-ng-apikey-changeme'

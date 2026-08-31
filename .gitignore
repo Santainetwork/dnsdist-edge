@@ -1,0 +1,42 @@
+# Runtime data
+/var/lib/dnsdist/*.db
+/var/log/
+
+# Large database files
+blacklist.db
+*.db
+*.bin
+
+# SSL certificates (private)
+certs/*.key
+!certs/*.crt
+
+# Configuration secrets
+config/secrets.*
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Monitoring data
+monitoring/data/
+monitoring/cache/
+
+# Ansible artifacts
+*.retry
+ansible.cfg.local
+site.yml.swp
+
+# Build artifacts
+scripts/asn-db.bin
+*.csv
