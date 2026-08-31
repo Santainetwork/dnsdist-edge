@@ -12,7 +12,7 @@ Struktur inti (jangan dipindah tanpa update path di script):
 
 ```
 setup/          # CORE — self-contained, cukup ini untuk deploy node
-  ├── setup-edge.sh        # installer CLI (17 opsi, lihat docs/SETUP-EDGE-COMMANDS.md)
+  ├── setup-edge.sh        # installer CLI (19 opsi, lihat docs/SETUP-EDGE-COMMANDS.md)
   ├── update-blacklist.sh  # sync CDB dari central (Mode A)
   ├── dnsdist.conf         # config baseline
   ├── deploy-edge.yml      # Ansible playbook (opsional)

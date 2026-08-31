@@ -4,9 +4,9 @@
 
 ---
 
-## 📊 Ringkasan Total Perintah & Opsi (17 Opsi CLI)
+## 📊 Ringkasan Total Perintah & Opsi (19 Opsi CLI)
 
-Skrip `setup-edge.sh` mendukung **17 opsi baris perintah (CLI options)** yang dikelompokkan ke dalam beberapa kategori operasi:
+Skrip `setup-edge.sh` mendukung **19 opsi baris perintah (CLI options)** yang dikelompokkan ke dalam beberapa kategori operasi:
 
 | No | Opsi / Flag | Argumen | Kategori | Deskripsi |
 |:---:|---|---|---|---|
@@ -26,7 +26,9 @@ Skrip `setup-edge.sh` mendukung **17 opsi baris perintah (CLI options)** yang di
 | 14 | `--apikey` | `<KEY>` | **Web Console** | Menyetel API Key untuk autentikasi endpoint REST API (`X-API-Key`). |
 | 15 | `--set-webserver` | - | **Web Console** | Menerapkan perubahan password dan API Key baru ke `dnsdist.conf` dan merestart service. |
 | 16 | `--uninstall` | - | **Sistem** | Menghapus seluruh instalasi DNSDist, direktori `/etc/dnsdist`, `/var/lib/dnsdist`, dan cronjob terkait. |
-| 17 | `-V`, `--version` / `-h`, `--help` | - | **Informasi** | Menampilkan versi skrip atau menu bantuan CLI. |
+| 17 | `--set-cdb-sources` | `<URL1, URL2...>` | **Cluster** | Mengubah daftar sumber CDB (central, mirror, peer) dipisah koma → `SAVED_CDB_SOURCES` di node.conf |
+| 18 | `--with-panel` | - | **Panel** | Auto-install DNSDist Panel (download binary release + systemd unit) |
+| 19 | `-V`, `--version` / `-h`, `--help` | - | **Informasi** | Menampilkan versi skrip atau menu bantuan CLI. |
 
 ---
 

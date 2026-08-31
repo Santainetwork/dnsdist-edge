@@ -44,7 +44,7 @@ Untuk command-finding cepat dan troubleshooting, lihat:
 | Dokumentasi | Deskripsi |
 |-------------|-----------|
 | [**SETUP.md**](docs/SETUP.md) | Panduan instalasi lengkap dari awal sampai production |
-| [**SETUP-EDGE-COMMANDS.md**](docs/SETUP-EDGE-COMMANDS.md) | Panduan lengkap CLI `setup-edge.sh` & 17 daftar command |
+| [**SETUP-EDGE-COMMANDS.md**](docs/SETUP-EDGE-COMMANDS.md) | Panduan lengkap CLI `setup-edge.sh` & 19 daftar command |
 | [**PANEL-PLAN.md**](docs/PANEL-PLAN.md) | Rencana management panel web (mode central download + local CDB gen) |
 | [**CLUSTER-PLAN.md**](docs/CLUSTER-PLAN.md) | Rencana CDB redundancy & cluster (failover antar node, peer-to-peer) |
 | [**QUICK_REFERENCE.md**](docs/QUICK_REFERENCE.md) | Command cheatsheet & troubleshooting tips |
