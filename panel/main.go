@@ -58,6 +58,8 @@ var (
 	flagCustomBLFile  = flag.String("custom-bl-file", envOr("PANEL_CUSTOM_BL_FILE", "/etc/dnsdist-master/custom-blacklist.txt"), "Path to custom-blacklist.txt")
 	flagBuildInterval = flag.Duration("build-interval", 6*time.Hour, "Automatic build interval (0 to disable auto-build)")
 	flagBuildNow      = flag.Bool("build-now", false, "Compile CDB immediately and exit (CLI builder mode)")
+	flagDnsdistAPI    = flag.String("dnsdist-api", envOr("DNSDIST_API_URL", "http://127.0.0.1:8083"), "dnsdist web API base URL")
+	flagDnsdistKey    = flag.String("dnsdist-key", envOr("DNSDIST_API_KEY", ""), "dnsdist web API key (X-API-Key)")
 )
 
 func envOr(key, def string) string {
@@ -183,6 +185,9 @@ type statsCollector struct {
 	lastUDPTs    time.Time
 	qps          atomic.Int64
 	udpInTotal   atomic.Uint64
+	blockedTotal atomic.Int64
+	cacheHitPct  atomic.Int64 // stored as pct * 100 (fixed-point, 2 decimals)
+	queriesTotal atomic.Int64
 }
 
 var stats statsCollector
@@ -319,6 +324,63 @@ func updateQPS() {
 	stats.udpInTotal.Add(cur - prev)
 }
 
+// fetchDnsdistStats polls dnsdist web API /api/v1/servers/localhost/statistics
+// and updates blockedTotal, cacheHitPct, queriesTotal atomics.
+func fetchDnsdistStats() {
+	url := *flagDnsdistAPI + "/api/v1/servers/localhost/statistics"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return
+	}
+	if *flagDnsdistKey != "" {
+		req.Header.Set("X-API-Key", *flagDnsdistKey)
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+	// dnsdist returns array of {name, type, value}
+	var items []struct {
+		Name  string  `json:"name"`
+		Value float64 `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return
+	}
+	var queries, blocked, cacheHits, cacheMisses float64
+	for _, it := range items {
+		switch it.Name {
+		case "queries":
+			queries = it.Value
+		case "rdrop", "rule-drop":
+			blocked += it.Value
+		case "nxdomain":
+			// nxdomain from RPZ/block rules counted as blocked
+			// ponytail: pisahkan nxdomain organik vs block, add when ada rule tag
+		case "cache-hits":
+			cacheHits = it.Value
+		case "cache-misses":
+			cacheMisses = it.Value
+		case "queries-per-second":
+			if it.Value > 0 {
+				stats.qps.Store(int64(it.Value))
+			}
+		}
+	}
+	stats.queriesTotal.Store(int64(queries))
+	stats.blockedTotal.Store(int64(blocked))
+	total := cacheHits + cacheMisses
+	if total > 0 {
+		pct := cacheHits / total * 10000 // fixed-point * 100
+		stats.cacheHitPct.Store(int64(pct))
+	}
+}
+
 func startStatsTicker() {
 	// warm up CPU baseline
 	readCPUStat()
@@ -326,6 +388,7 @@ func startStatsTicker() {
 		t := time.NewTicker(5 * time.Second)
 		for range t.C {
 			updateQPS()
+			fetchDnsdistStats()
 		}
 	}()
 }
@@ -591,9 +654,9 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"qps":             stats.qps.Load(),
-		"queries_total":   stats.udpInTotal.Load(),
-		"blocked_total":   0, // ponytail: hook ke dnsdist console socket, add when /run/dnsdist/dnsdist.sock exposed
-		"cache_hit_pct":   0.0,
+		"queries_total":   func() int64 { if v := stats.queriesTotal.Load(); v > 0 { return v }; return int64(stats.udpInTotal.Load()) }(),
+		"blocked_total":   stats.blockedTotal.Load(),
+		"cache_hit_pct":   math.Round(float64(stats.cacheHitPct.Load())/100*10) / 10,
 		"cpu_pct":         math.Round(cpuPercent()*10) / 10,
 		"mem_used_mb":     memUsed,
 		"mem_total_mb":    memTotal,
