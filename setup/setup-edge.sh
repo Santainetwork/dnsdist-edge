@@ -485,11 +485,17 @@ do_check_config() {
         echo "N/A (dnsdist.conf tidak ditemukan)"
     fi
     
-    echo -n "IP Sinkhole   : "
+    echo "IP Sinkhole   :"
     if [ -f "$DNSDIST_CONF" ]; then
-        grep "^SINKHOLE_IPS" "$DNSDIST_CONF" | cut -d"{" -f2 | cut -d"}" -f1
+        # Ekstrak isi tabel Lua {..} lalu cetak satu IP per baris
+        grep "^SINKHOLE_IPS" "$DNSDIST_CONF" \
+            | sed "s/.*= {//;s/}//" \
+            | tr "," "\n" \
+            | sed "s/'//g;s/^[[:space:]]*//;s/[[:space:]]*$//" \
+            | grep -v '^$' \
+            | while read -r _ip; do echo "    • $_ip"; done
     else
-        echo "N/A"
+        echo "  N/A"
     fi
     
     echo "Upstream DNS  : "
@@ -735,11 +741,13 @@ Type=simple
 ExecStart=/usr/local/bin/dnsdist-panel
 Restart=on-failure
 RestartSec=3
-Environment=PANEL_ADDR=127.0.0.1:8084
+Environment=PANEL_ADDR=0.0.0.0:8443
 Environment=PANEL_DB=/var/lib/dnsdist/panel.db
-Environment=PANEL_USER=admin
-Environment=PANEL_PASS=${WEBSERVER_PASSWORD}
-Environment=DNSDIST_APIKEY=${WEBSERVER_APIKEY}
+Environment=PANEL_SECRET_FILE=/var/lib/dnsdist/panel.secret
+Environment=PANEL_CERT=/var/lib/dnsdist/panel-cert.pem
+Environment=PANEL_KEY=/var/lib/dnsdist/panel-key.pem
+Environment=DNSDIST_CONF=/etc/dnsdist/dnsdist.conf
+Environment=DNSDIST_UPSTREAMS=/etc/dnsdist/upstreams.conf
 LimitNOFILE=65536
 
 [Install]
@@ -748,8 +756,11 @@ UNIT
             systemctl daemon-reload
             systemctl enable dnsdist-panel >/dev/null 2>&1
             systemctl restart dnsdist-panel || true
-            echo -e "  ${GREEN}[✓] Panel terinstall & aktif: http://127.0.0.1:8084${NC}"
-            echo -e "       Login: admin / ${WEBSERVER_PASSWORD}"
+            local node_ip
+            node_ip=$(hostname -I | awk '{print $1}')
+            echo -e "  ${GREEN}[✓] Panel terinstall & aktif: https://${node_ip}:8443${NC}"
+            echo -e "       (self-signed cert, accept browser warning)"
+            echo -e "       Password: ${WEBSERVER_PASSWORD}"
         else
             echo -e "  ${YELLOW}[!] Gagal mengunduh panel binary. Panel dilewati.${NC}"
         fi
