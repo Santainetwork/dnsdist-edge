@@ -83,35 +83,32 @@ do_install() {
         fi
     fi
 
-    echo -e "\n${CYAN}=== [2/5] Menyiapkan Komponen trust-builder ===${NC}"
+    echo -e "\n${CYAN}=== [2/5] Menyiapkan Engine Kompilasi Master ===${NC}"
     mkdir -p "$CONF_DIR" "$SERVE_DIR"
 
-    # Cari dan pasang binary trust-builder
-    local src_builder=""
-    if [ -f "$MASTER_DIR/trust-builder" ]; then
-        src_builder="$MASTER_DIR/trust-builder"
-    elif [ -f "$MASTER_DIR/tools/trust-builder/trust-builder" ]; then
-        src_builder="$MASTER_DIR/tools/trust-builder/trust-builder"
-    elif [ -f "$MASTER_DIR/../tools/trust-builder/trust-builder" ]; then
-        src_builder="$MASTER_DIR/../tools/trust-builder/trust-builder"
+    local panel_bin="/usr/local/bin/dnsdist-panel"
+    local src_panel=""
+    if [ -f "$MASTER_DIR/dnsdist-panel" ]; then
+        src_panel="$MASTER_DIR/dnsdist-panel"
+    elif [ -f "$MASTER_DIR/tools/dnsdist-panel" ]; then
+        src_panel="$MASTER_DIR/tools/dnsdist-panel"
+    elif [ -f "$MASTER_DIR/../tools/dnsdist-panel" ]; then
+        src_panel="$MASTER_DIR/../tools/dnsdist-panel"
     fi
 
-    if [ -n "$src_builder" ]; then
-        cp "$src_builder" "$BUILDER_BIN"
-        chmod 0755 "$BUILDER_BIN"
-        echo -e "  ${GREEN}[✓] trust-builder terpasang di $BUILDER_BIN${NC}"
-    elif command -v go >/dev/null 2>&1 && [ -f "$MASTER_DIR/tools/trust-builder/main.go" ]; then
-        echo "[*] Mengompilasi trust-builder dari source..."
-        cd "$MASTER_DIR/tools/trust-builder" && bash build.sh
-        cp trust-builder "$BUILDER_BIN"
-        chmod 0755 "$BUILDER_BIN"
-        cd "$MASTER_DIR"
-        echo -e "  ${GREEN}[✓] trust-builder berhasil dikompilasi & dipasang.${NC}"
-    else
-        echo -e "${YELLOW}[!] Binary trust-builder belum ada. Akan diunduh atau dipasang manual.${NC}"
+    if [ -n "$src_panel" ]; then
+        if systemctl is-active --quiet dnsdist-panel 2>/dev/null; then
+            systemctl stop dnsdist-panel || true
+        fi
+        cp "$src_panel" "$panel_bin"
+        chmod 0755 "$panel_bin"
+        ln -sfn "$panel_bin" "$BUILDER_BIN"
+        echo -e "  ${GREEN}[✓] Unified Master Engine terpasang di $panel_bin${NC}"
+    elif [ -f "$BUILDER_BIN" ]; then
+        echo -e "  ${GREEN}[✓] trust-builder terdeteksi di $BUILDER_BIN${NC}"
     fi
 
-    # Pasang skrip builder
+    # Pasang skrip builder wrapper
     local src_script=""
     if [ -f "$MASTER_DIR/build-master-cdb.sh" ]; then
         src_script="$MASTER_DIR/build-master-cdb.sh"
@@ -234,6 +231,11 @@ RestartSec=3
 Environment=PANEL_ADDR=0.0.0.0:8443
 Environment=PANEL_HTTP_ADDR=0.0.0.0:8084
 Environment=PANEL_TLS=true
+Environment=PANEL_MASTER=true
+Environment=PANEL_FILES_DIR=/var/www/html/files
+Environment=PANEL_SOURCES_FILE=/etc/dnsdist-master/sources.txt
+Environment=PANEL_WHITELIST_FILE=/etc/dnsdist-master/whitelist.txt
+Environment=PANEL_CUSTOM_BL_FILE=/etc/dnsdist-master/custom-blacklist.txt
 Environment=PANEL_DB=/var/lib/dnsdist/panel.db
 Environment=PANEL_SECRET_FILE=/var/lib/dnsdist/panel.secret
 Environment=PANEL_CERT=/var/lib/dnsdist/panel-cert.pem

@@ -42,15 +42,22 @@ var indexHTML []byte
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 var (
-	flagAddr      = flag.String("addr", envOr("PANEL_ADDR", ":8443"), "Primary listen address (HTTPS if TLS enabled, else HTTP)")
-	flagHTTPAddr  = flag.String("http-addr", envOr("PANEL_HTTP_ADDR", ""), "Optional secondary HTTP listen address (enables dual HTTP+HTTPS mode)")
-	flagTLS       = flag.Bool("tls", envBool("PANEL_TLS", true), "Enable TLS on primary address (set false for pure HTTP)")
-	flagConf      = flag.String("config", envOr("DNSDIST_CONF", "/etc/dnsdist/dnsdist.conf"), "dnsdist.conf path")
-	flagUpstreams = flag.String("upstreams", envOr("DNSDIST_UPSTREAMS", "/etc/dnsdist/upstreams.conf"), "upstreams.conf path")
-	flagCert      = flag.String("cert", envOr("PANEL_CERT", "/var/lib/dnsdist/panel-cert.pem"), "TLS cert path")
-	flagKey       = flag.String("key", envOr("PANEL_KEY", "/var/lib/dnsdist/panel-key.pem"), "TLS key path")
-	flagSecret    = flag.String("secret-file", envOr("PANEL_SECRET_FILE", "/var/lib/dnsdist/panel.secret"), "JWT secret file")
-	flagSetupSh   = flag.String("setup-sh", "/usr/local/bin/setup-edge.sh", "Path to setup-edge.sh")
+	flagAddr          = flag.String("addr", envOr("PANEL_ADDR", ":8443"), "Primary listen address (HTTPS if TLS enabled, else HTTP)")
+	flagHTTPAddr      = flag.String("http-addr", envOr("PANEL_HTTP_ADDR", ""), "Optional secondary HTTP listen address (enables dual HTTP+HTTPS mode)")
+	flagTLS           = flag.Bool("tls", envBool("PANEL_TLS", true), "Enable TLS on primary address (set false for pure HTTP)")
+	flagConf          = flag.String("config", envOr("DNSDIST_CONF", "/etc/dnsdist/dnsdist.conf"), "dnsdist.conf path")
+	flagUpstreams     = flag.String("upstreams", envOr("DNSDIST_UPSTREAMS", "/etc/dnsdist/upstreams.conf"), "upstreams.conf path")
+	flagCert          = flag.String("cert", envOr("PANEL_CERT", "/var/lib/dnsdist/panel-cert.pem"), "TLS cert path")
+	flagKey           = flag.String("key", envOr("PANEL_KEY", "/var/lib/dnsdist/panel-key.pem"), "TLS key path")
+	flagSecret        = flag.String("secret-file", envOr("PANEL_SECRET_FILE", "/var/lib/dnsdist/panel.secret"), "JWT secret file")
+	flagSetupSh       = flag.String("setup-sh", "/usr/local/bin/setup-edge.sh", "Path to setup-edge.sh")
+	flagMaster        = flag.Bool("master", envBool("PANEL_MASTER", false), "Enable Central Master mode (CDB builder & publisher)")
+	flagFilesDir      = flag.String("files-dir", envOr("PANEL_FILES_DIR", "/var/www/html/files"), "Directory to serve /files/ from (trust.db, manifest.json)")
+	flagSourcesFile   = flag.String("sources-file", envOr("PANEL_SOURCES_FILE", "/etc/dnsdist-master/sources.txt"), "Path to sources.txt for master compilation")
+	flagWhitelistFile = flag.String("whitelist-file", envOr("PANEL_WHITELIST_FILE", "/etc/dnsdist-master/whitelist.txt"), "Path to whitelist.txt")
+	flagCustomBLFile  = flag.String("custom-bl-file", envOr("PANEL_CUSTOM_BL_FILE", "/etc/dnsdist-master/custom-blacklist.txt"), "Path to custom-blacklist.txt")
+	flagBuildInterval = flag.Duration("build-interval", 6*time.Hour, "Automatic build interval (0 to disable auto-build)")
+	flagBuildNow      = flag.Bool("build-now", false, "Compile CDB immediately and exit (CLI builder mode)")
 )
 
 func envOr(key, def string) string {
@@ -732,11 +739,73 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w)
 }
 
+func handleMasterStatus(w http.ResponseWriter, r *http.Request) {
+	masterState.mu.Lock()
+	defer masterState.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(&masterState)
+}
+
+func handleMasterBuild(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	masterState.mu.Lock()
+	if masterState.IsBuilding {
+		masterState.mu.Unlock()
+		jsonErr(w, http.StatusConflict, "Kompilasi sedang berjalan")
+		return
+	}
+	masterState.mu.Unlock()
+
+	go func() {
+		_ = BuildMasterCDB(*flagFilesDir, *flagSourcesFile, *flagWhitelistFile, *flagCustomBLFile, 8, true)
+	}()
+	jsonOK(w)
+}
+
+func handleMasterSources(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		content, _ := os.ReadFile(*flagSourcesFile)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"sources": string(content)})
+		return
+	}
+	if r.Method == http.MethodPost {
+		var body struct {
+			Sources string `json:"sources"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			jsonErr(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		_ = os.MkdirAll(filepath.Dir(*flagSourcesFile), 0755)
+		if err := atomicWriteString(*flagSourcesFile, body.Sources, 0644); err != nil {
+			jsonErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		jsonOK(w)
+		return
+	}
+	jsonErr(w, http.StatusMethodNotAllowed, "GET or POST only")
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 func main() {
 	flag.Parse()
 	log.SetPrefix("[panel] ")
+
+	if *flagBuildNow {
+		log.Printf("[master-builder] Memulai kompilasi CDB via CLI...")
+		err := BuildMasterCDB(*flagFilesDir, *flagSourcesFile, *flagWhitelistFile, *flagCustomBLFile, 8, true)
+		if err != nil {
+			log.Fatalf("[master-builder] Kompilasi gagal: %v", err)
+		}
+		log.Printf("[master-builder] Kompilasi selesai!")
+		os.Exit(0)
+	}
 
 	var err error
 	jwtSecret, err = loadOrGenSecret(*flagSecret)
@@ -769,6 +838,31 @@ func main() {
 	mux.HandleFunc("/api/safesearch", auth(handleSafeSearch))
 	mux.HandleFunc("/api/dotdoh", auth(handleDoTDoH))
 	mux.HandleFunc("/api/settings", auth(handleSettings))
+
+	// Master API Endpoints
+	mux.HandleFunc("/api/master/status", auth(handleMasterStatus))
+	mux.HandleFunc("/api/master/build", auth(handleMasterBuild))
+	mux.HandleFunc("/api/master/sources", auth(handleMasterSources))
+
+	// File Publisher (for Master Mode: serves trust.db, manifest.json)
+	fs := http.FileServer(http.Dir(*flagFilesDir))
+	mux.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Cache-Control", "public, must-revalidate, proxy-revalidate")
+		http.StripPrefix("/files/", fs).ServeHTTP(w, r)
+	})
+
+	// Master Auto-Build Cron Ticker
+	if *flagMaster && *flagBuildInterval > 0 {
+		log.Printf("[master-builder] Penjadwal kompilasi otomatis aktif (interval: %v)", *flagBuildInterval)
+		go func() {
+			ticker := time.NewTicker(*flagBuildInterval)
+			for range ticker.C {
+				log.Printf("[master-builder] Menjalankan build otomatis terjadwal...")
+				_ = BuildMasterCDB(*flagFilesDir, *flagSourcesFile, *flagWhitelistFile, *flagCustomBLFile, 8, false)
+			}
+		}()
+	}
 
 	// Jika secondary HTTP address diberikan (misal :8084), jalankan listener HTTP di background (Dual Mode)
 	if *flagHTTPAddr != "" {

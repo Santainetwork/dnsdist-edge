@@ -529,6 +529,10 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
       <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       <span>DoT / DoH</span>
     </a>
+    <a href="#" onclick="nav('master',this)">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span>Central Master</span>
+    </a>
     <a href="#" onclick="nav('settings',this)">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span>Pengaturan</span>
@@ -818,6 +822,120 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
     </div>
   </div>
 
+  <!-- Master Page -->
+  <div id="page-master" class="page">
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>Central Master &amp; CDB Builder</h2>
+        <p>Kompilator blacklist mandiri dan distributor database CDB ke seluruh node</p>
+      </div>
+      <button class="btn btn-primary" id="btn-trigger-build" onclick="triggerMasterBuild()">
+        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span id="btn-build-text">Mulai Kompilasi CDB</span>
+      </button>
+    </div>
+
+    <!-- Status Grid -->
+    <div class="metrics-grid">
+      <div class="metric-card accent-sky">
+        <div class="metric-header">
+          <span class="metric-label">Status Builder</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        </div>
+        <div class="metric-val tabular" id="m-status" style="font-size:1.35rem">Standby</div>
+        <div class="metric-sub" id="m-status-sub">Siap melakukan build</div>
+      </div>
+
+      <div class="metric-card accent-emerald">
+        <div class="metric-header">
+          <span class="metric-label">Total Entri CDB</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div class="metric-val tabular" id="m-entries">0</div>
+        <div class="metric-sub">Domain &amp; IP dalam CDB</div>
+      </div>
+
+      <div class="metric-card accent-indigo">
+        <div class="metric-header">
+          <span class="metric-label">Ukuran Database</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <div class="metric-val tabular" id="m-size">0 MB</div>
+        <div class="metric-sub" id="m-hash">Hash: —</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Terakhir Selesai</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="metric-val tabular" id="m-time" style="font-size:1.1rem">—</div>
+        <div class="metric-sub" id="m-duration">Durasi: —</div>
+      </div>
+    </div>
+
+    <!-- Publisher Links Card -->
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Endpoint Distribusi untuk Edge Node</h3>
+          <p>Tautan yang didaftarkan ke Edge Node melalui <code>setup-edge.sh --url</code></p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div>
+          <label>File Database (CDB Output):</label>
+          <div class="chip" style="font-size:0.85rem;padding:0.45rem 0.8rem;">
+            <span id="pub-db-url">http://HOST/files/trust.db</span>
+            <button class="copy-btn" onclick="copyText(document.getElementById('pub-db-url').textContent)" title="Salin">
+              <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div>
+          <label>Sidecar Manifest (Metadata):</label>
+          <div class="chip" style="font-size:0.85rem;padding:0.45rem 0.8rem;">
+            <span id="pub-man-url">http://HOST/files/manifest.json</span>
+            <button class="copy-btn" onclick="copyText(document.getElementById('pub-man-url').textContent)" title="Salin">
+              <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sources Editor -->
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Daftar URL Sumber Blacklist (sources.txt)</h3>
+          <p>URL yang akan diunduh dan digabung ke dalam database CDB</p>
+        </div>
+      </div>
+      <div class="form-group">
+        <textarea id="master-sources-input" placeholder="https://raw.githubusercontent.com/.../domains.txt" style="min-height:130px"></textarea>
+        <div class="hint">Satu URL per baris. Gunakan <code>#</code> untuk menonaktifkan sumber sementara.</div>
+      </div>
+      <button class="btn btn-primary" onclick="saveMasterSources()">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span>Simpan Daftar Sumber</span>
+      </button>
+    </div>
+
+    <!-- Build Logs Card -->
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Log Kompilasi Terkini</h3>
+          <p>Aktivitas kompilasi CDB yang dilakukan biner panel</p>
+        </div>
+      </div>
+      <div id="master-logs-box" style="background:#07090e;border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.75rem 1rem;font-family:ui-monospace,monospace;font-size:0.75rem;max-height:220px;overflow-y:auto;color:var(--text-muted);line-height:1.6">
+        Tidak ada log kompilasi.
+      </div>
+    </div>
+  </div>
+
   <!-- Settings Page -->
   <div id="page-settings" class="page">
     <div class="top-bar">
@@ -1009,6 +1127,13 @@ function nav(page, el) {
   document.getElementById('page-' + page).classList.add('active');
   if (el) el.classList.add('active');
   if (page === 'dashboard') setTimeout(initChart, 50);
+  if (page === 'master') {
+    fetchMasterStatus();
+    fetchMasterSources();
+    if (!masterPoller) masterPoller = setInterval(fetchMasterStatus, 3000);
+  } else {
+    if (masterPoller) { clearInterval(masterPoller); masterPoller = null; }
+  }
   if (page === 'rpz' || page === 'upstream' || page === 'safesearch' || page === 'dotdoh' || page === 'settings') {
     fetchConfig();
   }
@@ -1262,6 +1387,82 @@ async function savePassword() {
     document.getElementById('set-pass').value = '';
   } catch (e) {
     toast('Gagal mengganti sandi: ' + e.message, 'error');
+  }
+}
+
+// ── Master Mode Handler ──
+let masterPoller = null;
+
+async function fetchMasterStatus() {
+  try {
+    const d = await api('/api/master/status');
+    const stEl = document.getElementById('m-status');
+    const stSub = document.getElementById('m-status-sub');
+    const btn = document.getElementById('btn-trigger-build');
+    const btnText = document.getElementById('btn-build-text');
+
+    if (d.is_building) {
+      stEl.textContent = 'Membangun...';
+      stEl.style.color = 'var(--amber)';
+      stSub.textContent = 'Proses download & kompilasi CDB sedang berjalan';
+      btn.disabled = true;
+      btnText.textContent = 'Sedang Kompilasi...';
+    } else {
+      stEl.textContent = d.last_status === 'success' ? 'Sukses' : (d.last_status === 'error' ? 'Gagal' : 'Standby');
+      stEl.style.color = d.last_status === 'success' ? 'var(--emerald)' : (d.last_status === 'error' ? 'var(--rose)' : '#fff');
+      stSub.textContent = d.last_status === 'error' ? d.last_error : 'Siap melakukan kompilasi';
+      btn.disabled = false;
+      btnText.textContent = 'Mulai Kompilasi CDB';
+    }
+
+    document.getElementById('m-entries').textContent = fmtNum(d.last_entries || 0);
+    document.getElementById('m-size').textContent = (d.last_size_mb || 0).toFixed(1) + ' MB';
+    document.getElementById('m-hash').textContent = d.last_sha256 ? `Hash: ${d.last_sha256.substring(0, 16)}...` : 'Hash: —';
+    document.getElementById('m-time').textContent = d.last_build_time && !d.last_build_time.startsWith('0001') ? new Date(d.last_build_time).toLocaleTimeString() : '—';
+    document.getElementById('m-duration').textContent = d.last_duration ? `Durasi: ${d.last_duration}` : 'Durasi: —';
+
+    // Update publisher URLs
+    const origin = window.location.origin;
+    document.getElementById('pub-db-url').textContent = `${origin}/files/trust.db`;
+    document.getElementById('pub-man-url').textContent = `${origin}/files/manifest.json`;
+
+    // Update logs
+    const logBox = document.getElementById('master-logs-box');
+    if (d.build_logs && d.build_logs.length) {
+      logBox.innerHTML = d.build_logs.map(l => `<div>${l}</div>`).join('');
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+  } catch (e) {
+    // Master mode might be inactive or not running
+  }
+}
+
+async function triggerMasterBuild() {
+  try {
+    await api('/api/master/build', 'POST');
+    toast('Kompilasi CDB dimulai di background!');
+    fetchMasterStatus();
+  } catch (e) {
+    toast('Gagal memicu build: ' + e.message, 'error');
+  }
+}
+
+async function fetchMasterSources() {
+  try {
+    const d = await api('/api/master/sources');
+    document.getElementById('master-sources-input').value = d.sources || '';
+  } catch (e) {
+    // Ignore if not in master mode
+  }
+}
+
+async function saveMasterSources() {
+  const sources = document.getElementById('master-sources-input').value;
+  try {
+    await api('/api/master/sources', 'POST', { sources });
+    toast('Daftar sumber blacklist berhasil disimpan!');
+  } catch (e) {
+    toast('Gagal menyimpan sumber: ' + e.message, 'error');
   }
 }
 
