@@ -324,32 +324,159 @@ func updateQPS() {
 	stats.udpInTotal.Add(cur - prev)
 }
 
-// fetchDnsdistStats polls dnsdist web API /api/v1/servers/localhost/statistics
+var (
+	reDnsdistAPIKey   = regexp.MustCompile(`(?m)apiKey\s*=\s*['"]([^'"]+)['"]`)
+	reDnsdistPassword = regexp.MustCompile(`(?m)password\s*=\s*['"]([^'"]+)['"]`)
+)
+
+func getDnsdistCreds() (apiKey, password string) {
+	if *flagDnsdistKey != "" {
+		apiKey = *flagDnsdistKey
+	}
+	if b, err := os.ReadFile(*flagConf); err == nil {
+		str := string(b)
+		if apiKey == "" {
+			if m := reDnsdistAPIKey.FindStringSubmatch(str); len(m) > 1 {
+				apiKey = m[1]
+			}
+		}
+		if m := reDnsdistPassword.FindStringSubmatch(str); len(m) > 1 {
+			password = m[1]
+		}
+	}
+	return
+}
+
+type dnsdistRuleItem struct {
+	ID      int     `json:"id"`
+	Matches float64 `json:"matches"`
+	Rule    string  `json:"rule"`
+	Action  string  `json:"action"`
+	Name    string  `json:"name"`
+}
+
+type dnsdistPoolItem struct {
+	Name        string  `json:"name"`
+	CacheHits   float64 `json:"cacheHits"`
+	CacheMisses float64 `json:"cacheMisses"`
+}
+
+type dnsdistServerOverview struct {
+	Rules      []dnsdistRuleItem `json:"rules"`
+	Pools      []dnsdistPoolItem `json:"pools"`
+	Statistics map[string]any    `json:"statistics"`
+}
+
+func statFloatVal(val any) float64 {
+	switch v := val.(type) {
+	case float64:
+		return v
+	case string:
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return 0
+}
+
+func statFloat(m map[string]any, keys ...string) float64 {
+	for _, k := range keys {
+		if val, ok := m[k]; ok {
+			return statFloatVal(val)
+		}
+	}
+	return 0
+}
+
+// fetchDnsdistStats polls dnsdist web API /api/v1/servers/localhost
 // and updates blockedTotal, cacheHitPct, queriesTotal atomics.
 func fetchDnsdistStats() {
-	url := *flagDnsdistAPI + "/api/v1/servers/localhost/statistics"
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return
-	}
-	if *flagDnsdistKey != "" {
-		req.Header.Set("X-API-Key", *flagDnsdistKey)
-	}
+	apiKey, password := getDnsdistCreds()
 	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Do(req)
+
+	// 1. Coba endpoint utama /api/v1/servers/localhost (lengkap dengan rules & pools)
+	overviewURL := *flagDnsdistAPI + "/api/v1/servers/localhost"
+	req, err := http.NewRequest(http.MethodGet, overviewURL, nil)
+	if err == nil {
+		if apiKey != "" {
+			req.Header.Set("X-API-Key", apiKey)
+		}
+		if password != "" {
+			req.SetBasicAuth("admin", password)
+		}
+		if resp, err := client.Do(req); err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				var ov dnsdistServerOverview
+				if err := json.NewDecoder(resp.Body).Decode(&ov); err == nil {
+					// Hitung blocked: cari semua rule lookup blacklist CDB
+					// Format dnsdist rule: (lookup key-value store based on 'qname in wire format') && (qtype==...)
+					// Action bisa spoof IP manapun (v4/v6/multi-IP), nxdomain, atau drop.
+					var blocked float64
+					var foundKVSRule bool
+					for _, r := range ov.Rules {
+						rLower := strings.ToLower(r.Rule)
+						if strings.Contains(rLower, "key-value store") || strings.Contains(rLower, "kvs") {
+							blocked += r.Matches
+							foundKVSRule = true
+						}
+					}
+					if !foundKVSRule {
+						blocked = statFloat(ov.Statistics, "rule-drop", "rdrop")
+					}
+					stats.blockedTotal.Store(int64(blocked))
+
+					// Hitung cache hit rate
+					var cacheHits, cacheMisses float64
+					for _, p := range ov.Pools {
+						cacheHits += p.CacheHits
+						cacheMisses += p.CacheMisses
+					}
+					if cacheHits == 0 && cacheMisses == 0 {
+						cacheHits = statFloat(ov.Statistics, "cache-hits", "packetcache-hits")
+						cacheMisses = statFloat(ov.Statistics, "cache-misses", "packetcache-misses")
+					}
+					totalCache := cacheHits + cacheMisses
+					if totalCache > 0 {
+						pct := (cacheHits / totalCache) * 10000 // fixed-point * 100
+						stats.cacheHitPct.Store(int64(pct))
+					}
+
+					// Queries total & QPS
+					if q := statFloat(ov.Statistics, "queries"); q > 0 {
+						stats.queriesTotal.Store(int64(q))
+					}
+					if qps := statFloat(ov.Statistics, "queries-per-second"); qps > 0 {
+						stats.qps.Store(int64(qps))
+					}
+					return
+				}
+			}
+		}
+	}
+
+	// 2. Fallback: /api/v1/servers/localhost/statistics jika overview gagal
+	statsURL := *flagDnsdistAPI + "/api/v1/servers/localhost/statistics"
+	req2, err := http.NewRequest(http.MethodGet, statsURL, nil)
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if apiKey != "" {
+		req2.Header.Set("X-API-Key", apiKey)
+	}
+	resp2, err := client.Do(req2)
+	if err != nil {
 		return
 	}
-	// dnsdist returns array of {name, type, value}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		return
+	}
 	var items []struct {
 		Name  string  `json:"name"`
 		Value float64 `json:"value"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+	if err := json.NewDecoder(resp2.Body).Decode(&items); err != nil {
 		return
 	}
 	var queries, blocked, cacheHits, cacheMisses float64
@@ -359,24 +486,25 @@ func fetchDnsdistStats() {
 			queries = it.Value
 		case "rdrop", "rule-drop":
 			blocked += it.Value
-		case "nxdomain":
-			// nxdomain from RPZ/block rules counted as blocked
-			// ponytail: pisahkan nxdomain organik vs block, add when ada rule tag
-		case "cache-hits":
-			cacheHits = it.Value
-		case "cache-misses":
-			cacheMisses = it.Value
+		case "cache-hits", "packetcache-hits":
+			cacheHits += it.Value
+		case "cache-misses", "packetcache-misses":
+			cacheMisses += it.Value
 		case "queries-per-second":
 			if it.Value > 0 {
 				stats.qps.Store(int64(it.Value))
 			}
 		}
 	}
-	stats.queriesTotal.Store(int64(queries))
-	stats.blockedTotal.Store(int64(blocked))
+	if queries > 0 {
+		stats.queriesTotal.Store(int64(queries))
+	}
+	if blocked > 0 {
+		stats.blockedTotal.Store(int64(blocked))
+	}
 	total := cacheHits + cacheMisses
 	if total > 0 {
-		pct := cacheHits / total * 10000 // fixed-point * 100
+		pct := cacheHits / total * 10000
 		stats.cacheHitPct.Store(int64(pct))
 	}
 }
