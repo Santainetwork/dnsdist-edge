@@ -5,6 +5,30 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [2.5.0] — 2026-09-08
+
+### 🌟 Minor Release Highlights
+- **Installer Central Master Server (`setup-master.sh`)**:
+  - Pilihan mode fleksibel: Standalone (`--no-dnsdist`, tanpa port 53, murni generator & distributor) atau Hybrid (`--with-dnsdist`).
+  - Dilengkapi `build-master-cdb.sh` untuk kompilasi CDB otomatis dari Trust Positif, AdGuard, custom blacklist, dan whitelist.
+  - Distribusi file biner CDB (`trust.db`) dan sidecar metadata `manifest.json` via Nginx (default port 8080).
+  - Cronjob otomatis tiap 6 jam.
+- **Panel Fleksibel Dual-Listen**:
+  - Mendukung dua port secara bersamaan: HTTPS di `:8443` dan HTTP di `:8084` tanpa warning SSL.
+  - Mendukung mode pure HTTP via flag `-tls=false` atau env `PANEL_TLS=false`.
+- **Desain UI/UX Pro Max**:
+  - Antarmuka web panel didesain ulang total dengan palet Cyber Dark, indikator status *pulse ring*, dan layout responsif.
+  - Grafik aktivitas query per detik (QPS) interaktif real-time menggunakan Canvas API murni.
+  - Ikon SVG modern menggantikan emoji.
+  - Tombol one-click copy untuk daftar IP sinkhole dan upstream.
+- **Peningkatan CLI & Kompatibilitas**:
+  - `setup-edge.sh`: Pemasangan panel mandiri tanpa install ulang DNSDist (`--with-panel` / `--add-panel`).
+  - Download cepat panel binary dengan `aria2c` multi-connection (8 koneksi paralel) dan fallback `curl`.
+  - Auto-update panel saat menjalankan `setup-edge.sh --upgrade`.
+  - Kompatibilitas penuh POSIX `sh` / Dash pada `update-blacklist.sh`.
+
+---
+
 ## [2.4.2] — 2026-09-08
 
 ### 🚀 Added & Improved
