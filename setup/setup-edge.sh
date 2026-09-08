@@ -68,7 +68,7 @@ show_help() {
     echo "      --set-upstream    Ubah upstream DNS tanpa install ulang"
     echo "      --set-rpz         Ubah IP Sinkhole RPZ"
     echo "      --set-cdb-sources   Ubah daftar sumber CDB (central, mirror, peer) dipisah koma"
-    echo "      --with-panel        Install DNSDist Panel (download binary release + systemd)"
+    echo "      --with-panel        Pasang/aktifkan DNSDist Panel (bisa untuk node baru atau yang sudah jalan)"
     echo "  -c, --check-config    Periksa status dan validitas konfigurasi saat ini"
     echo "      --update-config   Perbarui setting Mode, RPZ, dan Upstream secara interaktif"
     echo "      --upgrade         Upgrade script dan config ke versi terbaru (migrasi otomatis)"
@@ -309,6 +309,12 @@ PYEOF
     if systemctl is-active --quiet dnsdist; then
         systemctl restart dnsdist
         echo -e "${GREEN}[+] Service dnsdist telah direstart.${NC}"
+    fi
+
+    # 5.5 Update/Pasang Panel jika sebelumnya sudah terpasang atau jika --with-panel diaktifkan
+    if [ -f "/usr/local/bin/dnsdist-panel" ] || [ "$WITH_PANEL" = true ]; then
+        WITH_PANEL=true
+        do_install_panel
     fi
 
     echo -e "\n${GREEN}============================================================${NC}"
@@ -755,6 +761,59 @@ do_install_panel() {
     fi
 
     if [ "$installed" = true ]; then
+        mkdir -p /var/lib/dnsdist
+        detect_dnsdist_user
+        chown -R "${DNSDIST_USER}:${DNSDIST_USER}" /var/lib/dnsdist 2>/dev/null || true
+
+        # Pastikan hook safesearch.conf dan dotdoh.conf ada di dnsdist.conf jika node sudah terpasang
+        if [ -f "$DNSDIST_CONF" ]; then
+            local conf_reloaded=false
+            if ! grep -q "dotdoh.conf" "$DNSDIST_CONF"; then
+                python3 - "$DNSDIST_CONF" << 'PYEOF'
+import sys
+path = sys.argv[1]
+with open(path) as f: c = f.read()
+hook = """
+-- DoT/DoH: dikontrol via panel atau edit manual di /etc/dnsdist/dotdoh.conf
+local dotdohFile = "/etc/dnsdist/dotdoh.conf"
+local _dd = io.open(dotdohFile, "r")
+if _dd then
+  _dd:close()
+  dofile(dotdohFile)
+end
+"""
+if "dotdoh.conf" not in c:
+    c = c.replace("addLocal('[::]:53')", "addLocal('[::]:53')\n" + hook)
+    with open(path, 'w') as f: f.write(c)
+PYEOF
+                conf_reloaded=true
+            fi
+            if ! grep -q "safesearch.conf" "$DNSDIST_CONF"; then
+                python3 - "$DNSDIST_CONF" << 'PYEOF'
+import sys
+path = sys.argv[1]
+with open(path) as f: c = f.read()
+hook = """
+-- [6.5] SAFESEARCH (optional — dikontrol via panel)
+local ssFile = "/etc/dnsdist/safesearch.conf"
+local _ss = io.open(ssFile, "r")
+if _ss then
+  _ss:close()
+  dofile(ssFile)
+end
+"""
+if "safesearch.conf" not in c:
+    c = c.replace("-- [7] FILTERING RULES", hook + "\n-- [7] FILTERING RULES")
+    with open(path, 'w') as f: f.write(c)
+PYEOF
+                conf_reloaded=true
+            fi
+            if [ "$conf_reloaded" = true ] && systemctl is-active --quiet dnsdist; then
+                systemctl restart dnsdist
+                echo -e "  ${GREEN}[✓] Hook SafeSearch & DoT/DoH ditambahkan ke dnsdist.conf${NC}"
+            fi
+        fi
+
         # Install systemd unit (baris Environment dari template)
         cat > /etc/systemd/system/dnsdist-panel.service <<UNIT
 [Unit]
@@ -1062,7 +1121,7 @@ while [ "$#" -gt 0 ]; do
             UPSTREAM_DNS=$(echo "$UPSTREAM_DNS" | sed 's/,[[:space:]]*$//;s/,$//')
             SET_UPSTREAM=true
             ;;
-        --with-panel)
+        --with-panel|--add-panel)
             WITH_PANEL=true
             ;;
         --set-cdb-sources)
@@ -1194,6 +1253,11 @@ fi
 
 if [ "$SET_WEBSERVER" = true ]; then
     do_set_webserver
+fi
+
+if [ "$WITH_PANEL" = true ]; then
+    do_install_panel
+    exit 0
 fi
 
 if [ "$SYNC_ONLY" = true ]; then
