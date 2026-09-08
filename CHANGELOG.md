@@ -5,6 +5,20 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [2.4.2] — 2026-09-08
+
+### 🚀 Added & Improved
+- **Download Cepat aria2c**: `setup-edge.sh` kini menggunakan `aria2c` multi-connection (8 koneksi paralel) untuk download panel binary, dengan fallback otomatis ke `curl` jika `aria2c` belum ada.
+- **Standalone `--with-panel` / `--add-panel`**: Bisa menambahkan panel ke node DNSDist yang sudah berjalan tanpa perlu instalasi ulang dari awal (`sudo ./setup-edge.sh --add-panel`).
+- **Auto-upgrade Panel**: Menjalankan `sudo ./setup-edge.sh --upgrade` kini otomatis mendeteksi dan memperbarui binary panel jika panel sudah terpasang.
+- **Auto-hook Config**: `do_install_panel` otomatis menyisipkan hook `dotdoh.conf` dan `safesearch.conf` ke `dnsdist.conf` yang sedang aktif.
+
+### 🐛 Fixed
+- **update-blacklist.sh**: Memperbaiki error `Syntax error: redirection unexpected` saat script dijalankan menggunakan `/bin/sh` (Dash pada Debian/Ubuntu) dengan mengganti loop bashism `<<<` dan `read -a` menjadi POSIX `sh` loop portabel.
+- **setup-edge.sh**: Pemanggilan skrip sinkronisasi kini secara eksplisit menggunakan `bash "$SCRIPT_UPDATE"`.
+
+---
+
 ## [2.4.1] — 2026-09-08
 
 ### 🐛 Bugfix (ditemukan via 18 integration test)

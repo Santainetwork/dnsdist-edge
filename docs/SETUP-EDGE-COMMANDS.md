@@ -183,6 +183,7 @@ sudo ./setup-edge.sh --uninstall
 
 | Versi | Perubahan Utama |
 |---|---|
+| v2.4.2 | Aria2c fast download, standalone --add-panel, update-blacklist dash fix |
 | v2.4.1 | Panel HTTPS :8443 bugfix (path hardcode → configurable) |
 | v2.4.0 | RPZ multi-IP + IPv6, python3 atomic patch, safesearch + DoT/DoH via panel |
 | v2.3.0 | `--with-panel` auto-install panel binary |
