@@ -1,210 +1,184 @@
-# ⚡ Quick Reference - DNSDist Edge Node
+# ⚡ Quick Reference — DNSDist Edge Node
 
 ## 🚀 Common Commands
 
 ### Service Management
 ```bash
-systemctl start dnsdist           # Start service
-systemctl stop dnsdist            # Stop service
-systemctl restart dnsdist         # Restart service
-systemctl reload dnsdist          # Reload config (no disconnect)
-systemctl status dnsdist          # Check status
+systemctl start dnsdist           # Start
+systemctl stop dnsdist            # Stop
+systemctl restart dnsdist         # Restart
+systemctl status dnsdist          # Status
 journalctl -u dnsdist -f          # Live logs
+
+systemctl status dnsdist-panel    # Panel status
+journalctl -u dnsdist-panel -f    # Panel logs
 ```
 
-### Configuration Updates
+### Setup Script
 ```bash
-sudo nano /etc/dnsdist/dnsdist.conf    # Edit main config
-sudo nano /etc/dnsdist/node.conf       # Edit saved config
-dnsdist --check-config                 # Validate syntax
-systemctl restart dnsdist              # Apply changes
+sudo ./setup-edge.sh --install              # Install baru
+sudo ./setup-edge.sh --check-config         # Cek status & syntax
+sudo ./setup-edge.sh --upgrade              # Upgrade ke versi terbaru
+sudo ./setup-edge.sh --update-config        # Wizard update config
 ```
 
-### Database Management
+### RPZ Sinkhole (v2.4.0 — multi-IP + IPv6)
 ```bash
-sudo /usr/local/bin/update-blacklist.sh          # Normal sync
-sudo /usr/local/bin/update-blacklist.sh --force  # Force update
-ls -lh /var/lib/dnsdist/blacklist.db             # Check size
+# IPv4 tunggal
+sudo ./setup-edge.sh --set-rpz "10.10.10.10"
+
+# Multi IPv4
+sudo ./setup-edge.sh --set-rpz "10.10.10.10, 10.10.10.11"
+
+# IPv4 + IPv6 (auto-split: A→IPv4, AAAA→IPv6)
+sudo ./setup-edge.sh --set-rpz "10.10.10.10, 2001:db8::1"
+
+# IPv6 saja
+sudo ./setup-edge.sh --set-rpz "2001:db8::1, 2001:db8::2"
 ```
 
-### Monitoring Access
+### Upstream DNS
 ```bash
-# Web Console (Port 8083)
-http://YOUR_SERVER:8083
+# IPv4
+sudo ./setup-edge.sh --set-upstream "1.1.1.1, 8.8.8.8"
 
-# API Endpoints
-curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/stats
-curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/top-queries?n=20
-curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/top-blocked?n=20
-curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/top-asn?n=20
+# IPv4 + IPv6
+sudo ./setup-edge.sh --set-upstream "1.1.1.1, [2606:4700:4700::1111]:53, 8.8.8.8"
 ```
 
-### DNS Testing
+### Database Sync
 ```bash
-# Test basic resolution
-dig @127.0.0.1 google.com
-
-# Test DoT (TLS)
-openssl s_client -connect 127.0.0.1:853 </dev/null | dig @127.0.0.1 google.com
-
-# Test blocked domain (should return sinkhole IP)
-dig @127.0.0.1 evil-domain.com
-```
-
-## 📁 Important Files Location
-
-| Purpose | Path |
-|---------|------|
-| Main Config | `/etc/dnsdist/dnsdist.conf` |
-| Saved Config | `/etc/dnsdist/node.conf` |
-| Top Stats Module | `/etc/dnsdist/top-stats.lua` |
-| SSL Certs | `/etc/dnsdist/certs/server.{crt,key}` |
-| Blacklist DB | `/var/lib/dnsdist/blacklist.db` |
-| Sync Script | `/usr/local/bin/update-blacklist.sh` |
-| ASN Builder | `/usr/local/bin/build-asn-db.sh` |
-| Query Logs | `/var/log/dnsdist/queries.log` |
-
-## 🔧 Maintenance Tasks
-
-### Daily Checks
-```bash
-# Check disk space
-df -h /var/lib/dnsdist
-
-# Check service health
-systemctl is-active dnsdist
-
-# Check last sync time
-grep "Terakhir Update" /var/www/html/status/index.html
-```
-
-### Weekly Tasks
-```bash
-# Rotate logs if needed
-logrotate -f /etc/logrotate.d/dnsdist
-
-# Review top blocked domains
-curl -s "http://localhost:8083/api/v1/top-blocked?n=50" \
-  -H "X-API-Key: YOUR_KEY" | jq '.top[]'
-```
-
-### Monthly Tasks
-```bash
-# Update system packages
-apt-get update && apt-get upgrade -y
-
-# Upgrade dnsdist-edge scripts
-cd /opt/dnsdist-edge/setup
-sudo ./setup-edge.sh --upgrade
-
-# Rebuild ASN database (optional)
-sudo /usr/local/bin/build-asn-db.sh
-```
-
-## 🎯 Setup Options Explained
-
-### install flag usage
-```bash
-# Masuk ke folder setup
-cd dnsdist-edge/setup
-
-# Minimal install (defaults)
-sudo ./setup-edge.sh --install
-
-# With custom Central Manager URL
-sudo ./setup-edge.sh --install --url http://central.local:8080/db
-
-# Set custom password and API key
-sudo ./setup-edge.sh --install --password MyPass123 --apikey MyApiKey
-
-# Install + immediate sync
-sudo ./setup-edge.sh --install && sudo /usr/local/bin/update-blacklist.sh
+sudo /usr/local/bin/update-blacklist.sh           # Normal sync
+sudo /usr/local/bin/update-blacklist.sh --force   # Force download
+ls -lh /var/lib/dnsdist/blacklist.db              # Cek ukuran
+cat /var/lib/dnsdist/blacklist.db.manifest.json   # Hash & sumber
 ```
 
 ### Cluster / Multi-source
 ```bash
-# Atur daftar sumber CDB (central + mirror + peer)
-sudo ./setup-edge.sh --set-cdb-sources "http://central/trust.db,http://mirror/trust.db"
-
-# Force sync (failover otomatis ke sumber berikutnya)
-sudo /usr/local/bin/update-blacklist.sh --force-update
-
-# Lihat manifest DB aktif
-cat /var/lib/dnsdist/blacklist.db.manifest.json
-
-# Probe peer CDB (dari panel atau curl)
-curl -H "X-CDB-Token: TOKEN" http://PEER_IP:8084/cdb/manifest.json
+sudo ./setup-edge.sh --set-cdb-sources \
+  "http://central/trust.db,http://mirror/trust.db,http://peer:8443/cdb/blacklist.db"
 ```
 
-### Sync modes
+---
+
+## 🖥️ Panel Web (HTTPS :8443)
+
 ```bash
-# Normal sync (checks cache, skips if recent)
-sudo /usr/local/bin/update-blacklist.sh
+# Install
+sudo ./setup-edge.sh --with-panel
 
-# Force download (bypasses all caching)
-sudo /usr/local/bin/update-blacklist.sh --force-update
+# Akses
+https://YOUR_SERVER_IP:8443
+# Password default: trust-ng-admin (ganti di Settings)
 
-# Run with verbose debugging
-bash -x /usr/local/bin/update-blacklist.sh
+# Manual start
+sudo /usr/local/bin/dnsdist-panel -addr :8443
+
+# Cek
+ss -tlnp | grep 8443
+systemctl status dnsdist-panel
 ```
 
-## ❗ Troubleshooting Cheat Sheet
-
-### Problem: Service won't start
+Panel API (butuh token dari `POST /api/login`):
 ```bash
-# 1. Check config syntax
+TOKEN=$(curl -sk -X POST -H "Content-Type: application/json" \
+  -d '{"password":"admin"}' https://localhost:8443/api/login | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+curl -sk -H "Authorization: Bearer $TOKEN" https://localhost:8443/api/stats
+curl -sk -H "Authorization: Bearer $TOKEN" https://localhost:8443/api/config
+```
+
+---
+
+## 📊 Monitoring
+
+```bash
+# dnsdist web console
+http://YOUR_SERVER:8083
+
+# API stats
+curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/stats
+curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/top-queries?n=20
+curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/top-blocked?n=20
+
+# Panel stats (real-time, no dnsdist dependency)
+curl -sk -H "Authorization: Bearer $TOKEN" https://localhost:8443/api/stats
+```
+
+---
+
+## 🧪 DNS Testing
+
+```bash
+# Plaintext
+dig @127.0.0.1 google.com
+
+# Test blokir (return sinkhole IP)
+dig @127.0.0.1 evil-domain.com
+
+# DoT
+kdig @127.0.0.1 +tls google.com
+
+# DoH
+curl -sk "https://127.0.0.1/dns-query?name=google.com&type=A" \
+  -H "Accept: application/dns-json"
+```
+
+---
+
+## 📁 File Penting
+
+| Path | Keterangan |
+|---|---|
+| `/etc/dnsdist/dnsdist.conf` | Config utama |
+| `/etc/dnsdist/upstreams.conf` | Upstream (auto-generated) |
+| `/etc/dnsdist/safesearch.conf` | SafeSearch (panel, optional) |
+| `/etc/dnsdist/dotdoh.conf` | DoT/DoH (panel, optional) |
+| `/etc/dnsdist/node.conf` | Config tersimpan |
+| `/var/lib/dnsdist/blacklist.db` | Symlink CDB aktif |
+| `/var/lib/dnsdist/panel-cert.pem` | TLS cert panel |
+| `/var/lib/dnsdist/panel.secret` | JWT secret panel |
+| `/var/lib/dnsdist/panel.password` | Password panel |
+| `/usr/local/bin/dnsdist-panel` | Binary panel |
+| `/usr/local/bin/setup-edge.sh` | Script utama |
+| `/usr/local/bin/update-blacklist.sh` | Sync CDB |
+
+---
+
+## ❗ Troubleshooting Cepat
+
+```bash
+# Syntax config
 dnsdist --check-config
 
-# 2. Check file permissions
-ls -la /etc/dnsdist/
-chmod 644 /etc/dnsdist/*.lua
-chown -R dnsdist:dnsdist /etc/dnsdist/
+# Service error
+journalctl -u dnsdist -n 50 --no-pager
+journalctl -u dnsdist-panel -n 30
 
-# 3. Verify systemd unit exists
-systemctl cat dnsdist
+# Panel tidak jalan
+ss -tlnp | grep 8443
+rm /var/lib/dnsdist/panel-cert.pem /var/lib/dnsdist/panel-key.pem
+systemctl restart dnsdist-panel   # regenerate cert
 
-# 4. View detailed errors
-journalctl -u dnsdist --no-pager -n 100
-```
+# Blacklist tidak sync
+bash -x /usr/local/bin/update-blacklist.sh
 
-### Problem: No blacklist data
-```bash
-# 1. Test manual download
-curl -I http://CENTRAL_URL/blacklist.db
-
-# 2. Check firewall
-firewall-cmd --list-ports  # Firewalld
-ufw status                  # UFW
-iptables -L -n              # Raw iptables
-
-# 3. Verify network connectivity
-ping CENTRAL_SERVER_IP
-telnet CENTRAL_HOST 80
-```
-
-### Problem: DNS queries failing
-```bash
-# 1. Test each upstream individually
-dig @8.8.8.8 example.com
-dig @1.1.1.1 example.com
-
-# 2. Check cache performance
-dig @localhost +stats
-
-# 3. Look for rate limiting
-grep "MaxQPSIPRule" /var/log/dnsdist.log
+# Permission reset
+chown -R dnsdist:dnsdist /etc/dnsdist /var/lib/dnsdist
+chmod 600 /etc/dnsdist/certs/server.key
 ```
 
 ## 🛡️ Security Checklist
 
-- [ ] Change default web console password
-- [ ] Change default API key
-- [ ] Restrict port 8083 access via firewall
-- [ ] Enable TLS (DoT/DoH) on public interfaces
-- [ ] Use strong SSL/TLS certificates
-- [ ] Regular security updates
-- [ ] Monitor log files for suspicious activity
+- [ ] Ganti default password web console (port 8083)
+- [ ] Ganti default API key dnsdist
+- [ ] Ganti password panel (halaman Settings, port 8443)
+- [ ] Restrict port 8083 & 8443 via firewall (hanya akses admin)
+- [ ] Enable DoT/DoH untuk query publik
+- [ ] Pasang cert valid (bukan self-signed) jika exposed publik
 
 ---
 
-**For complete documentation:** See `SETUP.md`, `EDGE-README.md`, `TOPSTATS-README.md`
+**Docs lengkap:** `docs/SETUP.md` · `docs/SETUP-EDGE-COMMANDS.md` · `EDGE-README.md`

@@ -1,102 +1,95 @@
-# Changelog
+# Changelog — DNSDist Edge Node (Trust-NG)
 
-Semua perubahan penting pada project ini akan didokumentasikan di file ini.
+Semua perubahan signifikan dicatat di sini.
+Format: [versi] — tanggal, deskripsi singkat.
 
-Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+---
 
-## [Unreleased]
+## [2.4.1] — 2026-09-08
 
-### Added
-- `setup-edge.sh` v2.3.0: flag `--with-panel` (auto-install DNSDist Panel dari GitHub release + systemd unit)
-- `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
-- `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
+### 🐛 Bugfix (ditemukan via 18 integration test)
+- **panel**: path `safesearch.conf`, `dotdoh.conf`, `panel.password` hardcoded ke `/etc/dnsdist/` → sekarang derive dari `filepath.Dir(flagConf)` / `filepath.Dir(flagSecret)` sehingga binary bisa dijalankan dengan path custom (`-config`, `-secret-file`)
+- **panel**: `panel.password` write error sebelumnya silent drop (`_ = ...`) → sekarang return HTTP 500 dengan pesan error
+- **panel**: default `cert_path` / `key_path` di `/api/config` sekarang relatif ke confDir, bukan hardcode
 
-### Changed
-- `update-blacklist.sh` v3.1.0: multi-URL failover + content-addressed storage (`blacklist.<sha>.db` + symlink swap) + manifest sidecar (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
-- `setup/` dibuat **self-contained**: cukup 3 file inti (`setup-edge.sh`, `dnsdist.conf`, `update-blacklist.sh`) untuk deploy node
-- Modul opsional (top-stats, build-asn-db, asn-toolkit) dipindah ke `addons/`
-- `setup-edge.sh` mendeteksi addon di `addons/`; jika tidak ada, lewati (client butuh file seminimal mungkin)
-- `deploy-edge.yml` & `templates/node.conf.j2` ikut di dalam `setup/`
+### Panel (v2.4.1)
+- Binary `tools/dnsdist-panel` — Go 1.22, stdlib only, 6.5 MB
+- HTTPS `:8443`, self-signed ECDSA P-256 cert auto-generate
+- JWT HS256 manual (tanpa dependency eksternal), secret di `panel.secret`
+- UI embed single-file `panel/static/index.html` (501 baris, dark theme)
+- **API endpoints:**
+  - `POST /api/login` — JWT auth
+  - `GET  /api/stats` — QPS (UDP delta `/proc/net/snmp`), CPU, RAM, uptime, dnsdist status
+  - `GET  /api/config` — parse `dnsdist.conf` + `upstreams.conf` + `safesearch.conf`
+  - `POST /api/rpz` — validasi IP, jalankan `setup-edge.sh --set-rpz`
+  - `POST /api/upstream` — jalankan `setup-edge.sh --set-upstream`
+  - `POST /api/safesearch` — write `safesearch.conf` atomic + restart dnsdist
+  - `POST /api/dotdoh` — write `dotdoh.conf` atomic + restart dnsdist
+  - `POST /api/settings` — block_mode + ganti password panel
 
-## [2.1.0] - 2026-08-31
+---
 
-### Added
-- `tools/gen-cdb.py`: generator CDB wire-format (dipakai docs, sebelumnya tidak ada)
-- `tools/dnsdist-health.sh`: health check node (service, config, DB, resolusi, port)
-- GitHub Actions CI (`.github/workflows/ci.yml`): shellcheck, yamllint, smoke test CDB
-- `SECURITY.md`: kebijakan keamanan & panduan pelaporan kerentanan
+## [2.4.0] — 2026-09-08
 
-### Added
-- `setup-edge.sh` v2.3.0: flag `--with-panel` (auto-install DNSDist Panel dari GitHub release + systemd unit)
-- `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
-- `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
+### 🚀 RPZ Multi-IP + IPv6 Support (`setup-edge.sh` v2.4.0)
 
-### Changed
-- `update-blacklist.sh` v3.1.0: multi-URL failover + content-addressed storage (`blacklist.<sha>.db` + symlink swap) + manifest sidecar (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
-- Dedupe: `scripts/asn-toolkit/` hanya menyimpan data (`ipinfo_lite.csv`, `asn-db.bin`, `dnsdist.conf`); source script tunggal di `scripts/`
-- Path resolver di `setup-edge.sh` diarahkan ke `../scripts/` (single source of truth)
-- Versi script `setup-edge.sh` 2.1.0 & `update-blacklist.sh` 3.0.0
+#### Fitur Baru
+- **`--set-rpz` multi-IP**: sekarang terima IPv4, IPv6, `[IPv6]:port`, campur koma/spasi
+  ```bash
+  sudo ./setup-edge.sh --set-rpz "10.10.10.10, 2001:db8::1"
+  ```
+- **`_rpz_normalize()`**: validasi + normalize input → bash array, filter IP tidak valid dengan warning
+- **`_rpz_build_lua()`**: build Lua table string dari array
+- **`_rpz_patch_conf()`**: patch `dnsdist.conf` via python3 (atomic, aman dari karakter IPv6 di `sed`)
 
-## [2.0.0] - 2026-08-31
+#### Bugfix
+- `sed -i "s|SINKHOLE_IPS={.*}|...|"` pecah saat nilai mengandung IPv6 (`:`, `[`, `]`) → seluruh operasi `SINKHOLE_IPS` kini pakai python3 atomic replace
+- Semua `sed -i` pada `SINKHOLE_IPS` diganti (termasuk path upgrade, adguard mode, do_update_config)
+- `--set-rpz` arg parser: join pakai koma bukan spasi (aman untuk IPv6 bare address)
 
-### Added
-- Restrukturisasi folder: `setup/`, `config/`, `scripts/`, `docs/`, `templates/`, `monitoring/`, `tools/`, `certs/`
-- Dokumentasi CLI `docs/SETUP-EDGE-COMMANDS.md` (17 opsi perintah `setup-edge.sh`)
-- Panduan instalasi `docs/SETUP.md` dan cheatsheet `docs/QUICK_REFERENCE.md`
-- File `LICENSE` (MIT) dan `CHANGELOG.md`
-- Deteksi otomatis path modul `top-stats.lua`, `build-asn-db.sh`, `ipinfo_lite.csv` di `../scripts/`
-  saat `setup-edge.sh` dijalankan dari folder `setup/`
-- `templates/node.conf.j2` diperluas: `SAVED_CERT_MODE`, password/API key webserver opsional,
-  dan `SAVED_INSTALL_DATE` via Ansible
+#### `dnsdist.conf`
+- Auto-split `_sinkhole_v4` / `_sinkhole_v6` dari `SINKHOLE_IPS` saat startup
+- Query `A` → redirect ke IPv4 sinkhole saja
+- Query `AAAA` → redirect ke IPv6 sinkhole jika ada, else `NXDOMAIN`
+- Query `HTTPS/TXT/dll` → `NXDOMAIN` (sebelumnya lolos ke upstream)
+- Tambah optional `dofile('/etc/dnsdist/safesearch.conf')` [section 6.5]
+- Tambah optional `dofile('/etc/dnsdist/dotdoh.conf')` [section 1] — dikontrol panel
 
-### Added
-- `setup-edge.sh` v2.3.0: flag `--with-panel` (auto-install DNSDist Panel dari GitHub release + systemd unit)
-- `setup-edge.sh` v2.2.0: flag `--set-cdb-sources` (daftar sumber CDB central/mirror/peer) → `SAVED_CDB_SOURCES` di node.conf
-- `update-blacklist.sh` v3.1.0: dukungan `SAVED_CDB_SOURCES` multi-source
+#### `setup-edge.sh`
+- `do_check_config`: tampilkan IP Sinkhole satu per baris dengan bullet `•`
+- `do_install_panel`: port `8084` → `8443` HTTPS, env vars sesuai binary baru
 
-### Changed
-- `update-blacklist.sh` v3.1.0: multi-URL failover + content-addressed storage (`blacklist.<sha>.db` + symlink swap) + manifest sidecar (central + mirror + peer), verifikasi ukuran file, manifest sidecar JSON
-- `config/deploy-edge.yml` disesuaikan dengan struktur baru (path repo root, `setup/` folder,
-  dukungan `--password`/`--apikey` opsional)
-- README & dokumen lain: URL repo diperbarui ke `Santainetwork/dnsdist-edge`
+---
 
-## [1.0.0] - 2026-07-28
+## [2.3.0] — 2026-09
 
-### Added
-- Rilis awal: `setup-edge.sh` v2.0.0, `update-blacklist.sh`, `top-stats.lua`, `build-asn-db.sh`
-- Arsitektur Central vs Edge (pembuatan CDB terpusat, sinkronisasi hot-reload di Edge)
-- Monitoring stack Grafana + Prometheus
+### `setup-edge.sh` v2.3.0
+- **`--with-panel`**: auto-download binary `dnsdist-panel` dari GitHub release + install systemd unit
+- CLI options: 17 → 19 (`--set-cdb-sources`, `--with-panel`)
 
-## [2.4.0] - 2026-09-08
+---
 
-### Fixed
-- **RPZ multi-IP + IPv6**: `do_set_rpz` sekarang pakai `python3` untuk patch `dnsdist.conf` secara atomic, aman dari karakter IPv6 (`:`, `[`, `]`) yang rusak di `sed`
-- **`--set-rpz` argumen**: parsing di-normalisasi, support koma dan spasi campur, multiple argumen
-- Semua `sed -i "s|SINKHOLE_IPS|..."` diganti python3 atomic replace (upgrade path, adguard mode, do_update_config)
+## [2.2.0] — 2026-09
 
-### Improved  
-- **dnsdist.conf**: RPZ mode sekarang pisah `_sinkhole_v4` dan `_sinkhole_v6` otomatis
-  - Query `A` → di-redirect ke IPv4 sinkhole saja
-  - Query `AAAA` → di-redirect ke IPv6 sinkhole jika ada, sinon NXDOMAIN
-  - Query `HTTPS/TXT/dll` → NXDOMAIN (sebelumnya lolos ke upstream)
-- Contoh konfigurasi multi-IP + IPv6 di dnsdist.conf
+### `setup-edge.sh` v2.2.0
+- **`--set-cdb-sources`**: ubah daftar sumber CDB (central, mirror, peer) tanpa reinstall
+- Cluster Phase 4 client-side selesai
 
-### Breaking change (minor)
-- RPZ mode sekarang balikan NXDOMAIN untuk non-A/AAAA query (sebelumnya diteruskan upstream)
+---
 
-## [2.4.1] - 2026-09-08
+## [3.1.0] — update-blacklist.sh — 2026-09
 
-### Added
-- **panel/**: Go binary panel HTTPS :8443, self-signed cert auto-generate
-  - JWT auth (stdlib HMAC-SHA256), password disimpan di `/var/lib/dnsdist/panel.password`
-  - API: `/api/login`, `/api/stats`, `/api/config`, `/api/rpz`, `/api/upstream`, `/api/safesearch`, `/api/dotdoh`, `/api/settings`
-  - Stats dari `/proc/stat` (CPU), `/proc/meminfo` (RAM), `/proc/uptime`, `/proc/net/snmp` (QPS delta)
-  - UI embed `panel/static/index.html` (501 baris, single-file SPA dark theme)
-- **panel/static/index.html**: dark theme SPA — Dashboard, RPZ, Upstream, SafeSearch, DoT/DoH, Settings
-- **dnsdist.conf**: optional `dofile(/etc/dnsdist/safesearch.conf)` [6.5] dan `dofile(/etc/dnsdist/dotdoh.conf)` [1]
-  - Kedua file hanya di-load jika ada (panel yang generate)
-- `panel/build.sh`: build ke `tools/dnsdist-panel` (strip, ~6.5MB)
+### `update-blacklist.sh` v3.1.0
+- Content-addressed DB: simpan sebagai `blacklist.<sha256>.db` + symlink atomic swap
+- Manifest sidecar `blacklist.db.manifest.json`
+- Cluster Phase 2 selesai
 
-### Changed
-- `do_install_panel` systemd env: `PANEL_ADDR=0.0.0.0:8443`, tambah `PANEL_SECRET_FILE`, `PANEL_CERT`, `PANEL_KEY`, `DNSDIST_CONF`, `DNSDIST_UPSTREAMS`
+---
+
+## [2.1.0] — 2026-08
+
+### Versi awal publik
+- `setup-edge.sh` v2.1.0: 17 opsi CLI, RPZ/AdGuard mode, self-signed cert, cronjob
+- `update-blacklist.sh`: ETag cache, multi-source failover, hot-reload CDB 5 detik
+- `dnsdist.conf`: RPZ + AdGuard mode, blacklist CDB, top-stats module, rate limit
+- `tools/trust-builder`: Go CDB generator, multi-URL, ETag, atomic replace

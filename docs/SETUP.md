@@ -1,362 +1,315 @@
-# 🚀 Setup Guide - DNSDist Edge Node (Trust-NG)
+# 🚀 Setup Guide — DNSDist Edge Node (Trust-NG)
 
-Panduan lengkap untuk部署 DNSDist Edge Node secara native (tanpa Docker).
+Panduan lengkap deploy DNSDist Edge Node secara native (tanpa Docker).
+
+---
 
 ## 📋 Prasyarat
 
-### Sistem Operasi
-- **Debian 11+** atau **Ubuntu 20.04+** (rekomendasi: Debian 12 Bookworm)
-- Minimal requirements:
-  - RAM: 2 GB (minimal), 8 GB (recommended)
-  - CPU: 2 cores
-  - Storage: 20 GB SSD
+| Item | Minimal | Rekomendasi |
+|---|---|---|
+| OS | Debian 11 / Ubuntu 20.04 | Debian 12 Bookworm |
+| RAM | 2 GB | 8 GB |
+| CPU | 2 core | 4 core |
+| Storage | 20 GB SSD | 40 GB SSD |
+| Python | 3.x (stdlib) | — |
 
-### Akses & Permissions
 ```bash
-sudo su -  # Atau gunakan sudo untuk setiap command
+sudo su -   # atau prefix tiap perintah dengan sudo
 ```
+
+---
 
 ## 🔧 Instalasi Cepat
 
 ### 1. Download Repositori
 ```bash
-cd /tmp
+cd /opt
 git clone https://github.com/Santainetwork/dnsdist-edge.git
 cd dnsdist-edge/setup
 ```
 
 ### 2. Jalankan Installer
 ```bash
-# Instal dengan konfigurasi default
+# Install standar (interaktif)
 sudo ./setup-edge.sh --install
 
-# Atau dengan URL Central Manager custom
+# Non-interaktif dengan Central Manager URL
 sudo ./setup-edge.sh --install --url http://central-manager.local:8080/files/trust.db
 
-# Set password web console
+# Dengan password web console kustom
 sudo ./setup-edge.sh --install --password mypassword --apikey myapikey
 
-# Install + aktifkan DNSDist Panel (download binary dari GitHub release)
+# Install + panel manajemen (HTTPS :8443)
 sudo ./setup-edge.sh --install --with-panel
 ```
 
-## 📝 Konfigurasi Manual
+---
 
-### Jika Ingin Custom Configuration
+## 📝 Konfigurasi
 
-#### Step 1: Edit Variabel di `setup-edge.sh`
+### Mode Operasional
+
+Saat install, pilih mode blokir:
+
+| Mode | Return | Kegunaan |
+|---|---|---|
+| `rpz` | IP Sinkhole (halaman blokir) | ISP, operator |
+| `adguard` | `0.0.0.0` / `::` (null route) | Privacy, internal |
+
+### RPZ Sinkhole — Multi-IP + IPv6
+
+Sejak v2.4.0, sinkhole mendukung **beberapa IP sekaligus**, termasuk IPv6:
+
 ```bash
-# Default values (bisa diubah sebelum run)
-CENTRAL_DB_URL="http://your-central-server.com/blacklist.db"
-UPSTREAM_DNS="1.1.1.1, 8.8.8.8"
-RPZ_IPS="10.10.10.10"
-WEBSERVER_PASSWORD="changeme"
-WEBSERVER_APIKEY="change-this-apikey"
+# IPv4 tunggal
+sudo ./setup-edge.sh --set-rpz "10.10.10.10"
+
+# IPv4 + IPv6 (dipisah koma)
+sudo ./setup-edge.sh --set-rpz "10.10.10.10, 2001:db8::1"
+
+# Multiple IPv4
+sudo ./setup-edge.sh --set-rpz "10.10.10.10, 10.10.10.11"
 ```
 
-#### Step 2: Pilih Mode Operasional
-Saat run installer, Anda akan diminta memilih:
-1. **Mode AdGuard (Privacy)** - Returns `0.0.0.0` untuk blocked domains
-2. **Mode RPZ (ISP)** - Redirect ke IP Sinkhole (tampilkan halaman warning)
+DNSDist otomatis memisahkan IPv4/IPv6:
+- Query `A` → IP sinkhole **IPv4** saja
+- Query `AAAA` → IP sinkhole **IPv6** jika ada, else `NXDOMAIN`
+- Query `HTTPS/TXT/dll` → `NXDOMAIN`
 
-Rekomendasi:
-- Production public resolver → **RPZ mode**
-- Internal/privacy-focused → **AdGuard mode**
+Edit manual di `/etc/dnsdist/dnsdist.conf`:
+```lua
+SINKHOLE_IPS = {'10.10.10.10', '10.10.10.11', '2001:db8::1'}
+```
 
-#### Step 3: Konfigurasi Upstream DNS
-Masukkan IP upstream (comma-separated):
-- Google: `8.8.8.8, 8.8.4.4`
-- Cloudflare: `1.1.1.1, 1.0.0.1`
-- Quad9: `9.9.9.9`
-- Kombinasi: `1.1.1.1, 8.8.8.8, 9.9.9.9`
+### Upstream DNS
 
-#### Step 4: SSL/TLS Certificate Option
-Pilihan sertifikat:
-1. Self-signed (default, ready-to-use)
-2. Let's Encrypt (butuh domain + nginx)
-3. Existing certificate (paste path ke cert/key)
+```bash
+# IPv4
+sudo ./setup-edge.sh --set-upstream "1.1.1.1, 8.8.8.8"
+
+# IPv4 + IPv6
+sudo ./setup-edge.sh --set-upstream "1.1.1.1, [2606:4700:4700::1111]:53"
+```
+
+### SafeSearch (via panel atau manual)
+
+Panel menulis `/etc/dnsdist/safesearch.conf` yang di-load otomatis oleh `dnsdist.conf`.
+Rewrite DNS ke IP paksa safesearch:
+
+| Provider | IP Paksa |
+|---|---|
+| Google | `216.239.38.120` (A), `2001:4860:4802:32::78` (AAAA) |
+| Bing | `204.79.197.220` |
+| YouTube | `216.239.38.120` |
+
+### DoT / DoH (via panel atau manual)
+
+Panel menulis `/etc/dnsdist/dotdoh.conf`. Atau edit manual:
+
+```lua
+-- /etc/dnsdist/dotdoh.conf
+addTLSLocal('0.0.0.0:853', '/etc/dnsdist/certs/server.crt', '/etc/dnsdist/certs/server.key',
+  {provider='openssl', minTLSVersion='tls1.2'})
+addTLSLocal('[::]:853', '/etc/dnsdist/certs/server.crt', '/etc/dnsdist/certs/server.key',
+  {provider='openssl', minTLSVersion='tls1.2'})
+```
+
+---
+
+## 🖥️ DNSDist Panel (Opsional — HTTPS :8443)
+
+Panel web untuk manajemen node tanpa CLI. **Optional** — tanpa panel, semua fungsi tetap berjalan.
+
+### Install via setup-edge.sh
+
+```bash
+sudo ./setup-edge.sh --install --with-panel
+# atau setelah install:
+sudo ./setup-edge.sh --with-panel
+```
+
+### Build dari Source
+
+```bash
+cd panel
+bash build.sh
+# Output: tools/dnsdist-panel (6.5 MB, stdlib only)
+```
+
+### Jalankan Manual
+
+```bash
+sudo /usr/local/bin/dnsdist-panel \
+  -addr ":8443" \
+  -config /etc/dnsdist/dnsdist.conf \
+  -upstreams /etc/dnsdist/upstreams.conf
+```
+
+### Akses Panel
+
+```
+https://YOUR_SERVER_IP:8443
+```
+
+> ⚠️ Self-signed cert — browser akan warning, klik "Accept" / "Proceed".
+
+Password default: sama dengan password web console dnsdist (`trust-ng-admin`).
+Ganti di halaman **Settings** atau:
+```bash
+echo "passwordbaru" > /var/lib/dnsdist/panel.password
+```
+
+### Fitur Panel
+
+| Halaman | Fungsi |
+|---|---|
+| Dashboard | QPS real-time, CPU, RAM, uptime, status dnsdist |
+| RPZ Sinkhole | Set multi-IP sinkhole (IPv4+IPv6), tampilkan aktif |
+| Upstream DNS | Set resolver upstream, tampilkan aktif |
+| SafeSearch | Toggle Google/Bing/YouTube safe search per provider |
+| DoT / DoH | Enable/disable + path cert/key, restart otomatis |
+| Settings | Block mode, ganti password panel |
+
+### Env Vars Systemd (untuk kustomisasi)
+
+```ini
+Environment=PANEL_ADDR=0.0.0.0:8443
+Environment=DNSDIST_CONF=/etc/dnsdist/dnsdist.conf
+Environment=DNSDIST_UPSTREAMS=/etc/dnsdist/upstreams.conf
+Environment=PANEL_CERT=/var/lib/dnsdist/panel-cert.pem
+Environment=PANEL_KEY=/var/lib/dnsdist/panel-key.pem
+Environment=PANEL_SECRET_FILE=/var/lib/dnsdist/panel.secret
+```
+
+---
 
 ## 🔄 Setelah Instalasi
 
-### 1. Cek Status Service
+### Cek Status
 ```bash
+sudo ./setup-edge.sh --check-config
 systemctl status dnsdist
 ```
 
-Expected output:
-```
-● dnsdist.service - DNS traffic distributor and blocker
-   Loaded: loaded (/etc/systemd/system/dnsdist.service)
-   Active: active (running)
-```
-
-### 2. Test DNS Resolution
+### Test DNS
 ```bash
-# DNS plaintext (port 53)
+# Plaintext
 dig @127.0.0.1 google.com
 
-# DoT (DNS over TLS - port 853)
-openssl s_client -connect 127.0.0.1:853 -starttls dns </dev/null 2>/dev/null | dig @127.0.0.1 google.com
+# Test blokir (harus return sinkhole IP)
+dig @127.0.0.1 evil-domain.com
 
-# DoH (DNS over HTTPS - port 443)
-curl -v --http2 https://127.0.0.1/dns-query -H "X-DNS-over-HTTPS: true"
+# DoT
+kdig @127.0.0.1 +tls google.com
 ```
 
-### 3. Verifikasi Web Console
-Access di browser: `http://YOUR_SERVER_IP:8083`
-- Username: `trust-ng-admin`
-- Password: (sesuai yang Anda set saat install)
-
-API Key tersedia di header request:
-```bash
-curl -H "X-API-Key: YOUR_API_KEY" http://localhost:8083/api/v1/stats
+### Web Console dnsdist
 ```
-
-### 4. Monitoring Logs
-```bash
-# Main service logs
-tail -f /var/log/dnsdist.log
-
-# Sync logs (blacklist database updates)
-tail -f /var/log/dnsdist-sync.log
-
-# Real-time query logging (if enabled in dnsdist.conf)
-tail -f /var/log/dnsdist/queries.log
+http://YOUR_SERVER_IP:8083
 ```
+API: `curl -H "X-API-Key: YOUR_KEY" http://localhost:8083/api/v1/stats`
 
-## ⏰ Auto-Sync Blacklist Database
+---
 
-Installer otomatis membuat cronjob yang berjalan setiap 3 jam:
-```bash
+## ⏰ Auto-Sync Blacklist
+
+Cronjob tiap 3 jam (dibuat otomatis saat install):
+```cron
 0 */3 * * * /usr/local/bin/update-blacklist.sh >> /var/log/dnsdist-sync.log 2>&1
 ```
 
-Manual sync anytime:
+Manual sync:
 ```bash
-# Normal sync
-sudo /usr/local/bin/update-blacklist.sh
-
-# Force update (ignore cache)
-sudo /usr/local/bin/update-blacklist.sh --force-update
+sudo /usr/local/bin/update-blacklist.sh           # normal
+sudo /usr/local/bin/update-blacklist.sh --force   # bypass cache
 ```
 
-Status page available at: `http://YOUR_SERVER_IP/status/`
+---
 
-## 🌐 CDB Cluster & Redundancy (v3.x)
+## 🌐 CDB Cluster & Redundancy (update-blacklist v3.x)
 
-Sejak `update-blacklist.sh` v3.0.0, node mendukung **multi-source failover**:
-central + mirror + peer. Jika satu sumber mati, otomatis pindah ke berikutnya.
-
-### Konfigurasi Sumber CDB
+Multi-source failover: central → mirror → peer.
 
 ```bash
-# Daftar sumber dipisah koma (central + mirror + peer)
 sudo ./setup-edge.sh --set-cdb-sources \
-  "http://central-manager/trust.db,http://mirror-01/trust.db,http://peer-02:8084/cdb/blacklist.db"
+  "http://central/trust.db,http://mirror/trust.db,http://peer:8443/cdb/blacklist.db"
 ```
 
-Atau langsung edit `/etc/dnsdist/node.conf`:
+Content-addressed storage: `blacklist.<sha256>.db` + symlink atomic swap.
 
-```ini
-SAVED_CDB_SOURCES="http://central-manager/trust.db,http://mirror-01/trust.db"
-```
+---
 
-### Content-Addressed Storage
+## 🆙 Upgrade
 
-Setiap DB disimpan sebagai `blacklist.<sha256>.db` + symlink `blacklist.db`
-(swap atomic, tanpa copy besar). Manifest sidecar di `blacklist.db.manifest.json`:
-
-```json
-{"version": 3, "sha256": "abc...", "source": "http://mirror-01/trust.db", "built_at": "2026-08-31T..."}
-```
-
-### Peer Publisher (di panel :8084)
-
-Node yang menjalankan panel mempublikasikan CDB-nya di `/cdb/*`:
-
-| Endpoint | Deskripsi |
-|----------|-----------|
-| `GET /cdb/healthz` | Status DB (`X-CDB-Token`) |
-| `GET /cdb/manifest.json` | Metadata versi/hash/sumber |
-| `GET /cdb/blacklist.db` | DB aktif (symlink resolved) |
-| `GET /cdb/blacklist.<sha>.db` | DB versi tertentu (immutable) |
-
-Set `CDB_TOKEN` di systemd unit panel agar peer harus menyertakan
-header `X-CDB-Token` saat menarik DB.
-
-### Kelola Peer via Panel
-
-Halaman **Cluster** di panel (`/cluster`):
-- Tambah/hapus peer (name, URL, token)
-- Tombol **Probe**: cek `reachable` + `health` + manifest peer
-- Lihat manifest lokal (version, sha256, source, built_at)
-
-### Urutan Failover
-
-```
-1. Coba sumber 1 (central)   — HTTP check + download
-2. Coba sumber 2 (mirror)    — bila source 1 gagal/404
-3. Coba sumber 3 (peer)      — bila source 2 gagal
-4. Semua gagal               — DB lama dipertahankan (tidak patah)
-```
-
-Setiap file yang berhasil diunduh diverifikasi ukuran ≥ 2KB sebelum dipasang.
-
-## 🆙 Upgrade Script
-
-Untuk update ke versi terbaru tanpa kehilangan konfigurasi:
 ```bash
 cd /opt/dnsdist-edge/setup
 sudo ./setup-edge.sh --upgrade
 ```
 
-Script akan otomatis:
-1. Backup konfigurasi lama
-2. Update semua file config dan scripts
-3. Preserve user settings (URL, password, upstreams, dll)
-4. Restart service dengan aman
-
-## 🛠️ Troubleshooting
-
-### Issue: Service tidak start
-```bash
-# Cek konfigurasi syntax
-dnsdist --check-config
-
-# Lihat error logs
-journalctl -u dnsdist -n 50 --no-pager
-
-# Verify files ownership
-ls -la /etc/dnsdist/
-```
-
-### Issue: DNS resolution lambat
-```bash
-# Check upstream connectivity
-dig @8.8.8.8 google.com
-dig @1.1.1.1 google.com
-
-# Increase cache size di dnsdist.conf
-maxCacheEntries 500000
-```
-
-### Issue: Blacklist tidak sinkron
-```bash
-# Test manual download
-curl -I http://CENTRAL_MANAGER_URL/blacklist.db
-
-# Check firewall rules
-iptables -L -n | grep :80
-systemctl status nginx  # if using nginx as central manager
-
-# Enable verbose logging di update-blacklist.sh
-bash -x /usr/local/bin/update-blacklist.sh
-```
-
-### Issue: No certificates found
-```bash
-# Regenerate self-signed certificates
-cd /etc/dnsdist/certs
-rm -f server.*
-openssl req -x509 -newkey rsa:4096 \
-  -keyout server.key \
-  -out server.crt \
-  -days 365 \
-  -nodes \
-  -subj "/CN=$(hostname)/O=Trust-NG/C=ID"
-
-chmod 600 server.key && chown dnsdist:dnsdist server.key
-systemctl restart dnsdist
-```
-
-## 📊 Monitoring Integration
-
-### Prometheus Metrics
-Scrape endpoint: `http://YOUR_SERVER_IP:8083/metrics`
-
-Add to your `prometheus.yml`:
-```yaml
-scrape_configs:
-  - job_name: 'dnsdist-edge'
-    static_configs:
-      - targets: ['localhost:8083']
-    metrics_path: /metrics
-```
-
-### Grafana Dashboard
-Import dari: `monitoring/grafana/provisioning/dashboards/dnsdist.json`
-
-Dashboard menampilkan:
-- QPS (Queries Per Second)
-- Cache hit rate
-- Top queries domains
-- Top blocked domains
-- Response times
-- ASN distribution
-
-## 🎯 Performance Tuning
-
-### Kernel Parameters (untuk high-traffic)
-Tambahkan ke `/etc/sysctl.conf`:
-```ini
-net.core.rmem_max=16777216
-net.core.rmem_default=16777216
-net.core.wmem_max=16777216
-net.core.wmem_default=16777216
-net.core.netdev_max_backlog=2000
-net.ipv4.tcp_tw_reuse=1
-net.ipv4.tcp_fin_timeout=15
-net.ipv4.ip_local_port_range=1024 65535
-net.netfilter.nf_conntrack_max=1048576
-```
-
-Apply:
-```bash
-sysctl -p
-```
-
-### DNSDist Lua Tuning
-Edit `/etc/dnsdist/dnsdist.conf`:
-```lua
--- Increase max threads
-setMaxThreads(16)
-
--- Optimize TCP buffers
-setMaxTCPCacheSize(100000)
-setTCPCloseTimeout(2)
-
--- Tune UDP timeouts
-setUDPTimeout(5)
-```
-
-## 📦 File Reference
-
-| Path | Purpose |
-|------|---------|
-| `/etc/dnsdist/dnsdist.conf` | Main configuration |
-| `/etc/dnsdist/top-stats.lua` | Statistics module |
-| `/etc/dnsdist/node.conf` | User saved config |
-| `/etc/dnsdist/certs/server.crt` | SSL certificate |
-| `/etc/dnsdist/certs/server.key` | SSL private key |
-| `/var/lib/dnsdist/blacklist.db` | Blacklist database (CDB format) |
-| `/var/log/dnsdist.log` | DNSDist operational logs |
-| `/var/log/dnsdist-sync.log` | Sync job logs |
-
-## 🔐 Security Best Practices
-
-1. **Change default credentials**: Update web console password immediately
-2. **Restrict API access**: Use firewall to limit who can access port 8083
-3. **TLS enforcement**: Always use DoT/DoH, disable plaintext DNS on public interfaces
-4. **Regular updates**: Keep system packages updated
-5. **Monitor disk space**: Blacklist.db can grow to hundreds of MB
-
-## 📞 Support & Resources
-
-- GitHub Repository: https://github.com/Santainetwork/dnsdist-edge
-- Documentation: `EDGE-README.md`, `TOPSTATS-README.md`
-- Community: Trust-NG Discord/Forum (link TBD)
+Otomatis: backup config → update scripts → migrasi path → restart.
 
 ---
 
-**Version:** v2.0.0  
-**Last Updated:** August 2026
+## 🛠️ Troubleshooting
+
+### Service tidak start
+```bash
+dnsdist --check-config
+journalctl -u dnsdist -n 50 --no-pager
+```
+
+### Panel tidak bisa diakses
+```bash
+systemctl status dnsdist-panel
+journalctl -u dnsdist-panel -n 30
+# Cek port
+ss -tlnp | grep 8443
+```
+
+### RPZ tidak bekerja
+```bash
+# Cek SINKHOLE_IPS di config
+grep "SINKHOLE_IPS" /etc/dnsdist/dnsdist.conf
+# Test blokir
+dig @127.0.0.1 <domain-yang-ada-di-blacklist>
+```
+
+### Regenerate cert panel
+```bash
+rm /var/lib/dnsdist/panel-cert.pem /var/lib/dnsdist/panel-key.pem
+systemctl restart dnsdist-panel  # auto-generate baru
+```
+
+---
+
+## 📊 Monitoring
+
+- **Prometheus**: scrape `http://YOUR_SERVER:8083/metrics`
+- **Grafana**: import `monitoring/grafana/provisioning/dashboards/dnsdist.json`
+- **Panel**: `https://YOUR_SERVER:8443` — dashboard QPS + resource real-time
+
+---
+
+## 📦 File Reference
+
+| Path | Keterangan |
+|---|---|
+| `/etc/dnsdist/dnsdist.conf` | Config utama |
+| `/etc/dnsdist/upstreams.conf` | Upstream (auto-generated) |
+| `/etc/dnsdist/safesearch.conf` | SafeSearch rules (panel-generated, optional) |
+| `/etc/dnsdist/dotdoh.conf` | DoT/DoH listeners (panel-generated, optional) |
+| `/etc/dnsdist/node.conf` | Config tersimpan (URL, mode, dll) |
+| `/etc/dnsdist/certs/server.{crt,key}` | TLS cert dnsdist |
+| `/var/lib/dnsdist/blacklist.db` | Symlink ke CDB aktif |
+| `/var/lib/dnsdist/panel-cert.pem` | TLS cert panel (auto-generated) |
+| `/var/lib/dnsdist/panel.secret` | JWT secret panel |
+| `/var/lib/dnsdist/panel.password` | Password login panel |
+| `/usr/local/bin/dnsdist-panel` | Binary panel |
+| `/usr/local/bin/setup-edge.sh` | Script manajemen utama |
+| `/usr/local/bin/update-blacklist.sh` | Sync CDB |
+
+---
+
+**Version:** v2.4.1
+**Last Updated:** September 2026

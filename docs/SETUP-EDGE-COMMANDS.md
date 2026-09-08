@@ -1,132 +1,190 @@
 # 🛠️ Dokumentasi CLI `setup-edge.sh`
 
-`setup-edge.sh` adalah skrip instalasi, konfigurasi, sinkronisasi, dan manajemen operasional otomatis untuk **DNSDist Edge Node (Trust-NG)** pada sistem operasi turunan Debian/Ubuntu.
+`setup-edge.sh` adalah skrip instalasi, konfigurasi, dan manajemen operasional untuk **DNSDist Edge Node (Trust-NG)** pada Debian/Ubuntu.
 
 ---
 
-## 📊 Ringkasan Total Perintah & Opsi (19 Opsi CLI)
+## 📊 Ringkasan Opsi CLI (19 Opsi)
 
-Skrip `setup-edge.sh` mendukung **19 opsi baris perintah (CLI options)** yang dikelompokkan ke dalam beberapa kategori operasi:
-
-| No | Opsi / Flag | Argumen | Kategori | Deskripsi |
+| No | Opsi | Argumen | Kategori | Deskripsi |
 |:---:|---|---|---|---|
-| 1 | `-i`, `--install` | - | **Instalasi** | Menginstal DNSDist, dependensi, sertifikat TLS, modul stats, cronjob, dan menyetel konfigurasi awal. |
-| 2 | `-u`, `--url` | `<URL>` | **Konfigurasi DB** | Menentukan URL Central Manager untuk sinkronisasi file `blacklist.db`. |
-| 3 | `-s`, `--sync-only` | - | **Sinkronisasi** | Menjalankan sinkronisasi database secara manual satu kali (memanfaatkan cache header). |
-| 4 | `-f`, `--force-update` | - | **Sinkronisasi** | Menjalankan sinkronisasi database manual dengan mengabaikan cache lokal (`If-Modified-Since`). |
-| 5 | `-c`, `--check-config` | - | **Diagnostik** | Memeriksa versi, mode blokir, IP sinkhole, upstream, status file DB, validitas syntax `dnsdist.conf`, dan status systemd. |
-| 6 | `--update-config` | - | **Konfigurasi** | Membuka wizard interaktif untuk mengubah Mode Blokir (AdGuard / RPZ) dan IP Upstream DNS. |
-| 7 | `--upgrade` | - | **Pemeliharaan** | Mengupgrade konfigurasi dan skrip ke versi terbaru dengan migrasi otomatis tanpa menghapus setelan lama. |
-| 8 | `--set-upstream` | `<IP1, IP2...>` | **Konfigurasi** | Mengubah daftar IP Upstream DNS resolver tanpa perlu menginstal ulang node. |
-| 9 | `--set-rpz` | `<IP1, IP2...>` | **Konfigurasi** | Mengubah IP Sinkhole target pemblokiran RPZ pada `dnsdist.conf`. |
-| 10 | `--set-cert` | `<1\|2\|3>` | **Sertifikat** | Memilih mode sertifikat: `1` (Self-Signed), `2` (Let's Encrypt), `3` (Disable DoT/DoH / Plaintext only). |
-| 11 | `--cert-domain` | `<domain>` | **Sertifikat** | Domain untuk request sertifikat Let's Encrypt (DoT/DoH). |
-| 12 | `--cert-email` | `<email>` | **Sertifikat** | Alamat email pendaftaran sertifikat Let's Encrypt untuk notifikasi expiry. |
-| 13 | `--password` | `<PWD>` | **Web Console** | Menyetel password login untuk Web Console DNSDist & API (Port 8083). |
-| 14 | `--apikey` | `<KEY>` | **Web Console** | Menyetel API Key untuk autentikasi endpoint REST API (`X-API-Key`). |
-| 15 | `--set-webserver` | - | **Web Console** | Menerapkan perubahan password dan API Key baru ke `dnsdist.conf` dan merestart service. |
-| 16 | `--uninstall` | - | **Sistem** | Menghapus seluruh instalasi DNSDist, direktori `/etc/dnsdist`, `/var/lib/dnsdist`, dan cronjob terkait. |
-| 17 | `--set-cdb-sources` | `<URL1, URL2...>` | **Cluster** | Mengubah daftar sumber CDB (central, mirror, peer) dipisah koma → `SAVED_CDB_SOURCES` di node.conf |
-| 18 | `--with-panel` | - | **Panel** | Auto-install DNSDist Panel (download binary release + systemd unit) |
-| 19 | `-V`, `--version` / `-h`, `--help` | - | **Informasi** | Menampilkan versi skrip atau menu bantuan CLI. |
+| 1 | `-i`, `--install` | — | **Instalasi** | Install DNSDist + deps + cert + stats + cronjob + config awal |
+| 2 | `-u`, `--url` | `<URL>` | **Config DB** | URL Central Manager untuk sync `blacklist.db` |
+| 3 | `-s`, `--sync-only` | — | **Sync** | Sync database manual (dengan cache header) |
+| 4 | `-f`, `--force-update` | — | **Sync** | Sync database paksa (bypass cache) |
+| 5 | `-c`, `--check-config` | — | **Diagnostik** | Cek versi, mode, sinkhole IPs, upstream, DB, syntax, service |
+| 6 | `--update-config` | — | **Config** | Wizard interaktif: ubah mode + upstream |
+| 7 | `--upgrade` | — | **Maintenance** | Upgrade ke versi terbaru, migrasi otomatis |
+| 8 | `--set-upstream` | `<IP1,IP2,...>` | **Config** | Set IP upstream DNS (IPv4, IPv6, IPv4:port, [IPv6]:port) |
+| 9 | `--set-rpz` | `<IP1,IP2,...>` | **Config** | Set IP Sinkhole RPZ — **multi-IP + IPv6 (v2.4.0)** |
+| 10 | `--set-cert` | `<1\|2\|3>` | **Cert** | Mode cert: `1`=Self-signed, `2`=Let's Encrypt, `3`=Disable |
+| 11 | `--cert-domain` | `<domain>` | **Cert** | Domain untuk Let's Encrypt |
+| 12 | `--cert-email` | `<email>` | **Cert** | Email Let's Encrypt |
+| 13 | `--password` | `<PWD>` | **Web Console** | Set password login web console dnsdist (port 8083) |
+| 14 | `--apikey` | `<KEY>` | **Web Console** | Set API Key dnsdist |
+| 15 | `--set-webserver` | — | **Web Console** | Terapkan password + apikey ke config + restart |
+| 16 | `--uninstall` | — | **Sistem** | Hapus instalasi lengkap |
+| 17 | `--set-cdb-sources` | `<URL1,URL2,...>` | **Cluster** | Set daftar sumber CDB (central, mirror, peer) |
+| 18 | `--with-panel` | — | **Panel** | Install panel HTTPS :8443 (download binary + systemd) |
+| 19 | `-V`, `--version` / `-h`, `--help` | — | **Info** | Tampilkan versi / bantuan |
 
 ---
 
-## 💻 Panduan Penggunaan & Contoh Perintah
+## 💻 Contoh Penggunaan
 
-Semua perintah di bawah ini harus dijalankan dengan hak akses root (`sudo` atau user `root`).
+### 1. Instalasi
 
-### 1. Instalasi Node Baru
-
-#### Instalasi Standar (Interaktif)
 ```bash
+# Interaktif standar
 sudo ./setup-edge.sh --install
-```
 
-#### Instalasi Non-Interaktif / Otomatis dengan Central Manager URL
-```bash
-sudo ./setup-edge.sh --install --url "http://central-manager.local:8080/files/trust.db"
-```
+# Non-interaktif
+sudo ./setup-edge.sh --install --url "http://central.local/trust.db"
 
-#### Instalasi Lengkap dengan Kredensial Web & Mode Sertifikat
-```bash
+# Lengkap + panel
 sudo ./setup-edge.sh --install \
-  --url "https://central-db.domain.id/trust.db" \
-  --password "AdminSuperRahasia123" \
-  --apikey "api-key-edge-node-01" \
-  --set-cert "1"
+  --url "https://central.domain.id/trust.db" \
+  --password "AdminRahasia123" \
+  --apikey "apikey-edge-01" \
+  --with-panel
 ```
 
 ---
 
-### 2. Manajemen Sinkronisasi Database Blacklist
+### 2. RPZ Sinkhole — Multi-IP + IPv6 (v2.4.0)
 
-#### Sinkronisasi Manual (Normal)
 ```bash
-sudo ./setup-edge.sh --sync-only
+# IPv4 tunggal
+sudo ./setup-edge.sh --set-rpz "10.10.10.10"
+
+# Multi IPv4
+sudo ./setup-edge.sh --set-rpz "10.10.10.10, 10.10.10.11"
+
+# IPv4 + IPv6 (dnsdist.conf auto-split A→IPv4, AAAA→IPv6)
+sudo ./setup-edge.sh --set-rpz "10.10.10.10, 2001:db8::1"
+
+# IPv6 saja (query A → NXDOMAIN, AAAA → IPv6 sinkhole)
+sudo ./setup-edge.sh --set-rpz "2001:db8::1"
 ```
 
-#### Paksa Download Database Baru (Bypass Cache)
+Format yang diterima:
+- `10.10.10.10` — IPv4 bare
+- `10.10.10.10:8080` — IPv4 dengan port
+- `2001:db8::1` — IPv6 bare
+- `[2001:db8::1]:5353` — IPv6 dengan port
+
+Semua format boleh dicampur, dipisah koma atau spasi. IP tidak valid di-skip dengan warning.
+
+---
+
+### 3. Upstream DNS
+
 ```bash
+# Standard
+sudo ./setup-edge.sh --set-upstream "1.1.1.1, 8.8.8.8"
+
+# Dengan IPv6
+sudo ./setup-edge.sh --set-upstream "1.1.1.1, [2606:4700:4700::1111]:53, 8.8.8.8"
+
+# Quad9 + Cloudflare
+sudo ./setup-edge.sh --set-upstream "9.9.9.9, 1.1.1.1"
+```
+
+---
+
+### 4. Panel Web (HTTPS :8443)
+
+```bash
+# Install saat pertama kali
+sudo ./setup-edge.sh --install --with-panel
+
+# Tambah panel ke node yang sudah ada
+sudo ./setup-edge.sh --with-panel
+```
+
+Panel tersedia di `https://YOUR_IP:8443` dengan self-signed cert (otomatis).
+
+**Fitur panel:**
+- Dashboard: QPS, CPU, RAM, uptime, status dnsdist
+- RPZ Sinkhole: set multi-IP, tampilkan aktif
+- Upstream DNS: set upstream, tampilkan aktif
+- SafeSearch: toggle Google/Bing/YouTube per provider
+- DoT/DoH: enable/disable + cert path, restart otomatis
+- Settings: block mode, ganti password panel
+
+**Password panel:** sama dengan `--password` saat install. Ganti via Settings atau:
+```bash
+echo "passwordbaru" > /var/lib/dnsdist/panel.password
+```
+
+---
+
+### 5. Diagnostik
+
+```bash
+sudo ./setup-edge.sh --check-config
+```
+
+Output:
+- Versi terpasang vs script
+- Mode blokir (`rpz` / `adguard`)
+- IP Sinkhole aktif (bullet list, multi-IP)
+- Upstream DNS aktif
+- Ukuran & path `blacklist.db`
+- Hasil `dnsdist --check-config`
+- Status service dnsdist + nginx
+
+---
+
+### 6. Cluster / Multi-source CDB
+
+```bash
+# Set sumber (central + mirror + peer)
+sudo ./setup-edge.sh --set-cdb-sources \
+  "http://central/trust.db,http://mirror/trust.db,http://peer:8443/cdb/blacklist.db"
+```
+
+Urutan failover: central → mirror → peer. DB lama dipertahankan jika semua gagal.
+
+---
+
+### 7. Upgrade
+
+```bash
+sudo ./setup-edge.sh --upgrade
+```
+
+Otomatis: update `update-blacklist.sh` + `dnsdist.conf` + migrasi path + restart.
+
+---
+
+### 8. Sync Database
+
+```bash
+# Normal (ETag cache)
+sudo ./setup-edge.sh --sync-only
+
+# Paksa re-download
 sudo ./setup-edge.sh --force-update
 ```
 
 ---
 
-### 3. Modifikasi Konfigurasi DNS & Upstream Tanpa Reinstall
-
-#### Mengubah Upstream Resolver (IPv4 & IPv6 didukung)
-```bash
-sudo ./setup-edge.sh --set-upstream "1.1.1.1, 8.8.8.8, 9.9.9.9"
-```
-
-#### Mengubah IP Target Sinkhole (RPZ Mode)
-```bash
-sudo ./setup-edge.sh --set-rpz "10.10.10.10, 10.10.10.11"
-```
-
-#### Mengubah Password & API Key Webserver
-```bash
-sudo ./setup-edge.sh --password "SandiBaru" --apikey "ApiKeyBaru" --set-webserver
-```
-
-#### Update Konfigurasi Interaktif (Wizard CLI)
-```bash
-sudo ./setup-edge.sh --update-config
-```
-
----
-
-### 4. Pengecekan & Diagnostik Sistem
-
-#### Cek Status & Validitas Syntax Konfigurasi
-```bash
-sudo ./setup-edge.sh --check-config
-```
-
-Output mencakup:
-- Versi script & versi terpasang
-- Mode pemblokiran (`rpz` / `adguard`)
-- IP Sinkhole & Upstream DNS aktif
-- Lokasi & ukuran file `blacklist.db`
-- Validasi syntax DNSDist (`dnsdist --check-config`)
-- Status service systemd (`dnsdist` & `nginx`)
-
----
-
-### 5. Upgrade & Pemeliharaan
-
-#### Upgrade Node ke Versi Terbaru
-```bash
-sudo ./setup-edge.sh --upgrade
-```
-*Proses ini secara otomatis membuat backup konfigurasi lama, memperbarui skrip `update-blacklist.sh` & `dnsdist.conf`, menjalankan migrasi path/format jika diperlukan, dan me-restart service secara aman.*
-
----
-
-### 6. Menghapus Instalasi (Uninstall)
+### 9. Uninstall
 
 ```bash
 sudo ./setup-edge.sh --uninstall
+# Diminta konfirmasi sebelum hapus
 ```
-*Akan meminta konfirmasi sebelum menghapus paket DNSDist, file konfigurasi di `/etc/dnsdist/`, database di `/var/lib/dnsdist/`, dan cronjob sync.*
+
+---
+
+## 📝 Catatan Versi
+
+| Versi | Perubahan Utama |
+|---|---|
+| v2.4.1 | Panel HTTPS :8443 bugfix (path hardcode → configurable) |
+| v2.4.0 | RPZ multi-IP + IPv6, python3 atomic patch, safesearch + DoT/DoH via panel |
+| v2.3.0 | `--with-panel` auto-install panel binary |
+| v2.2.0 | `--set-cdb-sources` cluster Phase 4 |
+| v2.1.0 | Versi publik awal, 17 opsi CLI |
