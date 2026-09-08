@@ -8,7 +8,7 @@
 set -e
 
 # --- Versi Script ---
-SCRIPT_VERSION="2.3.0"
+SCRIPT_VERSION="2.4.0"
 
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---
 CONF_DIR="/etc/dnsdist"
@@ -279,9 +279,17 @@ do_upgrade() {
         # Copy config baru
         cp "$EDGE_DIR/dnsdist.conf" "$DNSDIST_CONF"
 
-        # Terapkan kembali setting lama
-        sed -i "s|BLOCK_MODE = '.*'|BLOCK_MODE = '${old_block_mode}'|g" "$DNSDIST_CONF"
-        sed -i "s|SINKHOLE_IPS = {.*}|SINKHOLE_IPS = ${old_sinkhole_ips}|g" "$DNSDIST_CONF"
+        # Terapkan kembali setting lama — pakai python3 agar IPv6 aman
+        python3 - "$DNSDIST_CONF" "$old_block_mode" "$old_sinkhole_ips" <<'PYEOF'
+import sys, re, os
+path, mode, sinkhole = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path) as f: c = f.read()
+c = re.sub(r"^BLOCK_MODE = '.*'", f"BLOCK_MODE = '{mode}'", c, flags=re.MULTILINE)
+c = re.sub(r'^SINKHOLE_IPS = \{[^}]*\}', f'SINKHOLE_IPS = {sinkhole}', c, flags=re.MULTILINE)
+tmp = path + '.tmp'
+with open(tmp,'w') as f: f.write(c)
+os.replace(tmp, path)
+PYEOF
         echo -e "  ${GREEN}[✓] dnsdist.conf diupdate (mode: ${old_block_mode})${NC}"
     fi
 
@@ -351,35 +359,84 @@ do_set_upstream() {
     fi
 }
 
+# _rpz_normalize: ubah RPZ_IPS (koma/spasi campur) jadi array bash RPZ_IPS_ARR
+# Support IPv4, IPv4:port, IPv6 (dengan atau tanpa []), IPv6:port [::1]:53
+_rpz_normalize() {
+    RPZ_IPS_ARR=()
+    # Ganti koma+spasi jadi newline, lalu baca per baris
+    local normalized
+    normalized=$(echo "$RPZ_IPS" | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$')
+    while IFS= read -r entry; do
+        [ -z "$entry" ] && continue
+        # Validasi: IPv4, IPv4:port, bare IPv6, [IPv6], [IPv6]:port
+        if echo "$entry" | grep -qE \
+            '^([0-9]{1,3}\.){3}[0-9]{1,3}(:[0-9]+)?$|^\[?[0-9a-fA-F:]+\]?(:[0-9]+)?$'; then
+            RPZ_IPS_ARR+=("$entry")
+        else
+            echo -e "${YELLOW}[!] IP tidak valid, dilewati: '$entry'${NC}"
+        fi
+    done <<< "$normalized"
+}
+
+# _rpz_build_lua: build string Lua table dari RPZ_IPS_ARR
+_rpz_build_lua() {
+    local lua="{"
+    local first=true
+    for ip in "${RPZ_IPS_ARR[@]}"; do
+        if [ "$first" = true ]; then
+            lua="$lua'$ip'"
+            first=false
+        else
+            lua="$lua, '$ip'"
+        fi
+    done
+    lua="$lua}"
+    echo "$lua"
+}
+
+# _rpz_patch_conf: tulis SINKHOLE_IPS ke dnsdist.conf dengan python3 (regex-safe untuk IPv6)
+_rpz_patch_conf() {
+    local lua_val="$1"
+    python3 - "$DNSDIST_CONF" "$lua_val" <<'PYEOF'
+import sys, re
+path, val = sys.argv[1], sys.argv[2]
+with open(path, 'r') as f:
+    content = f.read()
+content = re.sub(r"^BLOCK_MODE = '.*'", "BLOCK_MODE = 'rpz'", content, flags=re.MULTILINE)
+content = re.sub(r'^SINKHOLE_IPS = \{[^}]*\}', 'SINKHOLE_IPS = ' + val, content, flags=re.MULTILINE)
+tmp = path + '.tmp'
+with open(tmp, 'w') as f:
+    f.write(content)
+import os; os.replace(tmp, path)
+print('[python] SINKHOLE_IPS patched OK')
+PYEOF
+}
+
 do_set_rpz() {
     echo -e "${CYAN}=== Mengonfigurasi RPZ Sinkhole ===${NC}"
     if [ -z "$RPZ_IPS" ]; then
-        echo -e "${RED}[!] Harap berikan IP RPZ, misal: --set-rpz \"10.10.10.10\"${NC}"
+        echo -e "${RED}[!] Harap berikan IP RPZ, misal: --set-rpz \"10.10.10.10, 2001:db8::1\"${NC}"
         exit 1
     fi
     mkdir -p "$CONF_DIR"
-    
-    LUA_SINKHOLE="{"
-    IFS=','
-    first=true
-    for ip in $RPZ_IPS; do
-        clean_ip=$(echo "$ip" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-        if [ -n "$clean_ip" ]; then
-            if [ "$first" = true ]; then
-                LUA_SINKHOLE="$LUA_SINKHOLE'$clean_ip'"
-                first=false
-            else
-                LUA_SINKHOLE="$LUA_SINKHOLE, '$clean_ip'"
-            fi
-        fi
+
+    _rpz_normalize
+    if [ ${#RPZ_IPS_ARR[@]} -eq 0 ]; then
+        echo -e "${RED}[!] Tidak ada IP valid yang diberikan.${NC}"
+        exit 1
+    fi
+
+    local LUA_SINKHOLE
+    LUA_SINKHOLE=$(_rpz_build_lua)
+
+    _rpz_patch_conf "$LUA_SINKHOLE"
+
+    echo -e "${GREEN}[+] RPZ Sinkhole diset ke: $LUA_SINKHOLE${NC}"
+    echo -e "${GREEN}[+] IP terdaftar (${#RPZ_IPS_ARR[@]}):${NC}"
+    for ip in "${RPZ_IPS_ARR[@]}"; do
+        echo -e "    • $ip"
     done
-    unset IFS
-    LUA_SINKHOLE="$LUA_SINKHOLE}"
-    
-    sed -i "s|BLOCK_MODE = '.*'|BLOCK_MODE = 'rpz'|g" "$DNSDIST_CONF"
-    sed -i "s|SINKHOLE_IPS = {.*}|SINKHOLE_IPS = $LUA_SINKHOLE|g" "$DNSDIST_CONF"
-    
-    echo -e "${GREEN}[+] Konfigurasi RPZ di dnsdist.conf telah diset ke $LUA_SINKHOLE.${NC}"
+
     if systemctl is-active --quiet dnsdist; then
         systemctl restart dnsdist
         echo -e "${GREEN}[+] Service dnsdist telah direstart.${NC}"
@@ -480,8 +537,16 @@ do_update_config() {
 
     if [ "$mode_choice" = "1" ]; then
         sed -i "s|BLOCK_MODE = '.*'|BLOCK_MODE = 'adguard'|g" "$DNSDIST_CONF"
-        sed -i "s|SINKHOLE_IPS = {.*}|SINKHOLE_IPS = {'0.0.0.0'}|g" "$DNSDIST_CONF"
-        echo -e "${GREEN}[*] Diubah ke Mode AdGuard.${NC}"
+        python3 - "$DNSDIST_CONF" <<'PYEOF'
+import sys, re, os
+path = sys.argv[1]
+with open(path) as f: c = f.read()
+c = re.sub(r"^BLOCK_MODE = '.*'", "BLOCK_MODE = 'adguard'", c, flags=re.MULTILINE)
+c = re.sub(r'^SINKHOLE_IPS = \{[^}]*\}', "SINKHOLE_IPS = {'0.0.0.0'}", c, flags=re.MULTILINE)
+tmp = path + '.tmp'
+with open(tmp,'w') as f: f.write(c)
+os.replace(tmp, path)
+PYEOF
     else
         read -p "Masukkan alamat IP Sinkhole (pisahkan dengan koma): " sink_ip
         if [ -n "$sink_ip" ]; then
@@ -761,7 +826,16 @@ do_install() {
     # Set mode dan rpz
     if [ "$CHOSEN_MODE" = "adguard" ]; then
         sed -i "s|BLOCK_MODE = '.*'|BLOCK_MODE = 'adguard'|g" "$DNSDIST_CONF"
-        sed -i "s|SINKHOLE_IPS = {.*}|SINKHOLE_IPS = {'0.0.0.0'}|g" "$DNSDIST_CONF"
+        python3 - "$DNSDIST_CONF" <<'PYEOF'
+import sys, re, os
+path = sys.argv[1]
+with open(path) as f: c = f.read()
+c = re.sub(r"^BLOCK_MODE = '.*'", "BLOCK_MODE = 'adguard'", c, flags=re.MULTILINE)
+c = re.sub(r'^SINKHOLE_IPS = \{[^}]*\}', "SINKHOLE_IPS = {'0.0.0.0'}", c, flags=re.MULTILINE)
+tmp = path + '.tmp'
+with open(tmp,'w') as f: f.write(c)
+os.replace(tmp, path)
+PYEOF
     else
         do_set_rpz
     fi
@@ -971,18 +1045,19 @@ while [ "$#" -gt 0 ]; do
         --set-rpz)
             if [ -z "$2" ] || [[ "$2" == -* ]]; then
                 echo -e "${RED}[!] Argumen --set-rpz membutuhkan daftar IP.${NC}"
+                echo -e "${YELLOW}    Contoh: --set-rpz \"10.10.10.10,2001:db8::1\"${NC}"
                 exit 1
             fi
+            # Terima 1 argumen (koma-separated) atau multiple argumen
             RPZ_IPS=""
-            while [ -n "$2" ] && [[ "$2" != -* ]]; do
+            while [ -n "$2" ] && [[ "$2" != --* ]]; do
                 if [ -n "$RPZ_IPS" ]; then
-                    RPZ_IPS="$RPZ_IPS $2"
+                    RPZ_IPS="$RPZ_IPS,$2"
                 else
                     RPZ_IPS="$2"
                 fi
                 shift
             done
-            RPZ_IPS=$(echo "$RPZ_IPS" | sed 's/,[[:space:]]*$//;s/,$//')
             SET_RPZ=true
             ;;
         --set-cert)

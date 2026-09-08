@@ -67,3 +67,20 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - Rilis awal: `setup-edge.sh` v2.0.0, `update-blacklist.sh`, `top-stats.lua`, `build-asn-db.sh`
 - Arsitektur Central vs Edge (pembuatan CDB terpusat, sinkronisasi hot-reload di Edge)
 - Monitoring stack Grafana + Prometheus
+
+## [2.4.0] - 2026-09-08
+
+### Fixed
+- **RPZ multi-IP + IPv6**: `do_set_rpz` sekarang pakai `python3` untuk patch `dnsdist.conf` secara atomic, aman dari karakter IPv6 (`:`, `[`, `]`) yang rusak di `sed`
+- **`--set-rpz` argumen**: parsing di-normalisasi, support koma dan spasi campur, multiple argumen
+- Semua `sed -i "s|SINKHOLE_IPS|..."` diganti python3 atomic replace (upgrade path, adguard mode, do_update_config)
+
+### Improved  
+- **dnsdist.conf**: RPZ mode sekarang pisah `_sinkhole_v4` dan `_sinkhole_v6` otomatis
+  - Query `A` → di-redirect ke IPv4 sinkhole saja
+  - Query `AAAA` → di-redirect ke IPv6 sinkhole jika ada, sinon NXDOMAIN
+  - Query `HTTPS/TXT/dll` → NXDOMAIN (sebelumnya lolos ke upstream)
+- Contoh konfigurasi multi-IP + IPv6 di dnsdist.conf
+
+### Breaking change (minor)
+- RPZ mode sekarang balikan NXDOMAIN untuk non-A/AAAA query (sebelumnya diteruskan upstream)
