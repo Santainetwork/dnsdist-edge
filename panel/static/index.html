@@ -3,275 +3,884 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DNSDist Panel</title>
+<title>Trust-NG — DNSDist Edge Panel</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0f172a;--card:#1e293b;--border:#334155;--accent:#38bdf8;
-  --accent2:#0ea5e9;--text:#e2e8f0;--muted:#94a3b8;--danger:#f87171;
-  --success:#4ade80;--warn:#fbbf24;--sidebar:220px;
+/* ── Design System & Variables ── */
+:root {
+  --bg: #07090e;
+  --surface: #0d121d;
+  --card: #121826;
+  --card-hover: #172033;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(56, 189, 248, 0.5);
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-sub: #64748b;
+  
+  --sky: #38bdf8;
+  --sky-glow: rgba(56, 189, 248, 0.15);
+  --emerald: #10b981;
+  --emerald-glow: rgba(16, 185, 129, 0.2);
+  --amber: #f59e0b;
+  --rose: #f43f5e;
+  --indigo: #6366f1;
+  
+  --sidebar-w: 240px;
+  --header-h: 60px;
+  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
-a{color:var(--accent);text-decoration:none}
-/* Sidebar */
-#sidebar{width:var(--sidebar);background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:100vh;position:fixed;top:0;left:0;z-index:10}
-#sidebar-header{padding:1.25rem 1rem;border-bottom:1px solid var(--border)}
-#sidebar-header h1{font-size:1rem;font-weight:700;color:var(--accent);letter-spacing:.02em}
-#sidebar-header p{font-size:.72rem;color:var(--muted);margin-top:.2rem}
-nav{padding:.5rem 0;flex:1}
-nav a{display:flex;align-items:center;gap:.6rem;padding:.6rem 1rem;font-size:.875rem;color:var(--muted);border-left:3px solid transparent;transition:all .15s}
-nav a:hover{color:var(--text);background:rgba(56,189,248,.06)}
-nav a.active{color:var(--accent);background:rgba(56,189,248,.1);border-left-color:var(--accent)}
-nav a .icon{width:1.1rem;text-align:center;font-size:1rem}
-#sidebar-footer{padding:.75rem 1rem;border-top:1px solid var(--border);font-size:.72rem;color:var(--muted)}
-#status-dot{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:var(--muted);margin-right:.3rem}
-#status-dot.up{background:var(--success)}
-#status-dot.down{background:var(--danger)}
-/* Main */
-#main{margin-left:var(--sidebar);flex:1;padding:1.5rem 2rem;max-width:calc(100vw - var(--sidebar))}
-.page{display:none}.page.active{display:block}
-h2{font-size:1.25rem;font-weight:700;margin-bottom:1.25rem;color:var(--text)}
-h3{font-size:.95rem;font-weight:600;margin-bottom:.75rem;color:var(--muted)}
-/* Cards */
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
-.card{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1rem 1.25rem}
-.card-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem}
-.card-val{font-size:1.75rem;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
-.card-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}
-.card.ok .card-val{color:var(--success)}
-.card.warn .card-val{color:var(--warn)}
-.card.danger .card-val{color:var(--danger)}
-/* Form */
-.form-group{margin-bottom:1rem}
-label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.35rem}
-textarea,input[type=text],input[type=password]{width:100%;background:#0f172a;border:1px solid var(--border);border-radius:.5rem;color:var(--text);padding:.6rem .8rem;font-size:.875rem;font-family:inherit;outline:none;transition:border .15s}
-textarea:focus,input[type=text]:focus,input[type=password]:focus{border-color:var(--accent)}
-textarea{min-height:90px;resize:vertical}
-.hint{font-size:.72rem;color:var(--muted);margin-top:.3rem}
-/* Buttons */
-.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.1rem;border-radius:.5rem;border:none;cursor:pointer;font-size:.875rem;font-weight:600;transition:all .15s}
-.btn-primary{background:var(--accent);color:#0f172a}
-.btn-primary:hover{background:var(--accent2)}
-.btn-danger{background:var(--danger);color:#fff}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-/* Toggle switch */
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-bottom:1px solid var(--border)}
-.toggle-row:last-child{border-bottom:none}
-.toggle-label{font-size:.9rem}
-.toggle-desc{font-size:.75rem;color:var(--muted);margin-top:.1rem}
-.switch{position:relative;display:inline-block;width:2.4rem;height:1.35rem}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;inset:0;background:var(--border);border-radius:99px;cursor:pointer;transition:.2s}
-.slider:before{content:'';position:absolute;width:1rem;height:1rem;left:.18rem;bottom:.18rem;background:#fff;border-radius:50%;transition:.2s}
-input:checked + .slider{background:var(--accent)}
-input:checked + .slider:before{transform:translateX(1rem)}
-/* Toast */
-#toast-container{position:fixed;top:1rem;right:1rem;z-index:1000;display:flex;flex-direction:column;gap:.5rem}
-.toast{padding:.65rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:500;animation:fadeIn .2s ease;max-width:320px}
-.toast.success{background:#166534;color:#bbf7d0;border:1px solid #4ade80}
-.toast.error{background:#7f1d1d;color:#fecaca;border:1px solid #f87171}
-@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-/* Login */
-#login-page{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
-.login-box{background:var(--card);border:1px solid var(--border);border-radius:1rem;padding:2rem;width:340px}
-.login-box h2{margin-bottom:1.25rem;font-size:1.1rem;text-align:center;color:var(--accent)}
-/* Section card */
-.section{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1.25rem;margin-bottom:1.25rem}
-/* Spinner */
-.spin{display:inline-block;width:1rem;height:1rem;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-/* IP list */
-.ip-chip{display:inline-block;background:#1e3a5f;border:1px solid #38bdf840;color:var(--accent);padding:.15rem .55rem;border-radius:99px;font-size:.75rem;margin:.15rem}
-/* Responsive */
-@media(max-width:640px){
-  #sidebar{display:none}
-  #main{margin-left:0;padding:1rem}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Typography & Helpers ── */
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.tabular { font-variant-numeric: tabular-nums; }
+a { color: var(--sky); text-decoration: none; transition: var(--transition); }
+a:hover { opacity: 0.85; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  transition: transform 0.3s ease;
+}
+
+.brand {
+  padding: 1.25rem 1.25rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #0284c7, #38bdf8);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+}
+.brand-icon svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; }
+.brand-text h1 { font-size: 0.95rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+.brand-text p { font-size: 0.68rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; }
+
+nav {
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+nav a svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; opacity: 0.8; }
+nav a:hover { color: #fff; background: rgba(255, 255, 255, 0.04); }
+nav a.active {
+  color: var(--sky);
+  background: var(--sky-glow);
+  font-weight: 600;
+}
+nav a.active svg { opacity: 1; stroke: var(--sky); }
+
+.sidebar-status {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+}
+.pulse-dot.online { background: var(--emerald); box-shadow: 0 0 10px var(--emerald); }
+.pulse-dot.online::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--emerald);
+  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+.pulse-dot.offline { background: var(--rose); box-shadow: 0 0 10px var(--rose); }
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ── Main Layout ── */
+#main {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  padding: 2rem 2.5rem;
+  max-width: calc(1440px - var(--sidebar-w));
+  min-height: 100vh;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+.page-title h2 { font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+.page-title p { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+.page { display: none; }
+.page.active { display: block; animation: fade-in 0.25s ease-out; }
+@keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ── Metric Cards ── */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.metric-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.metric-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--card-hover);
+  transform: translateY(-2px);
+}
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+}
+.metric-card.accent-sky::before { background: var(--sky); }
+.metric-card.accent-emerald::before { background: var(--emerald); }
+.metric-card.accent-amber::before { background: var(--amber); }
+.metric-card.accent-rose::before { background: var(--rose); }
+.metric-card.accent-indigo::before { background: var(--indigo); }
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.metric-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-sub); }
+.metric-icon { width: 16px; height: 16px; stroke: var(--text-sub); fill: none; stroke-width: 2; }
+.metric-val { font-size: 1.85rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+.metric-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; }
+
+/* Mini Progress Bar */
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  margin-top: 0.6rem;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--sky);
+  transition: width 0.5s ease;
+}
+
+/* ── Live Chart Section ── */
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.chart-title h3 { font-size: 0.95rem; font-weight: 600; color: #fff; }
+.chart-title p { font-size: 0.75rem; color: var(--text-muted); }
+.chart-canvas-wrap {
+  width: 100%;
+  height: 180px;
+  position: relative;
+}
+#qps-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Content Card & Sections ── */
+.card-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.card-box-header {
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-box-header h3 { font-size: 1rem; font-weight: 600; color: #fff; }
+.card-box-header p { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+
+/* ── Form Controls ── */
+.form-group { margin-bottom: 1.25rem; }
+label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.45rem; text-transform: uppercase; letter-spacing: 0.04em; }
+input[type="text"], input[type="password"], textarea {
+  width: 100%;
+  background: #090e18;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  transition: var(--transition);
+}
+textarea { min-height: 110px; resize: vertical; line-height: 1.5; font-family: ui-monospace, SFMono-Regular, monospace; }
+input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+  background: #0a111e;
+}
+.hint { font-size: 0.72rem; color: var(--text-sub); margin-top: 0.4rem; }
+.hint code { background: rgba(255, 255, 255, 0.06); padding: 0.1rem 0.35rem; border-radius: 4px; color: var(--sky); }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: var(--transition);
+}
+.btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+.btn-primary { background: var(--sky); color: #07090e; }
+.btn-primary:hover { background: #0284c7; color: #fff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25); }
+.btn-secondary { background: rgba(255, 255, 255, 0.05); color: var(--text-main); border-color: var(--border); }
+.btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+.btn-danger { background: rgba(244, 63, 94, 0.15); color: var(--rose); border-color: rgba(244, 63, 94, 0.3); }
+.btn-danger:hover { background: var(--rose); color: #fff; }
+
+/* ── Toggle Switch ── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-title { font-size: 0.9rem; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+.toggle-desc { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+.switch { position: relative; width: 44px; height: 24px; display: inline-block; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  bottom: 3px;
+  background: #94a3b8;
+  border-radius: 50%;
+  transition: var(--transition);
+}
+input:checked + .slider { background: var(--sky); border-color: var(--sky); }
+input:checked + .slider::before { transform: translateX(20px); background: #07090e; }
+
+/* ── Badges & Chips ── */
+.chips-wrap { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: var(--sky);
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-family: ui-monospace, monospace;
+}
+.chip .copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-sub);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.1rem;
+}
+.chip .copy-btn:hover { color: #fff; }
+
+/* ── Toast Notifications ── */
+#toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.toast {
+  background: #1e293b;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  color: #fff;
+  font-size: 0.82rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 280px;
+  animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast.success { border-left: 4px solid var(--emerald); }
+.toast.error { border-left: 4px solid var(--rose); }
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Login Modal ── */
+#login-page {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 9, 14, 0.85);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.login-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2.25rem;
+  width: 360px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+}
+.login-header { text-align: center; margin-bottom: 1.75rem; }
+.login-header .logo-ring {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 0.75rem;
+  background: linear-gradient(135deg, #0284c7, #38bdf8);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-header .logo-ring svg { width: 28px; height: 28px; stroke: #fff; fill: none; stroke-width: 2; }
+.login-header h2 { font-size: 1.15rem; font-weight: 700; color: #fff; }
+.login-header p { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+/* ── Mobile Drawer ── */
+.mobile-header {
+  display: none;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+@media (max-width: 840px) {
+  .mobile-header { display: flex; }
+  #sidebar { transform: translateX(-100%); }
+  #sidebar.open { transform: translateX(0); }
+  #main { margin-left: 0; padding: 1.25rem; max-width: 100%; }
 }
 </style>
 </head>
 <body>
 
-<!-- Login -->
+<!-- Login Modal -->
 <div id="login-page">
-  <div class="login-box">
-    <h2>🛡 DNSDist Panel</h2>
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" id="login-pass" placeholder="Password admin" autofocus>
+  <div class="login-card">
+    <div class="login-header">
+      <div class="logo-ring">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <h2>Trust-NG Edge Panel</h2>
+      <p>Masuk untuk mengelola resolver DNS</p>
     </div>
-    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Masuk</button>
-    <div id="login-err" style="color:var(--danger);font-size:.8rem;margin-top:.5rem;text-align:center"></div>
+    <div class="form-group">
+      <label>Sandi Panel</label>
+      <input type="password" id="login-pass" placeholder="Masukkan password" autofocus>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">
+      <span>Masuk ke Dashboard</span>
+      <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+    <div id="login-err" style="color:var(--rose);font-size:0.75rem;margin-top:0.6rem;text-align:center"></div>
   </div>
 </div>
 
 <!-- Sidebar -->
 <div id="sidebar">
-  <div id="sidebar-header">
-    <h1>🛡 DNSDist Panel</h1>
-    <p>Edge Node Manager</p>
+  <div class="brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div class="brand-text">
+      <h1>Trust-NG Edge</h1>
+      <p>Management Panel</p>
+    </div>
   </div>
   <nav>
-    <a href="#" class="active" onclick="nav('dashboard',this)"><span class="icon">📊</span> Dashboard</a>
-    <a href="#" onclick="nav('rpz',this)"><span class="icon">🚫</span> RPZ Sinkhole</a>
-    <a href="#" onclick="nav('upstream',this)"><span class="icon">🔀</span> Upstream DNS</a>
-    <a href="#" onclick="nav('safesearch',this)"><span class="icon">🔍</span> SafeSearch</a>
-    <a href="#" onclick="nav('dotdoh',this)"><span class="icon">🔒</span> DoT / DoH</a>
-    <a href="#" onclick="nav('settings',this)"><span class="icon">⚙️</span> Settings</a>
+    <a href="#" class="active" onclick="nav('dashboard',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="#" onclick="nav('rpz',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg>
+      <span>RPZ Sinkhole</span>
+    </a>
+    <a href="#" onclick="nav('upstream',this)">
+      <svg viewBox="0 0 24 24"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3"/><path d="M18 12h4m-2-2 2 2-2 2"/></svg>
+      <span>Upstream DNS</span>
+    </a>
+    <a href="#" onclick="nav('safesearch',this)">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>SafeSearch</span>
+    </a>
+    <a href="#" onclick="nav('dotdoh',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span>DoT / DoH</span>
+    </a>
+    <a href="#" onclick="nav('settings',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Pengaturan</span>
+    </a>
   </nav>
-  <div id="sidebar-footer">
-    <span id="status-dot"></span>
-    <span id="status-text">Memeriksa...</span>
+  <div class="sidebar-status">
+    <div class="status-pill">
+      <span class="pulse-dot online" id="status-dot"></span>
+      <span id="status-text" class="tabular">Aktif</span>
+    </div>
+    <button class="btn btn-secondary" style="padding:0.35rem 0.5rem;" onclick="doLogout()" title="Keluar">
+      <svg viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+    </button>
   </div>
 </div>
 
-<!-- Main content -->
+<!-- Main Container -->
 <div id="main">
-
-  <!-- Dashboard -->
+  
+  <!-- Dashboard Page -->
   <div id="page-dashboard" class="page active">
-    <h2>Dashboard</h2>
-    <div class="cards" id="stats-cards">
-      <div class="card"><div class="card-label">QPS</div><div class="card-val" id="s-qps">—</div><div class="card-sub">Queries per detik</div></div>
-      <div class="card"><div class="card-label">Total Queries</div><div class="card-val" id="s-total">—</div><div class="card-sub">Sejak panel aktif</div></div>
-      <div class="card"><div class="card-label">Blocked</div><div class="card-val" id="s-blocked">—</div><div class="card-sub">Terblokir</div></div>
-      <div class="card"><div class="card-label">Cache Hit</div><div class="card-val" id="s-cache">—</div><div class="card-sub">% hit rate</div></div>
-      <div class="card"><div class="card-label">CPU</div><div class="card-val" id="s-cpu">—</div><div class="card-sub">Utilisasi prosesor</div></div>
-      <div class="card"><div class="card-label">RAM</div><div class="card-val" id="s-ram">—</div><div class="card-sub" id="s-ram-sub">—</div></div>
-      <div class="card"><div class="card-label">Uptime</div><div class="card-val" id="s-uptime" style="font-size:1.1rem">—</div><div class="card-sub">Sistem</div></div>
-      <div class="card"><div class="card-label">DNSDist</div><div class="card-val" id="s-dnsdist" style="font-size:1rem">—</div><div class="card-sub">Service status</div></div>
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>Ringkasan Node</h2>
+        <p>Telemetri performa dan resolusi DNS secara real-time</p>
+      </div>
+      <button class="btn btn-secondary" onclick="fetchStats()">
+        <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
+        <span>Refresh</span>
+      </button>
     </div>
-    <div style="color:var(--muted);font-size:.75rem">Auto-refresh tiap 5 detik • <a href="#" onclick="fetchStats()">Refresh sekarang</a></div>
+
+    <!-- Live QPS Sparkline Chart -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">
+          <h3>Traffic Query per Detik (QPS)</h3>
+          <p>Aktivitas query UDP / TCP yang diproses node</p>
+        </div>
+        <div class="chip" id="peak-qps-chip">Peak: 0 QPS</div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="qps-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Metrics Grid -->
+    <div class="metrics-grid">
+      <div class="metric-card accent-sky">
+        <div class="metric-header">
+          <span class="metric-label">Beban QPS</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div class="metric-val tabular" id="s-qps">0</div>
+        <div class="metric-sub">Query per detik</div>
+      </div>
+
+      <div class="metric-card accent-indigo">
+        <div class="metric-header">
+          <span class="metric-label">Total Resolusi</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <div class="metric-val tabular" id="s-total">—</div>
+        <div class="metric-sub">Akumulasi request</div>
+      </div>
+
+      <div class="metric-card accent-rose">
+        <div class="metric-header">
+          <span class="metric-label">Query Ditolak</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="metric-val tabular" id="s-blocked">—</div>
+        <div class="metric-sub">Filter blacklist/RPZ</div>
+      </div>
+
+      <div class="metric-card accent-emerald">
+        <div class="metric-header">
+          <span class="metric-label">Cache Hit</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <div class="metric-val tabular" id="s-cache">—%</div>
+        <div class="metric-sub">Efisiensi upstream</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Utilisasi CPU</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+        </div>
+        <div class="metric-val tabular" id="s-cpu">0%</div>
+        <div class="progress-bar"><div class="progress-fill" id="p-cpu" style="width:0%"></div></div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Pemakaian RAM</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M6 19v-3M10 19v-3M14 19v-3M18 19v-3M6 5v3M10 5v3M14 5v3M18 5v3M2 8h20v8H2z"/></svg>
+        </div>
+        <div class="metric-val tabular" id="s-ram">0 GB</div>
+        <div class="metric-sub" id="s-ram-sub">dari — GB</div>
+        <div class="progress-bar"><div class="progress-fill" id="p-ram" style="width:0%"></div></div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Uptime Sistem</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="metric-val tabular" id="s-uptime" style="font-size:1.35rem">—</div>
+        <div class="metric-sub">Waktu aktif mesin</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Status Layanan</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <div class="metric-val tabular" id="s-dnsdist" style="font-size:1.2rem;color:var(--emerald)">Aktif</div>
+        <div class="metric-sub">dnsdist core daemon</div>
+      </div>
+    </div>
   </div>
 
-  <!-- RPZ -->
+  <!-- RPZ Page -->
   <div id="page-rpz" class="page">
-    <h2>RPZ Sinkhole</h2>
-    <div class="section">
-      <h3>IP Sinkhole Saat Ini</h3>
-      <div id="rpz-current" style="margin-bottom:1rem">—</div>
-      <h3>Set IP Sinkhole</h3>
-      <div class="form-group">
-        <label>Daftar IP (satu per baris atau pisahkan koma — IPv4 dan IPv6 didukung)</label>
-        <textarea id="rpz-input" placeholder="10.10.10.10&#10;10.10.10.11&#10;2001:db8::1"></textarea>
-        <div class="hint">Contoh: <code>10.10.10.10, 2001:db8::1, [2606:4700::]:5353</code></div>
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>RPZ Sinkhole Filtering</h2>
+        <p>Arahkan domain berbahaya / terblokir ke halaman peringatan khusus</p>
       </div>
-      <button class="btn btn-primary" onclick="saveRPZ()">💾 Simpan & Restart</button>
+    </div>
+
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Daftar IP Sinkhole Saat Ini</h3>
+          <p>IP target yang dikembalikan saat domain blacklist diakses</p>
+        </div>
+      </div>
+      <div id="rpz-current" class="chips-wrap" style="margin-bottom:1.5rem">
+        <span class="chip">Memuat data...</span>
+      </div>
+
+      <div class="form-group">
+        <label>Perbarui Alamat IP Sinkhole</label>
+        <textarea id="rpz-input" placeholder="10.10.10.10&#10;2001:db8::1"></textarea>
+        <div class="hint">Mendukung multi-IP (IPv4 & IPv6). Pisahkan dengan koma atau baris baru. DNSDist otomatis mengelompokkan record <code>A</code> ke IPv4 dan <code>AAAA</code> ke IPv6.</div>
+      </div>
+      <button class="btn btn-primary" onclick="saveRPZ()">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span>Terapkan IP Sinkhole</span>
+      </button>
     </div>
   </div>
 
-  <!-- Upstream -->
+  <!-- Upstream Page -->
   <div id="page-upstream" class="page">
-    <h2>Upstream DNS</h2>
-    <div class="section">
-      <h3>Upstream Saat Ini</h3>
-      <div id="upstream-current" style="margin-bottom:1rem">—</div>
-      <h3>Set Upstream DNS</h3>
-      <div class="form-group">
-        <label>Daftar server (satu per baris atau koma — format: IP, IP:port, [IPv6]:port)</label>
-        <textarea id="upstream-input" placeholder="1.1.1.1&#10;8.8.8.8&#10;[2606:4700:4700::1111]:53"></textarea>
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>Upstream DNS Resolver</h2>
+        <p>Tentukan server induk untuk meneruskan query non-blacklist</p>
       </div>
-      <button class="btn btn-primary" onclick="saveUpstream()">💾 Simpan & Restart</button>
+    </div>
+
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Upstream Resolver Aktif</h3>
+          <p>Server resolver recursive yang saat ini digunakan</p>
+        </div>
+      </div>
+      <div id="upstream-current" class="chips-wrap" style="margin-bottom:1.5rem">
+        <span class="chip">Memuat data...</span>
+      </div>
+
+      <div class="form-group">
+        <label>Daftar Server Upstream Baru</label>
+        <textarea id="upstream-input" placeholder="1.1.1.1&#10;8.8.8.8&#10;[2606:4700:4700::1111]:53"></textarea>
+        <div class="hint">Format valid: <code>1.1.1.1</code>, <code>8.8.8.8:53</code>, atau IPv6 <code>[2606:4700:4700::1111]:53</code>.</div>
+      </div>
+      <button class="btn btn-primary" onclick="saveUpstream()">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span>Simpan & Muat Ulang Upstream</span>
+      </button>
     </div>
   </div>
 
-  <!-- SafeSearch -->
+  <!-- SafeSearch Page -->
   <div id="page-safesearch" class="page">
-    <h2>SafeSearch</h2>
-    <div class="section">
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>Pencarian Aman (SafeSearch)</h2>
+        <p>Paksa mode ramah keluarga pada mesin pencari utama secara transparan</p>
+      </div>
+    </div>
+
+    <div class="card-box">
       <div class="toggle-row">
         <div>
-          <div class="toggle-label">🔍 Google SafeSearch</div>
-          <div class="toggle-desc">Paksa safe search via DNS rewrite ke 216.239.38.120</div>
+          <div class="toggle-title">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--sky);fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span>Google SafeSearch</span>
+          </div>
+          <div class="toggle-desc">Rewrite otomatis domain Google ke IP <code>forcesafesearch.google.com</code></div>
         </div>
         <label class="switch"><input type="checkbox" id="ss-google"><span class="slider"></span></label>
       </div>
+
       <div class="toggle-row">
         <div>
-          <div class="toggle-label">🔎 Bing SafeSearch</div>
-          <div class="toggle-desc">Paksa safe search via DNS rewrite ke 204.79.197.220</div>
+          <div class="toggle-title">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--amber);fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>Microsoft Bing SafeSearch</span>
+          </div>
+          <div class="toggle-desc">Mengarahkan query Bing ke endpoint pencarian ketat <code>strict.bing.com</code></div>
         </div>
         <label class="switch"><input type="checkbox" id="ss-bing"><span class="slider"></span></label>
       </div>
+
       <div class="toggle-row">
         <div>
-          <div class="toggle-label">▶️ YouTube Restricted</div>
-          <div class="toggle-desc">Paksa mode terbatas YouTube via DNS rewrite</div>
+          <div class="toggle-title">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--rose);fill:none;stroke-width:2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>YouTube Restricted Mode</span>
+          </div>
+          <div class="toggle-desc">Membatasi video konten dewasa secara ketat di jaringan YouTube</div>
         </div>
         <label class="switch"><input type="checkbox" id="ss-youtube"><span class="slider"></span></label>
       </div>
-      <div style="margin-top:1rem">
-        <button class="btn btn-primary" onclick="saveSafeSearch()">💾 Simpan & Restart</button>
+
+      <div style="margin-top:1.5rem">
+        <button class="btn btn-primary" onclick="saveSafeSearch()">
+          <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span>Terapkan Kebijakan SafeSearch</span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- DoT/DoH -->
+  <!-- DoT/DoH Page -->
   <div id="page-dotdoh" class="page">
-    <h2>DoT / DoH</h2>
-    <div class="section">
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>Protokol Terenkripsi (DoT & DoH)</h2>
+        <p>Konfigurasi listener DNS over TLS (Port 853) dan DNS over HTTPS (Port 443)</p>
+      </div>
+    </div>
+
+    <div class="card-box">
       <div class="toggle-row">
         <div>
-          <div class="toggle-label">🔒 DNS over TLS (DoT)</div>
-          <div class="toggle-desc">Port 853 — IPv4 + IPv6</div>
+          <div class="toggle-title">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--indigo);fill:none;stroke-width:2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>DNS over TLS (DoT)</span>
+          </div>
+          <div class="toggle-desc">Mengaktifkan port 853 dengan standar TLS 1.2+ untuk klien DoT</div>
         </div>
         <label class="switch"><input type="checkbox" id="dd-dot"><span class="slider"></span></label>
       </div>
+
       <div class="toggle-row">
         <div>
-          <div class="toggle-label">🌐 DNS over HTTPS (DoH)</div>
-          <div class="toggle-desc">Port 443, path /dns-query — IPv4 + IPv6</div>
+          <div class="toggle-title">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--sky);fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>DNS over HTTPS (DoH)</span>
+          </div>
+          <div class="toggle-desc">Melayani query HTTP/2 di port 443 pada path standar <code>/dns-query</code></div>
         </div>
         <label class="switch"><input type="checkbox" id="dd-doh"><span class="slider"></span></label>
       </div>
-      <div style="margin-top:1rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+
+      <div style="margin-top:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
         <div class="form-group">
-          <label>Path Sertifikat TLS (.crt)</label>
+          <label>Lokasi Sertifikat TLS (.crt)</label>
           <input type="text" id="dd-cert" value="/etc/dnsdist/certs/server.crt">
         </div>
         <div class="form-group">
-          <label>Path Private Key (.key)</label>
+          <label>Lokasi Kunci Privat TLS (.key)</label>
           <input type="text" id="dd-key" value="/etc/dnsdist/certs/server.key">
         </div>
       </div>
-      <button class="btn btn-primary" onclick="saveDoTDoH()">💾 Simpan & Restart</button>
+
+      <button class="btn btn-primary" onclick="saveDoTDoH()">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span>Simpan & Muat Ulang TLS Listener</span>
+      </button>
     </div>
   </div>
 
-  <!-- Settings -->
+  <!-- Settings Page -->
   <div id="page-settings" class="page">
-    <h2>Settings</h2>
-    <div class="section">
-      <h3>Block Mode</h3>
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>Pengaturan Node & Keamanan</h2>
+        <p>Konfigurasi mode pemblokiran umum dan kredensial administrasi</p>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Mode Pemblokiran Utama</h3>
+          <p>Tentukan perilaku responder saat mendeteksi domain terlarang</p>
+        </div>
+      </div>
       <div class="toggle-row">
         <div>
-          <div class="toggle-label">Mode RPZ (ISP/Sinkhole)</div>
-          <div class="toggle-desc">Query blocked → redirect ke IP Sinkhole. Off = Mode AdGuard (0.0.0.0 / null routing)</div>
+          <div class="toggle-title">Mode RPZ Sinkhole</div>
+          <div class="toggle-desc">Aktif: Balas dengan IP peringatan. Nonaktif: Mode AdGuard (0.0.0.0 / Null-route)</div>
         </div>
         <label class="switch"><input type="checkbox" id="set-mode" checked><span class="slider"></span></label>
       </div>
-      <div style="margin-top:.75rem">
-        <button class="btn btn-primary" onclick="saveBlockMode()">💾 Simpan Block Mode</button>
+      <div style="margin-top:1rem">
+        <button class="btn btn-primary" onclick="saveBlockMode()">
+          <span>Simpan Mode Blokir</span>
+        </button>
       </div>
     </div>
-    <div class="section">
-      <h3>Ganti Password Panel</h3>
-      <div class="form-group">
-        <label>Password Baru</label>
+
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Ubah Sandi Panel</h3>
+          <p>Perbarui kunci autentikasi administrator web panel</p>
+        </div>
+      </div>
+      <div class="form-group" style="max-width:400px">
+        <label>Sandi Baru</label>
         <input type="password" id="set-pass" placeholder="Minimal 8 karakter">
       </div>
-      <button class="btn btn-primary" onclick="savePassword()">🔑 Ganti Password</button>
+      <button class="btn btn-secondary" onclick="savePassword()">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Perbarui Sandi</span>
+      </button>
     </div>
-    <div class="section">
-      <h3>Info</h3>
-      <div style="font-size:.8rem;color:var(--muted);line-height:1.7">
-        <div>Panel: <strong>DNSDist Edge Panel v2.4.2</strong></div>
-        <div>Setup script: <code>setup-edge.sh</code></div>
-        <div>Config: <code>/etc/dnsdist/dnsdist.conf</code></div>
-        <div>Upstreams: <code>/etc/dnsdist/upstreams.conf</code></div>
+
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Informasi Versi & Sistem</h3>
+          <p>Detail arsitektur instalasi Trust-NG</p>
+        </div>
       </div>
-      <div style="margin-top:.75rem">
-        <button class="btn btn-ghost" onclick="doLogout()">🚪 Logout</button>
+      <div style="font-size:0.84rem;color:var(--text-muted);line-height:1.9;display:grid;grid-template-columns:160px 1fr;">
+        <span style="color:var(--text-sub)">Versi Rilis</span>
+        <span class="mono" style="color:var(--sky)">DNSDist Edge Panel v2.4.2</span>
+        <span style="color:var(--text-sub)">Skrip Inti</span>
+        <span class="mono">setup-edge.sh (v2.4.2)</span>
+        <span style="color:var(--text-sub)">File Konfigurasi</span>
+        <span class="mono">/etc/dnsdist/dnsdist.conf</span>
+        <span style="color:var(--text-sub)">Sandi Disimpan Di</span>
+        <span class="mono">/var/lib/dnsdist/panel.password</span>
       </div>
     </div>
   </div>
@@ -285,174 +894,341 @@ const API = '';
 let token = localStorage.getItem('panel_token') || '';
 let statsInterval = null;
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-function isLoggedIn(){ return !!token; }
+// ── Chart State ──
+const qpsHistory = Array(30).fill(0);
+let peakQPS = 0;
 
-async function doLogin(){
+function initChart() {
+  const canvas = document.getElementById('qps-canvas');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  drawChart();
+}
+
+function drawChart() {
+  const canvas = document.getElementById('qps-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const maxVal = Math.max(...qpsHistory, 10);
+  const stepX = w / (qpsHistory.length - 1);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+  grad.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
+  // Path outline
+  ctx.beginPath();
+  qpsHistory.forEach((v, i) => {
+    const x = i * stepX;
+    const y = h - (v / maxVal) * (h - 20 * dpr) - 10 * dpr;
+    if (i === 0) ctx.moveTo(x, y);
+    else {
+      const prevX = (i - 1) * stepX;
+      const prevY = h - (qpsHistory[i - 1] / maxVal) * (h - 20 * dpr) - 10 * dpr;
+      const cx = (prevX + x) / 2;
+      ctx.bezierCurveTo(cx, prevY, cx, y, x, y);
+    }
+  });
+
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line stroke
+  ctx.beginPath();
+  qpsHistory.forEach((v, i) => {
+    const x = i * stepX;
+    const y = h - (v / maxVal) * (h - 20 * dpr) - 10 * dpr;
+    if (i === 0) ctx.moveTo(x, y);
+    else {
+      const prevX = (i - 1) * stepX;
+      const prevY = h - (qpsHistory[i - 1] / maxVal) * (h - 20 * dpr) - 10 * dpr;
+      const cx = (prevX + x) / 2;
+      ctx.bezierCurveTo(cx, prevY, cx, y, x, y);
+    }
+  });
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2.5 * dpr;
+  ctx.stroke();
+}
+
+window.addEventListener('resize', () => {
+  initChart();
+});
+
+// ── Auth & Session ──
+function isLoggedIn() { return !!token; }
+
+async function doLogin() {
   const pass = document.getElementById('login-pass').value;
   const err = document.getElementById('login-err');
   err.textContent = '';
   try {
-    const r = await fetch(API+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pass})});
+    const r = await fetch(API + '/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass })
+    });
     const d = await r.json();
-    if(!r.ok){ err.textContent = d.error||'Login gagal'; return; }
+    if (!r.ok) { err.textContent = d.error || 'Login gagal'; return; }
     token = d.token;
     localStorage.setItem('panel_token', token);
-    document.getElementById('login-page').style.display='none';
+    document.getElementById('login-page').style.display = 'none';
     onLogin();
-  } catch(e){ err.textContent = 'Koneksi error: '+e.message; }
-}
-
-document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
-
-function doLogout(){
-  token=''; localStorage.removeItem('panel_token');
-  location.reload();
-}
-
-// ── Navigation ────────────────────────────────────────────────────────────────
-function nav(page, el){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
-  if(el) el.classList.add('active');
-  if(page==='rpz'||page==='upstream'||page==='safesearch'||page==='dotdoh'||page==='settings') fetchConfig();
-}
-
-// ── API helpers ───────────────────────────────────────────────────────────────
-async function api(path, method='GET', body=null){
-  const opts={method,headers:{Authorization:'Bearer '+token}};
-  if(body){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
-  const r = await fetch(API+path, opts);
-  const d = await r.json();
-  if(!r.ok) throw new Error(d.error||r.status);
-  return d;
-}
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
-function toast(msg, type='success'){
-  const c = document.getElementById('toast-container');
-  const el = document.createElement('div');
-  el.className = 'toast '+type;
-  el.textContent = msg;
-  c.appendChild(el);
-  setTimeout(()=>el.remove(), 3500);
-}
-
-// ── Stats ─────────────────────────────────────────────────────────────────────
-function fmtNum(n){ if(n>=1e6) return (n/1e6).toFixed(1)+'M'; if(n>=1e3) return (n/1e3).toFixed(1)+'K'; return String(n); }
-function fmtUptime(s){
-  const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60);
-  if(d>0) return d+'d '+h+'h';
-  if(h>0) return h+'h '+m+'m';
-  return m+'m '+(s%60)+'s';
-}
-
-async function fetchStats(){
-  try {
-    const d = await api('/api/stats');
-    document.getElementById('s-qps').textContent = fmtNum(d.qps);
-    document.getElementById('s-total').textContent = fmtNum(d.queries_total);
-    document.getElementById('s-blocked').textContent = fmtNum(d.blocked_total);
-    document.getElementById('s-cache').textContent = d.cache_hit_pct.toFixed(1)+'%';
-    document.getElementById('s-cpu').textContent = d.cpu_pct.toFixed(1)+'%';
-    document.getElementById('s-ram').textContent = Math.round(d.mem_used_mb/1024*10)/10+' GB';
-    document.getElementById('s-ram-sub').textContent = 'dari '+(d.mem_total_mb/1024).toFixed(1)+' GB';
-    document.getElementById('s-uptime').textContent = fmtUptime(d.uptime_sec);
-    const ds = document.getElementById('s-dnsdist');
-    ds.textContent = d.dnsdist_running ? '● Aktif' : '● Mati';
-    ds.style.color = d.dnsdist_running ? 'var(--success)' : 'var(--danger)';
-    const dot = document.getElementById('status-dot');
-    const txt = document.getElementById('status-text');
-    dot.className = 'up';
-    txt.textContent = 'DNSDist Aktif';
-    if(!d.dnsdist_running){ dot.className='down'; txt.textContent='DNSDist Mati'; }
-  } catch(e){
-    document.getElementById('status-dot').className='down';
-    document.getElementById('status-text').textContent='Koneksi error';
+  } catch (e) {
+    err.textContent = 'Koneksi error: ' + e.message;
   }
 }
 
-// ── Config ────────────────────────────────────────────────────────────────────
-async function fetchConfig(){
+document.getElementById('login-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+function doLogout() {
+  token = '';
+  localStorage.removeItem('panel_token');
+  location.reload();
+}
+
+// ── Navigation ──
+function nav(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (el) el.classList.add('active');
+  if (page === 'dashboard') setTimeout(initChart, 50);
+  if (page === 'rpz' || page === 'upstream' || page === 'safesearch' || page === 'dotdoh' || page === 'settings') {
+    fetchConfig();
+  }
+}
+
+// ── API Wrapper ──
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { Authorization: 'Bearer ' + token } };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(API + path, opts);
+  if (r.status === 401) {
+    doLogout();
+    throw new Error('Sesi berakhir');
+  }
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || r.statusText);
+  return d;
+}
+
+// ── Toast Notification ──
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(10px)';
+    el.style.transition = 'all 0.3s ease';
+    setTimeout(() => el.remove(), 300);
+  }, 3500);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    toast('Tersalin ke clipboard: ' + text);
+  });
+}
+
+// ── Stats Poller ──
+function fmtNum(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}h ${h}j`;
+  if (h > 0) return `${h}j ${m}m`;
+  return `${m}m ${s % 60}d`;
+}
+
+async function fetchStats() {
+  try {
+    const d = await api('/api/stats');
+    
+    // Update metric cards
+    document.getElementById('s-qps').textContent = fmtNum(d.qps);
+    document.getElementById('s-total').textContent = fmtNum(d.queries_total);
+    document.getElementById('s-blocked').textContent = fmtNum(d.blocked_total);
+    document.getElementById('s-cache').textContent = d.cache_hit_pct.toFixed(1) + '%';
+    document.getElementById('s-cpu').textContent = d.cpu_pct.toFixed(1) + '%';
+    document.getElementById('p-cpu').style.width = Math.min(d.cpu_pct, 100) + '%';
+    
+    const ramUsedGB = (d.mem_used_mb / 1024).toFixed(1);
+    const ramTotalGB = (d.mem_total_mb / 1024).toFixed(1);
+    document.getElementById('s-ram').textContent = ramUsedGB + ' GB';
+    document.getElementById('s-ram-sub').textContent = 'dari ' + ramTotalGB + ' GB';
+    const ramPct = d.mem_total_mb > 0 ? (d.mem_used_mb / d.mem_total_mb) * 100 : 0;
+    document.getElementById('p-ram').style.width = Math.min(ramPct, 100) + '%';
+
+    document.getElementById('s-uptime').textContent = fmtUptime(d.uptime_sec);
+    
+    const ds = document.getElementById('s-dnsdist');
+    const dot = document.getElementById('status-dot');
+    const txt = document.getElementById('status-text');
+
+    if (d.dnsdist_running) {
+      ds.textContent = 'Aktif';
+      ds.style.color = 'var(--emerald)';
+      dot.className = 'pulse-dot online';
+      txt.textContent = 'DNS Online';
+    } else {
+      ds.textContent = 'Mati';
+      ds.style.color = 'var(--rose)';
+      dot.className = 'pulse-dot offline';
+      txt.textContent = 'DNS Mati';
+    }
+
+    // Update QPS History & Chart
+    qpsHistory.shift();
+    qpsHistory.push(d.qps);
+    if (d.qps > peakQPS) peakQPS = d.qps;
+    document.getElementById('peak-qps-chip').textContent = `Peak: ${peakQPS} QPS`;
+    drawChart();
+
+  } catch (e) {
+    document.getElementById('status-dot').className = 'pulse-dot offline';
+    document.getElementById('status-text').textContent = 'Terputus';
+  }
+}
+
+// ── Config Handler ──
+async function fetchConfig() {
   try {
     const cfg = await api('/api/config');
-    // RPZ
-    if(cfg.sinkhole_ips&&cfg.sinkhole_ips.length){
-      document.getElementById('rpz-current').innerHTML = cfg.sinkhole_ips.map(ip=>`<span class="ip-chip">${ip}</span>`).join('');
+    
+    // RPZ Chips
+    const rpzBox = document.getElementById('rpz-current');
+    if (cfg.sinkhole_ips && cfg.sinkhole_ips.length) {
+      rpzBox.innerHTML = cfg.sinkhole_ips.map(ip => `
+        <span class="chip">
+          <span>${ip}</span>
+          <button class="copy-btn" onclick="copyText('${ip}')" title="Salin">
+            <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </span>
+      `).join('');
       document.getElementById('rpz-input').value = cfg.sinkhole_ips.join('\n');
+    } else {
+      rpzBox.innerHTML = '<span class="chip" style="color:var(--text-sub)">Tidak ada IP sinkhole</span>';
     }
-    // Upstream
-    if(cfg.upstreams&&cfg.upstreams.length){
-      document.getElementById('upstream-current').innerHTML = cfg.upstreams.map(s=>`<span class="ip-chip">${s}</span>`).join('');
+
+    // Upstream Chips
+    const upBox = document.getElementById('upstream-current');
+    if (cfg.upstreams && cfg.upstreams.length) {
+      upBox.innerHTML = cfg.upstreams.map(s => `
+        <span class="chip">
+          <span>${s}</span>
+          <button class="copy-btn" onclick="copyText('${s}')" title="Salin">
+            <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </span>
+      `).join('');
       document.getElementById('upstream-input').value = cfg.upstreams.join('\n');
+    } else {
+      upBox.innerHTML = '<span class="chip" style="color:var(--text-sub)">Default Fallback</span>';
     }
-    // SafeSearch
-    if(cfg.safesearch){
+
+    // SafeSearch Toggles
+    if (cfg.safesearch) {
       document.getElementById('ss-google').checked = !!cfg.safesearch.google;
       document.getElementById('ss-bing').checked = !!cfg.safesearch.bing;
       document.getElementById('ss-youtube').checked = !!cfg.safesearch.youtube;
     }
-    // DoT/DoH
+
+    // DoT / DoH
     document.getElementById('dd-dot').checked = !!cfg.dot_enabled;
     document.getElementById('dd-doh').checked = !!cfg.doh_enabled;
-    if(cfg.cert_path) document.getElementById('dd-cert').value = cfg.cert_path;
-    if(cfg.key_path) document.getElementById('dd-key').value = cfg.key_path;
-    // Block mode
+    if (cfg.cert_path) document.getElementById('dd-cert').value = cfg.cert_path;
+    if (cfg.key_path) document.getElementById('dd-key').value = cfg.key_path;
+
+    // Block Mode
     document.getElementById('set-mode').checked = cfg.block_mode === 'rpz';
-  } catch(e){ toast('Gagal load config: '+e.message,'error'); }
+
+  } catch (e) {
+    toast('Gagal memuat konfigurasi: ' + e.message, 'error');
+  }
 }
 
-// ── RPZ ───────────────────────────────────────────────────────────────────────
-function parseIPList(txt){
-  return txt.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
+// ── Actions ──
+function parseIPList(txt) {
+  return txt.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
 }
 
-function validateIPv4(s){ return /^(\d{1,3}\.){3}\d{1,3}(:\d+)?$/.test(s); }
-function validateIPv6(s){ return s.includes(':'); }
-function validateIP(s){
-  if(s.startsWith('[')) return true; // [IPv6]:port — let server validate
-  return validateIPv4(s)||validateIPv6(s);
+function validateIPv4(s) { return /^(\d{1,3}\.){3}\d{1,3}(:\d+)?$/.test(s); }
+function validateIPv6(s) { return s.includes(':'); }
+function validateIP(s) {
+  if (s.startsWith('[')) return true;
+  return validateIPv4(s) || validateIPv6(s);
 }
 
-async function saveRPZ(){
+async function saveRPZ() {
   const ips = parseIPList(document.getElementById('rpz-input').value);
-  if(!ips.length){ toast('Masukkan minimal 1 IP','error'); return; }
-  const invalid = ips.filter(ip=>!validateIP(ip));
-  if(invalid.length){ toast('IP tidak valid: '+invalid.join(', '),'error'); return; }
+  if (!ips.length) { toast('Masukkan minimal satu IP', 'error'); return; }
+  const invalid = ips.filter(ip => !validateIP(ip));
+  if (invalid.length) { toast('Format IP tidak valid: ' + invalid.join(', '), 'error'); return; }
   try {
-    await api('/api/rpz','POST',{ips});
-    toast('RPZ Sinkhole diperbarui! DNSDist direstart.');
+    await api('/api/rpz', 'POST', { ips });
+    toast('Alamat RPZ Sinkhole berhasil diperbarui!');
     fetchConfig();
-  } catch(e){ toast('Error: '+e.message,'error'); }
+  } catch (e) {
+    toast('Gagal menyimpan RPZ: ' + e.message, 'error');
+  }
 }
 
-// ── Upstream ──────────────────────────────────────────────────────────────────
-async function saveUpstream(){
+async function saveUpstream() {
   const servers = parseIPList(document.getElementById('upstream-input').value);
-  if(!servers.length){ toast('Masukkan minimal 1 server','error'); return; }
+  if (!servers.length) { toast('Masukkan minimal satu resolver upstream', 'error'); return; }
   try {
-    await api('/api/upstream','POST',{servers});
-    toast('Upstream DNS diperbarui! DNSDist direstart.');
+    await api('/api/upstream', 'POST', { servers });
+    toast('Upstream resolver berhasil disimpan!');
     fetchConfig();
-  } catch(e){ toast('Error: '+e.message,'error'); }
+  } catch (e) {
+    toast('Gagal menyimpan upstream: ' + e.message, 'error');
+  }
 }
 
-// ── SafeSearch ────────────────────────────────────────────────────────────────
-async function saveSafeSearch(){
+async function saveSafeSearch() {
   const body = {
     google: document.getElementById('ss-google').checked,
     bing: document.getElementById('ss-bing').checked,
     youtube: document.getElementById('ss-youtube').checked,
   };
   try {
-    await api('/api/safesearch','POST',body);
-    toast('SafeSearch disimpan! DNSDist direstart.');
-  } catch(e){ toast('Error: '+e.message,'error'); }
+    await api('/api/safesearch', 'POST', body);
+    toast('Kebijakan SafeSearch berhasil diterapkan!');
+  } catch (e) {
+    toast('Gagal menerapkan SafeSearch: ' + e.message, 'error');
+  }
 }
 
-// ── DoT/DoH ───────────────────────────────────────────────────────────────────
-async function saveDoTDoH(){
+async function saveDoTDoH() {
   const body = {
     dot: document.getElementById('dd-dot').checked,
     doh: document.getElementById('dd-doh').checked,
@@ -460,41 +1236,48 @@ async function saveDoTDoH(){
     key: document.getElementById('dd-key').value,
   };
   try {
-    await api('/api/dotdoh','POST',body);
-    toast('DoT/DoH diperbarui! DNSDist direstart.');
-  } catch(e){ toast('Error: '+e.message,'error'); }
+    await api('/api/dotdoh', 'POST', body);
+    toast('Listener DoT/DoH berhasil diperbarui!');
+  } catch (e) {
+    toast('Gagal menyimpan DoT/DoH: ' + e.message, 'error');
+  }
 }
 
-// ── Settings ──────────────────────────────────────────────────────────────────
-async function saveBlockMode(){
+async function saveBlockMode() {
   const mode = document.getElementById('set-mode').checked ? 'rpz' : 'adguard';
   try {
-    await api('/api/settings','POST',{block_mode:mode});
-    toast('Block mode diubah ke '+mode+'. DNSDist direstart.');
-  } catch(e){ toast('Error: '+e.message,'error'); }
+    await api('/api/settings', 'POST', { block_mode: mode });
+    toast('Mode blokir diubah ke ' + mode.toUpperCase());
+  } catch (e) {
+    toast('Gagal mengubah mode blokir: ' + e.message, 'error');
+  }
 }
 
-async function savePassword(){
+async function savePassword() {
   const p = document.getElementById('set-pass').value;
-  if(p.length<8){ toast('Password minimal 8 karakter','error'); return; }
+  if (p.length < 8) { toast('Sandi minimal 8 karakter', 'error'); return; }
   try {
-    await api('/api/settings','POST',{panel_password:p});
-    toast('Password berhasil diganti.');
-    document.getElementById('set-pass').value='';
-  } catch(e){ toast('Error: '+e.message,'error'); }
+    await api('/api/settings', 'POST', { panel_password: p });
+    toast('Sandi panel berhasil diperbarui!');
+    document.getElementById('set-pass').value = '';
+  } catch (e) {
+    toast('Gagal mengganti sandi: ' + e.message, 'error');
+  }
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-function onLogin(){
+// ── Startup ──
+function onLogin() {
   fetchStats();
+  initChart();
+  if (statsInterval) clearInterval(statsInterval);
   statsInterval = setInterval(fetchStats, 5000);
 }
 
-if(isLoggedIn()){
-  document.getElementById('login-page').style.display='none';
+if (isLoggedIn()) {
+  document.getElementById('login-page').style.display = 'none';
   onLogin();
 } else {
-  document.getElementById('login-page').style.display='flex';
+  document.getElementById('login-page').style.display = 'flex';
 }
 </script>
 </body>
