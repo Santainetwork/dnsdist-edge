@@ -84,3 +84,19 @@ dan project ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Breaking change (minor)
 - RPZ mode sekarang balikan NXDOMAIN untuk non-A/AAAA query (sebelumnya diteruskan upstream)
+
+## [2.4.1] - 2026-09-08
+
+### Added
+- **panel/**: Go binary panel HTTPS :8443, self-signed cert auto-generate
+  - JWT auth (stdlib HMAC-SHA256), password disimpan di `/var/lib/dnsdist/panel.password`
+  - API: `/api/login`, `/api/stats`, `/api/config`, `/api/rpz`, `/api/upstream`, `/api/safesearch`, `/api/dotdoh`, `/api/settings`
+  - Stats dari `/proc/stat` (CPU), `/proc/meminfo` (RAM), `/proc/uptime`, `/proc/net/snmp` (QPS delta)
+  - UI embed `panel/static/index.html` (501 baris, single-file SPA dark theme)
+- **panel/static/index.html**: dark theme SPA — Dashboard, RPZ, Upstream, SafeSearch, DoT/DoH, Settings
+- **dnsdist.conf**: optional `dofile(/etc/dnsdist/safesearch.conf)` [6.5] dan `dofile(/etc/dnsdist/dotdoh.conf)` [1]
+  - Kedua file hanya di-load jika ada (panel yang generate)
+- `panel/build.sh`: build ke `tools/dnsdist-panel` (strip, ~6.5MB)
+
+### Changed
+- `do_install_panel` systemd env: `PANEL_ADDR=0.0.0.0:8443`, tambah `PANEL_SECRET_FILE`, `PANEL_CERT`, `PANEL_KEY`, `DNSDIST_CONF`, `DNSDIST_UPSTREAMS`

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DNSDist Panel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--card:#1e293b;--border:#334155;--accent:#38bdf8;
+  --accent2:#0ea5e9;--text:#e2e8f0;--muted:#94a3b8;--danger:#f87171;
+  --success:#4ade80;--warn:#fbbf24;--sidebar:220px;
+}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+a{color:var(--accent);text-decoration:none}
+/* Sidebar */
+#sidebar{width:var(--sidebar);background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:100vh;position:fixed;top:0;left:0;z-index:10}
+#sidebar-header{padding:1.25rem 1rem;border-bottom:1px solid var(--border)}
+#sidebar-header h1{font-size:1rem;font-weight:700;color:var(--accent);letter-spacing:.02em}
+#sidebar-header p{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+nav{padding:.5rem 0;flex:1}
+nav a{display:flex;align-items:center;gap:.6rem;padding:.6rem 1rem;font-size:.875rem;color:var(--muted);border-left:3px solid transparent;transition:all .15s}
+nav a:hover{color:var(--text);background:rgba(56,189,248,.06)}
+nav a.active{color:var(--accent);background:rgba(56,189,248,.1);border-left-color:var(--accent)}
+nav a .icon{width:1.1rem;text-align:center;font-size:1rem}
+#sidebar-footer{padding:.75rem 1rem;border-top:1px solid var(--border);font-size:.72rem;color:var(--muted)}
+#status-dot{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:var(--muted);margin-right:.3rem}
+#status-dot.up{background:var(--success)}
+#status-dot.down{background:var(--danger)}
+/* Main */
+#main{margin-left:var(--sidebar);flex:1;padding:1.5rem 2rem;max-width:calc(100vw - var(--sidebar))}
+.page{display:none}.page.active{display:block}
+h2{font-size:1.25rem;font-weight:700;margin-bottom:1.25rem;color:var(--text)}
+h3{font-size:.95rem;font-weight:600;margin-bottom:.75rem;color:var(--muted)}
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1rem 1.25rem}
+.card-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem}
+.card-val{font-size:1.75rem;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.card-sub{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+.card.ok .card-val{color:var(--success)}
+.card.warn .card-val{color:var(--warn)}
+.card.danger .card-val{color:var(--danger)}
+/* Form */
+.form-group{margin-bottom:1rem}
+label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.35rem}
+textarea,input[type=text],input[type=password]{width:100%;background:#0f172a;border:1px solid var(--border);border-radius:.5rem;color:var(--text);padding:.6rem .8rem;font-size:.875rem;font-family:inherit;outline:none;transition:border .15s}
+textarea:focus,input[type=text]:focus,input[type=password]:focus{border-color:var(--accent)}
+textarea{min-height:90px;resize:vertical}
+.hint{font-size:.72rem;color:var(--muted);margin-top:.3rem}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.1rem;border-radius:.5rem;border:none;cursor:pointer;font-size:.875rem;font-weight:600;transition:all .15s}
+.btn-primary{background:var(--accent);color:#0f172a}
+.btn-primary:hover{background:var(--accent2)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+/* Toggle switch */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:.9rem}
+.toggle-desc{font-size:.75rem;color:var(--muted);margin-top:.1rem}
+.switch{position:relative;display:inline-block;width:2.4rem;height:1.35rem}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--border);border-radius:99px;cursor:pointer;transition:.2s}
+.slider:before{content:'';position:absolute;width:1rem;height:1rem;left:.18rem;bottom:.18rem;background:#fff;border-radius:50%;transition:.2s}
+input:checked + .slider{background:var(--accent)}
+input:checked + .slider:before{transform:translateX(1rem)}
+/* Toast */
+#toast-container{position:fixed;top:1rem;right:1rem;z-index:1000;display:flex;flex-direction:column;gap:.5rem}
+.toast{padding:.65rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:500;animation:fadeIn .2s ease;max-width:320px}
+.toast.success{background:#166534;color:#bbf7d0;border:1px solid #4ade80}
+.toast.error{background:#7f1d1d;color:#fecaca;border:1px solid #f87171}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+/* Login */
+#login-page{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:1rem;padding:2rem;width:340px}
+.login-box h2{margin-bottom:1.25rem;font-size:1.1rem;text-align:center;color:var(--accent)}
+/* Section card */
+.section{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1.25rem;margin-bottom:1.25rem}
+/* Spinner */
+.spin{display:inline-block;width:1rem;height:1rem;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* IP list */
+.ip-chip{display:inline-block;background:#1e3a5f;border:1px solid #38bdf840;color:var(--accent);padding:.15rem .55rem;border-radius:99px;font-size:.75rem;margin:.15rem}
+/* Responsive */
+@media(max-width:640px){
+  #sidebar{display:none}
+  #main{margin-left:0;padding:1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-page">
+  <div class="login-box">
+    <h2>🛡 DNSDist Panel</h2>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="Password admin" autofocus>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Masuk</button>
+    <div id="login-err" style="color:var(--danger);font-size:.8rem;margin-top:.5rem;text-align:center"></div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>🛡 DNSDist Panel</h1>
+    <p>Edge Node Manager</p>
+  </div>
+  <nav>
+    <a href="#" class="active" onclick="nav('dashboard',this)"><span class="icon">📊</span> Dashboard</a>
+    <a href="#" onclick="nav('rpz',this)"><span class="icon">🚫</span> RPZ Sinkhole</a>
+    <a href="#" onclick="nav('upstream',this)"><span class="icon">🔀</span> Upstream DNS</a>
+    <a href="#" onclick="nav('safesearch',this)"><span class="icon">🔍</span> SafeSearch</a>
+    <a href="#" onclick="nav('dotdoh',this)"><span class="icon">🔒</span> DoT / DoH</a>
+    <a href="#" onclick="nav('settings',this)"><span class="icon">⚙️</span> Settings</a>
+  </nav>
+  <div id="sidebar-footer">
+    <span id="status-dot"></span>
+    <span id="status-text">Memeriksa...</span>
+  </div>
+</div>
+
+<!-- Main content -->
+<div id="main">
+
+  <!-- Dashboard -->
+  <div id="page-dashboard" class="page active">
+    <h2>Dashboard</h2>
+    <div class="cards" id="stats-cards">
+      <div class="card"><div class="card-label">QPS</div><div class="card-val" id="s-qps">—</div><div class="card-sub">Queries per detik</div></div>
+      <div class="card"><div class="card-label">Total Queries</div><div class="card-val" id="s-total">—</div><div class="card-sub">Sejak panel aktif</div></div>
+      <div class="card"><div class="card-label">Blocked</div><div class="card-val" id="s-blocked">—</div><div class="card-sub">Terblokir</div></div>
+      <div class="card"><div class="card-label">Cache Hit</div><div class="card-val" id="s-cache">—</div><div class="card-sub">% hit rate</div></div>
+      <div class="card"><div class="card-label">CPU</div><div class="card-val" id="s-cpu">—</div><div class="card-sub">Utilisasi prosesor</div></div>
+      <div class="card"><div class="card-label">RAM</div><div class="card-val" id="s-ram">—</div><div class="card-sub" id="s-ram-sub">—</div></div>
+      <div class="card"><div class="card-label">Uptime</div><div class="card-val" id="s-uptime" style="font-size:1.1rem">—</div><div class="card-sub">Sistem</div></div>
+      <div class="card"><div class="card-label">DNSDist</div><div class="card-val" id="s-dnsdist" style="font-size:1rem">—</div><div class="card-sub">Service status</div></div>
+    </div>
+    <div style="color:var(--muted);font-size:.75rem">Auto-refresh tiap 5 detik • <a href="#" onclick="fetchStats()">Refresh sekarang</a></div>
+  </div>
+
+  <!-- RPZ -->
+  <div id="page-rpz" class="page">
+    <h2>RPZ Sinkhole</h2>
+    <div class="section">
+      <h3>IP Sinkhole Saat Ini</h3>
+      <div id="rpz-current" style="margin-bottom:1rem">—</div>
+      <h3>Set IP Sinkhole</h3>
+      <div class="form-group">
+        <label>Daftar IP (satu per baris atau pisahkan koma — IPv4 dan IPv6 didukung)</label>
+        <textarea id="rpz-input" placeholder="10.10.10.10&#10;10.10.10.11&#10;2001:db8::1"></textarea>
+        <div class="hint">Contoh: <code>10.10.10.10, 2001:db8::1, [2606:4700::]:5353</code></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveRPZ()">💾 Simpan & Restart</button>
+    </div>
+  </div>
+
+  <!-- Upstream -->
+  <div id="page-upstream" class="page">
+    <h2>Upstream DNS</h2>
+    <div class="section">
+      <h3>Upstream Saat Ini</h3>
+      <div id="upstream-current" style="margin-bottom:1rem">—</div>
+      <h3>Set Upstream DNS</h3>
+      <div class="form-group">
+        <label>Daftar server (satu per baris atau koma — format: IP, IP:port, [IPv6]:port)</label>
+        <textarea id="upstream-input" placeholder="1.1.1.1&#10;8.8.8.8&#10;[2606:4700:4700::1111]:53"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="saveUpstream()">💾 Simpan & Restart</button>
+    </div>
+  </div>
+
+  <!-- SafeSearch -->
+  <div id="page-safesearch" class="page">
+    <h2>SafeSearch</h2>
+    <div class="section">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">🔍 Google SafeSearch</div>
+          <div class="toggle-desc">Paksa safe search via DNS rewrite ke 216.239.38.120</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="ss-google"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">🔎 Bing SafeSearch</div>
+          <div class="toggle-desc">Paksa safe search via DNS rewrite ke 204.79.197.220</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="ss-bing"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">▶️ YouTube Restricted</div>
+          <div class="toggle-desc">Paksa mode terbatas YouTube via DNS rewrite</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="ss-youtube"><span class="slider"></span></label>
+      </div>
+      <div style="margin-top:1rem">
+        <button class="btn btn-primary" onclick="saveSafeSearch()">💾 Simpan & Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DoT/DoH -->
+  <div id="page-dotdoh" class="page">
+    <h2>DoT / DoH</h2>
+    <div class="section">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">🔒 DNS over TLS (DoT)</div>
+          <div class="toggle-desc">Port 853 — IPv4 + IPv6</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="dd-dot"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">🌐 DNS over HTTPS (DoH)</div>
+          <div class="toggle-desc">Port 443, path /dns-query — IPv4 + IPv6</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="dd-doh"><span class="slider"></span></label>
+      </div>
+      <div style="margin-top:1rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="form-group">
+          <label>Path Sertifikat TLS (.crt)</label>
+          <input type="text" id="dd-cert" value="/etc/dnsdist/certs/server.crt">
+        </div>
+        <div class="form-group">
+          <label>Path Private Key (.key)</label>
+          <input type="text" id="dd-key" value="/etc/dnsdist/certs/server.key">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveDoTDoH()">💾 Simpan & Restart</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="page-settings" class="page">
+    <h2>Settings</h2>
+    <div class="section">
+      <h3>Block Mode</h3>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Mode RPZ (ISP/Sinkhole)</div>
+          <div class="toggle-desc">Query blocked → redirect ke IP Sinkhole. Off = Mode AdGuard (0.0.0.0 / null routing)</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="set-mode" checked><span class="slider"></span></label>
+      </div>
+      <div style="margin-top:.75rem">
+        <button class="btn btn-primary" onclick="saveBlockMode()">💾 Simpan Block Mode</button>
+      </div>
+    </div>
+    <div class="section">
+      <h3>Ganti Password Panel</h3>
+      <div class="form-group">
+        <label>Password Baru</label>
+        <input type="password" id="set-pass" placeholder="Minimal 8 karakter">
+      </div>
+      <button class="btn btn-primary" onclick="savePassword()">🔑 Ganti Password</button>
+    </div>
+    <div class="section">
+      <h3>Info</h3>
+      <div style="font-size:.8rem;color:var(--muted);line-height:1.7">
+        <div>Panel: <strong>DNSDist Edge Panel v2.4.0</strong></div>
+        <div>Setup script: <code>setup-edge.sh</code></div>
+        <div>Config: <code>/etc/dnsdist/dnsdist.conf</code></div>
+        <div>Upstreams: <code>/etc/dnsdist/upstreams.conf</code></div>
+      </div>
+      <div style="margin-top:.75rem">
+        <button class="btn btn-ghost" onclick="doLogout()">🚪 Logout</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+const API = '';
+let token = localStorage.getItem('panel_token') || '';
+let statsInterval = null;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function isLoggedIn(){ return !!token; }
+
+async function doLogin(){
+  const pass = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-err');
+  err.textContent = '';
+  try {
+    const r = await fetch(API+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pass})});
+    const d = await r.json();
+    if(!r.ok){ err.textContent = d.error||'Login gagal'; return; }
+    token = d.token;
+    localStorage.setItem('panel_token', token);
+    document.getElementById('login-page').style.display='none';
+    onLogin();
+  } catch(e){ err.textContent = 'Koneksi error: '+e.message; }
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+function doLogout(){
+  token=''; localStorage.removeItem('panel_token');
+  location.reload();
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function nav(page, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if(el) el.classList.add('active');
+  if(page==='rpz'||page==='upstream'||page==='safesearch'||page==='dotdoh'||page==='settings') fetchConfig();
+}
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function api(path, method='GET', body=null){
+  const opts={method,headers:{Authorization:'Bearer '+token}};
+  if(body){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+  const r = await fetch(API+path, opts);
+  const d = await r.json();
+  if(!r.ok) throw new Error(d.error||r.status);
+  return d;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type='success'){
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast '+type;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function fmtNum(n){ if(n>=1e6) return (n/1e6).toFixed(1)+'M'; if(n>=1e3) return (n/1e3).toFixed(1)+'K'; return String(n); }
+function fmtUptime(s){
+  const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60);
+  if(d>0) return d+'d '+h+'h';
+  if(h>0) return h+'h '+m+'m';
+  return m+'m '+(s%60)+'s';
+}
+
+async function fetchStats(){
+  try {
+    const d = await api('/api/stats');
+    document.getElementById('s-qps').textContent = fmtNum(d.qps);
+    document.getElementById('s-total').textContent = fmtNum(d.queries_total);
+    document.getElementById('s-blocked').textContent = fmtNum(d.blocked_total);
+    document.getElementById('s-cache').textContent = d.cache_hit_pct.toFixed(1)+'%';
+    document.getElementById('s-cpu').textContent = d.cpu_pct.toFixed(1)+'%';
+    document.getElementById('s-ram').textContent = Math.round(d.mem_used_mb/1024*10)/10+' GB';
+    document.getElementById('s-ram-sub').textContent = 'dari '+(d.mem_total_mb/1024).toFixed(1)+' GB';
+    document.getElementById('s-uptime').textContent = fmtUptime(d.uptime_sec);
+    const ds = document.getElementById('s-dnsdist');
+    ds.textContent = d.dnsdist_running ? '● Aktif' : '● Mati';
+    ds.style.color = d.dnsdist_running ? 'var(--success)' : 'var(--danger)';
+    const dot = document.getElementById('status-dot');
+    const txt = document.getElementById('status-text');
+    dot.className = 'up';
+    txt.textContent = 'DNSDist Aktif';
+    if(!d.dnsdist_running){ dot.className='down'; txt.textContent='DNSDist Mati'; }
+  } catch(e){
+    document.getElementById('status-dot').className='down';
+    document.getElementById('status-text').textContent='Koneksi error';
+  }
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+async function fetchConfig(){
+  try {
+    const cfg = await api('/api/config');
+    // RPZ
+    if(cfg.sinkhole_ips&&cfg.sinkhole_ips.length){
+      document.getElementById('rpz-current').innerHTML = cfg.sinkhole_ips.map(ip=>`<span class="ip-chip">${ip}</span>`).join('');
+      document.getElementById('rpz-input').value = cfg.sinkhole_ips.join('\n');
+    }
+    // Upstream
+    if(cfg.upstreams&&cfg.upstreams.length){
+      document.getElementById('upstream-current').innerHTML = cfg.upstreams.map(s=>`<span class="ip-chip">${s}</span>`).join('');
+      document.getElementById('upstream-input').value = cfg.upstreams.join('\n');
+    }
+    // SafeSearch
+    if(cfg.safesearch){
+      document.getElementById('ss-google').checked = !!cfg.safesearch.google;
+      document.getElementById('ss-bing').checked = !!cfg.safesearch.bing;
+      document.getElementById('ss-youtube').checked = !!cfg.safesearch.youtube;
+    }
+    // DoT/DoH
+    document.getElementById('dd-dot').checked = !!cfg.dot_enabled;
+    document.getElementById('dd-doh').checked = !!cfg.doh_enabled;
+    if(cfg.cert_path) document.getElementById('dd-cert').value = cfg.cert_path;
+    if(cfg.key_path) document.getElementById('dd-key').value = cfg.key_path;
+    // Block mode
+    document.getElementById('set-mode').checked = cfg.block_mode === 'rpz';
+  } catch(e){ toast('Gagal load config: '+e.message,'error'); }
+}
+
+// ── RPZ ───────────────────────────────────────────────────────────────────────
+function parseIPList(txt){
+  return txt.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
+}
+
+function validateIPv4(s){ return /^(\d{1,3}\.){3}\d{1,3}(:\d+)?$/.test(s); }
+function validateIPv6(s){ return s.includes(':'); }
+function validateIP(s){
+  if(s.startsWith('[')) return true; // [IPv6]:port — let server validate
+  return validateIPv4(s)||validateIPv6(s);
+}
+
+async function saveRPZ(){
+  const ips = parseIPList(document.getElementById('rpz-input').value);
+  if(!ips.length){ toast('Masukkan minimal 1 IP','error'); return; }
+  const invalid = ips.filter(ip=>!validateIP(ip));
+  if(invalid.length){ toast('IP tidak valid: '+invalid.join(', '),'error'); return; }
+  try {
+    await api('/api/rpz','POST',{ips});
+    toast('RPZ Sinkhole diperbarui! DNSDist direstart.');
+    fetchConfig();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── Upstream ──────────────────────────────────────────────────────────────────
+async function saveUpstream(){
+  const servers = parseIPList(document.getElementById('upstream-input').value);
+  if(!servers.length){ toast('Masukkan minimal 1 server','error'); return; }
+  try {
+    await api('/api/upstream','POST',{servers});
+    toast('Upstream DNS diperbarui! DNSDist direstart.');
+    fetchConfig();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── SafeSearch ────────────────────────────────────────────────────────────────
+async function saveSafeSearch(){
+  const body = {
+    google: document.getElementById('ss-google').checked,
+    bing: document.getElementById('ss-bing').checked,
+    youtube: document.getElementById('ss-youtube').checked,
+  };
+  try {
+    await api('/api/safesearch','POST',body);
+    toast('SafeSearch disimpan! DNSDist direstart.');
+  } catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── DoT/DoH ───────────────────────────────────────────────────────────────────
+async function saveDoTDoH(){
+  const body = {
+    dot: document.getElementById('dd-dot').checked,
+    doh: document.getElementById('dd-doh').checked,
+    cert: document.getElementById('dd-cert').value,
+    key: document.getElementById('dd-key').value,
+  };
+  try {
+    await api('/api/dotdoh','POST',body);
+    toast('DoT/DoH diperbarui! DNSDist direstart.');
+  } catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+async function saveBlockMode(){
+  const mode = document.getElementById('set-mode').checked ? 'rpz' : 'adguard';
+  try {
+    await api('/api/settings','POST',{block_mode:mode});
+    toast('Block mode diubah ke '+mode+'. DNSDist direstart.');
+  } catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+async function savePassword(){
+  const p = document.getElementById('set-pass').value;
+  if(p.length<8){ toast('Password minimal 8 karakter','error'); return; }
+  try {
+    await api('/api/settings','POST',{panel_password:p});
+    toast('Password berhasil diganti.');
+    document.getElementById('set-pass').value='';
+  } catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+function onLogin(){
+  fetchStats();
+  statsInterval = setInterval(fetchStats, 5000);
+}
+
+if(isLoggedIn()){
+  document.getElementById('login-page').style.display='none';
+  onLogin();
+} else {
+  document.getElementById('login-page').style.display='flex';
+}
+</script>
+</body>
+</html>
