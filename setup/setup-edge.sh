@@ -748,6 +748,22 @@ do_install_panel() {
         cp "$panel_source" "$panel_bin"
         chmod 0755 "$panel_bin"
         installed=true
+    elif command -v aria2c >/dev/null 2>&1; then
+        echo "[*] Mengunduh panel binary menggunakan aria2c (8 koneksi paralel)..."
+        if aria2c -x 8 -s 8 -k 1M --connect-timeout=15 --timeout=60 --max-tries=3 \
+            --dir="$(dirname "$panel_bin")" --out="$(basename "$panel_bin")" \
+            --allow-overwrite=true --summary-interval=0 "$PANEL_RELEASE_URL"; then
+            chmod 0755 "$panel_bin"
+            installed=true
+        else
+            echo -e "  ${YELLOW}[!] Download via aria2c gagal, mencoba fallback ke curl...${NC}"
+            if command -v curl >/dev/null 2>&1 && curl -fsSL --connect-timeout 15 -o "$panel_bin" "$PANEL_RELEASE_URL"; then
+                chmod 0755 "$panel_bin"
+                installed=true
+            else
+                echo -e "  ${YELLOW}[!] Gagal mengunduh panel binary. Panel dilewati.${NC}"
+            fi
+        fi
     elif command -v curl >/dev/null 2>&1; then
         echo "[*] Mengunduh panel binary dari: $PANEL_RELEASE_URL"
         if curl -fsSL --connect-timeout 15 -o "$panel_bin" "$PANEL_RELEASE_URL"; then
@@ -757,7 +773,7 @@ do_install_panel() {
             echo -e "  ${YELLOW}[!] Gagal mengunduh panel binary. Panel dilewati.${NC}"
         fi
     else
-        echo -e "  ${YELLOW}[!] curl tidak tersedia dan panel binary lokal tidak ditemukan. Panel dilewati.${NC}"
+        echo -e "  ${YELLOW}[!] aria2c/curl tidak tersedia dan panel binary lokal tidak ditemukan. Panel dilewati.${NC}"
     fi
 
     if [ "$installed" = true ]; then
