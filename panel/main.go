@@ -21,6 +21,7 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"path/filepath"
 	"net"
 	"net/http"
 	"os"
@@ -312,6 +313,9 @@ func startStatsTicker() {
 	}()
 }
 
+// confDir returns the directory containing dnsdist.conf — used for sibling files.
+func confDir() string { return filepath.Dir(*flagConf) }
+
 // ─── Config parsing ───────────────────────────────────────────────────────────
 
 type SafeSearch struct {
@@ -351,10 +355,11 @@ func parseSinkholeIPs(raw string) []string {
 }
 
 func loadNodeConfig() NodeConfig {
+	cd := confDir()
 	cfg := NodeConfig{
-		BlockMode:  "rpz",
-		CertPath:   "/etc/dnsdist/certs/server.crt",
-		KeyPath:    "/etc/dnsdist/certs/server.key",
+		BlockMode: "rpz",
+		CertPath:  filepath.Join(cd, "certs", "server.crt"),
+		KeyPath:   filepath.Join(cd, "certs", "server.key"),
 	}
 	if b, err := os.ReadFile(*flagConf); err == nil {
 		content := string(b)
@@ -378,8 +383,8 @@ func loadNodeConfig() NodeConfig {
 			cfg.Upstreams = append(cfg.Upstreams, m[1])
 		}
 	}
-	// safesearch: check /etc/dnsdist/safesearch.conf
-	if b, err := os.ReadFile("/etc/dnsdist/safesearch.conf"); err == nil {
+	// safesearch: check safesearch.conf sibling to dnsdist.conf
+	if b, err := os.ReadFile(filepath.Join(confDir(), "safesearch.conf")); err == nil {
 		sc := string(b)
 		cfg.SafeSearch.Google = strings.Contains(sc, "google.com")
 		cfg.SafeSearch.Bing = strings.Contains(sc, "bing.com")
@@ -430,7 +435,7 @@ addAction(SuffixMatchNodeRule(newSuffixMatchNode()
 ), SpoofAction('216.239.38.120'))
 `)
 	}
-	return atomicWriteString("/etc/dnsdist/safesearch.conf", sb.String(), 0o644)
+	return atomicWriteString(filepath.Join(confDir(), "safesearch.conf"), sb.String(), 0o644)
 }
 
 // ─── DoT/DoH conf writer ──────────────────────────────────────────────────────
@@ -448,7 +453,7 @@ addTLSLocal('[::]:853', '%s', '%s', {provider='openssl',minTLSVersion='tls1.2'})
 addDOHLocal('[::]:443', '%s', '%s', '/dns-query', {provider='openssl',minTLSVersion='tls1.2'})
 `, cert, key, cert, key)
 	}
-	return atomicWriteString("/etc/dnsdist/dotdoh.conf", sb.String(), 0o644)
+	return atomicWriteString(filepath.Join(confDir(), "dotdoh.conf"), sb.String(), 0o644)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -545,8 +550,9 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Load password from secret file (first 32 bytes = JWT secret, next line = password hash)
-	// Simple: store plaintext password in separate file panel.password
-	storedPass, _ := os.ReadFile("/var/lib/dnsdist/panel.password")
+	// Password stored as sibling of secret file
+	passPath := filepath.Join(filepath.Dir(*flagSecret), "panel.password")
+	storedPass, _ := os.ReadFile(passPath)
 	expected := strings.TrimSpace(string(storedPass))
 	if expected == "" {
 		expected = "admin" // default if not set
@@ -665,11 +671,12 @@ func handleDoTDoH(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonErr(w, http.StatusBadRequest, "invalid json"); return
 	}
+	cd := confDir()
 	if body.Cert == "" {
-		body.Cert = "/etc/dnsdist/certs/server.crt"
+		body.Cert = filepath.Join(cd, "certs", "server.crt")
 	}
 	if body.Key == "" {
-		body.Key = "/etc/dnsdist/certs/server.key"
+		body.Key = filepath.Join(cd, "certs", "server.key")
 	}
 	if err := writeDoTDoH(body.DoT, body.DoH, body.Cert, body.Key); err != nil {
 		jsonErr(w, http.StatusInternalServerError, err.Error()); return
@@ -692,7 +699,11 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusBadRequest, "invalid json"); return
 	}
 	if body.PanelPassword != "" {
-		_ = atomicWriteString("/var/lib/dnsdist/panel.password", body.PanelPassword, 0o600)
+		passPath := filepath.Join(filepath.Dir(*flagSecret), "panel.password")
+		if err := atomicWriteString(passPath, body.PanelPassword, 0o600); err != nil {
+			jsonErr(w, http.StatusInternalServerError, "cannot save password: "+err.Error())
+			return
+		}
 	}
 	if body.BlockMode == "adguard" || body.BlockMode == "rpz" {
 		// patch dnsdist.conf block mode
