@@ -302,7 +302,7 @@ PYEOF
     # 4.5 Sinkronisasi Database Awal
     echo -e "\n${CYAN}[*] Menjalankan sinkronisasi database awal...${NC}"
     export CENTRAL_DB_URL
-    sh "$SCRIPT_UPDATE" || echo -e "${YELLOW}[!] Peringatan: Sinkronisasi awal gagal. Pastikan Central Manager URL ($CENTRAL_DB_URL) dapat diakses.${NC}"
+    bash "$SCRIPT_UPDATE" || echo -e "${YELLOW}[!] Peringatan: Sinkronisasi awal gagal. Pastikan Central Manager URL ($CENTRAL_DB_URL) dapat diakses.${NC}"
     [ -f "$DB_FILE" ] && chown "${DNSDIST_USER}:${DNSDIST_USER}" "$DB_FILE" 2>/dev/null || true
 
     # 5. Restart DNSDist
@@ -992,7 +992,7 @@ PYEOF
     echo -e "\n${CYAN}=== [4/5] Sinkronisasi Database Awal ===${NC}"
     # Export URL agar update-blacklist.sh bisa membacanya sebelum node.conf tersimpan
     export CENTRAL_DB_URL
-    sh "$SCRIPT_UPDATE" || echo -e "${YELLOW}[!] Peringatan: Sinkronisasi awal gagal. Pastikan Central Manager URL ($CENTRAL_DB_URL) dapat diakses.${NC}"
+    bash "$SCRIPT_UPDATE" || echo -e "${YELLOW}[!] Peringatan: Sinkronisasi awal gagal. Pastikan Central Manager URL ($CENTRAL_DB_URL) dapat diakses.${NC}"
     [ -f "$DB_FILE" ] && chown "${DNSDIST_USER}:${DNSDIST_USER}" "$DB_FILE" 2>/dev/null || true
 
     echo -e "\n${CYAN}=== [5/5] Memulai Layanan DNSDist ===${NC}"
@@ -1017,9 +1017,9 @@ do_sync() {
     echo -e "${CYAN}[*] Menjalankan sinkronisasi database manual...${NC}"
     if [ -f "$SCRIPT_UPDATE" ]; then
         if [ "$FORCE_SYNC" = true ]; then
-            sh "$SCRIPT_UPDATE" --force-update
+            bash "$SCRIPT_UPDATE" --force-update
         else
-            sh "$SCRIPT_UPDATE"
+            bash "$SCRIPT_UPDATE"
         fi
         detect_dnsdist_user
         [ -f "$DB_FILE" ] && chown "${DNSDIST_USER}:${DNSDIST_USER}" "$DB_FILE" 2>/dev/null || true

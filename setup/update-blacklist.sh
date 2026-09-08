@@ -104,14 +104,16 @@ download_source() {
 }
 
 # --- Main: loop semua source ---
-IFS=',' read -r -a SOURCES <<< "$CENTRAL_DB_URLS"
 TMP_FILE="${DB_FILE}.tmp"
 success=0
 success_url=""
 http_code="500"
 
-for src in "${SOURCES[@]}"; do
-    url=$(echo "$src" | xargs)  # trim whitespace
+OLD_IFS="$IFS"
+IFS=','
+for src in $CENTRAL_DB_URLS; do
+    IFS="$OLD_IFS"
+    url=$(echo "$src" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
     [ -z "$url" ] && continue
     echo "[*] Mencoba source: $url"
     if download_source "$url" "$TMP_FILE"; then
@@ -119,7 +121,9 @@ for src in "${SOURCES[@]}"; do
         success_url="$url"
         break
     fi
+    IFS=','
 done
+IFS="$OLD_IFS"
 rm -f "$FORCE_FLAG"
 
 # --- Generate halaman status HTML ---
