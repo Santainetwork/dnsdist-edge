@@ -843,6 +843,8 @@ ExecStart=/usr/local/bin/dnsdist-panel
 Restart=on-failure
 RestartSec=3
 Environment=PANEL_ADDR=0.0.0.0:8443
+Environment=PANEL_HTTP_ADDR=0.0.0.0:8084
+Environment=PANEL_TLS=true
 Environment=PANEL_DB=/var/lib/dnsdist/panel.db
 Environment=PANEL_SECRET_FILE=/var/lib/dnsdist/panel.secret
 Environment=PANEL_CERT=/var/lib/dnsdist/panel-cert.pem
@@ -859,8 +861,9 @@ UNIT
         systemctl restart dnsdist-panel || true
         local node_ip
         node_ip=$(hostname -I | awk '{print $1}')
-        echo -e "  ${GREEN}[✓] Panel terinstall & aktif: https://${node_ip}:8443${NC}"
-        echo -e "       (self-signed cert, accept browser warning)"
+        echo -e "  ${GREEN}[✓] Panel terinstall & aktif (Dual Mode):${NC}"
+        echo -e "       • HTTPS : https://${node_ip}:8443 (SSL self-signed)"
+        echo -e "       • HTTP  : http://${node_ip}:8084 (Plain HTTP)"
         echo -e "       Password: ${WEBSERVER_PASSWORD}"
     fi
 }

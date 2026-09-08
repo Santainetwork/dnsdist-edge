@@ -42,7 +42,9 @@ var indexHTML []byte
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 var (
-	flagAddr      = flag.String("addr", envOr("PANEL_ADDR", ":8443"), "Listen address")
+	flagAddr      = flag.String("addr", envOr("PANEL_ADDR", ":8443"), "Primary listen address (HTTPS if TLS enabled, else HTTP)")
+	flagHTTPAddr  = flag.String("http-addr", envOr("PANEL_HTTP_ADDR", ""), "Optional secondary HTTP listen address (enables dual HTTP+HTTPS mode)")
+	flagTLS       = flag.Bool("tls", envBool("PANEL_TLS", true), "Enable TLS on primary address (set false for pure HTTP)")
 	flagConf      = flag.String("config", envOr("DNSDIST_CONF", "/etc/dnsdist/dnsdist.conf"), "dnsdist.conf path")
 	flagUpstreams = flag.String("upstreams", envOr("DNSDIST_UPSTREAMS", "/etc/dnsdist/upstreams.conf"), "upstreams.conf path")
 	flagCert      = flag.String("cert", envOr("PANEL_CERT", "/var/lib/dnsdist/panel-cert.pem"), "TLS cert path")
@@ -54,6 +56,14 @@ var (
 func envOr(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func envBool(key string, def bool) bool {
+	if v := os.Getenv(key); v != "" {
+		v = strings.ToLower(strings.TrimSpace(v))
+		return v == "1" || v == "true" || v == "yes" || v == "on"
 	}
 	return def
 }
@@ -734,10 +744,6 @@ func main() {
 		log.Fatalf("cannot init JWT secret: %v", err)
 	}
 
-	if err := ensureCert(*flagCert, *flagKey); err != nil {
-		log.Fatalf("TLS cert error: %v", err)
-	}
-
 	startStatsTicker()
 
 	mux := http.NewServeMux()
@@ -764,18 +770,50 @@ func main() {
 	mux.HandleFunc("/api/dotdoh", auth(handleDoTDoH))
 	mux.HandleFunc("/api/settings", auth(handleSettings))
 
-	srv := &http.Server{
-		Addr:         *flagAddr,
-		Handler:      cors(mux),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		TLSConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		},
+	// Jika secondary HTTP address diberikan (misal :8084), jalankan listener HTTP di background (Dual Mode)
+	if *flagHTTPAddr != "" {
+		httpSrv := &http.Server{
+			Addr:         *flagHTTPAddr,
+			Handler:      cors(mux),
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 30 * time.Second,
+		}
+		go func() {
+			io.WriteString(os.Stderr, fmt.Sprintf("[panel] Starting HTTP (dual listener) on %s\n", *flagHTTPAddr))
+			if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Printf("[panel] HTTP listener error: %v", err)
+			}
+		}()
 	}
 
-	io.WriteString(os.Stderr, fmt.Sprintf("[panel] Starting HTTPS on %s\n", *flagAddr))
-	if err := srv.ListenAndServeTLS(*flagCert, *flagKey); err != nil {
-		log.Fatalf("server error: %v", err)
+	if *flagTLS {
+		if err := ensureCert(*flagCert, *flagKey); err != nil {
+			log.Fatalf("TLS cert error: %v", err)
+		}
+		srv := &http.Server{
+			Addr:         *flagAddr,
+			Handler:      cors(mux),
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 30 * time.Second,
+			TLSConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		}
+		io.WriteString(os.Stderr, fmt.Sprintf("[panel] Starting HTTPS on %s\n", *flagAddr))
+		if err := srv.ListenAndServeTLS(*flagCert, *flagKey); err != nil {
+			log.Fatalf("server error: %v", err)
+		}
+	} else {
+		// Pure HTTP Mode
+		srv := &http.Server{
+			Addr:         *flagAddr,
+			Handler:      cors(mux),
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 30 * time.Second,
+		}
+		io.WriteString(os.Stderr, fmt.Sprintf("[panel] Starting HTTP (TLS disabled) on %s\n", *flagAddr))
+		if err := srv.ListenAndServe(); err != nil {
+			log.Fatalf("server error: %v", err)
+		}
 	}
 }

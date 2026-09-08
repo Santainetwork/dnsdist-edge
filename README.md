@@ -36,8 +36,17 @@ sudo ./setup-edge.sh --install --url http://central-manager.local:8080/files/tru
 Lihat panduan lengkap di **[SETUP.md](docs/SETUP.md)**.
 
 ### Quick Reference
-Untuk command-finding cepat dan troubleshooting, lihat:
+Untuk command-finding cepat dan panduan mendalam:
 - **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Common commands & cheat sheet
+- **[SETUP-MASTER.md](docs/SETUP-MASTER.md)** - Panduan Central Master Server (CDB Compiler & Distributor)
+- **[SETUP-EDGE-COMMANDS.md](docs/SETUP-EDGE-COMMANDS.md)** - Dokumentasi lengkap CLI `setup-edge.sh`
+
+### Central Master Server (Opsional)
+Jika Anda ingin membangun server master sendiri untuk mengompilasi blacklist CDB:
+```bash
+cd setup
+sudo ./setup-master.sh --install --no-dnsdist --with-panel
+```
 
 ## 📚 Dokumentasi Lengkap
 
