@@ -725,12 +725,38 @@ do_install_panel() {
         echo -e "  ${YELLOW}[i] Panel dilewati (pakai --with-panel untuk mengaktifkan)${NC}"
         return
     fi
-    echo "[*] Mengunduh panel binary dari: $PANEL_RELEASE_URL"
-    if command -v curl >/dev/null 2>&1; then
+
+    # Deteksi binary panel lokal terlebih dahulu (untuk paket bundle/offline)
+    local panel_source=""
+    if [ -f "$EDGE_DIR/dnsdist-panel" ]; then
+        panel_source="$EDGE_DIR/dnsdist-panel"
+    elif [ -f "$EDGE_DIR/tools/dnsdist-panel" ]; then
+        panel_source="$EDGE_DIR/tools/dnsdist-panel"
+    elif [ -f "$EDGE_DIR/../tools/dnsdist-panel" ]; then
+        panel_source="$EDGE_DIR/../tools/dnsdist-panel"
+    fi
+
+    local installed=false
+    if [ -n "$panel_source" ]; then
+        echo -e "  ${GREEN}[*] Menggunakan panel binary lokal: $panel_source${NC}"
+        cp "$panel_source" "$panel_bin"
+        chmod 0755 "$panel_bin"
+        installed=true
+    elif command -v curl >/dev/null 2>&1; then
+        echo "[*] Mengunduh panel binary dari: $PANEL_RELEASE_URL"
         if curl -fsSL --connect-timeout 15 -o "$panel_bin" "$PANEL_RELEASE_URL"; then
             chmod 0755 "$panel_bin"
-            # Install systemd unit (baris Environment dari template)
-            cat > /etc/systemd/system/dnsdist-panel.service <<UNIT
+            installed=true
+        else
+            echo -e "  ${YELLOW}[!] Gagal mengunduh panel binary. Panel dilewati.${NC}"
+        fi
+    else
+        echo -e "  ${YELLOW}[!] curl tidak tersedia dan panel binary lokal tidak ditemukan. Panel dilewati.${NC}"
+    fi
+
+    if [ "$installed" = true ]; then
+        # Install systemd unit (baris Environment dari template)
+        cat > /etc/systemd/system/dnsdist-panel.service <<UNIT
 [Unit]
 Description=DNSDist Management Panel
 Wants=dnsdist.service
@@ -753,19 +779,14 @@ LimitNOFILE=65536
 [Install]
 WantedBy=multi-user.target
 UNIT
-            systemctl daemon-reload
-            systemctl enable dnsdist-panel >/dev/null 2>&1
-            systemctl restart dnsdist-panel || true
-            local node_ip
-            node_ip=$(hostname -I | awk '{print $1}')
-            echo -e "  ${GREEN}[✓] Panel terinstall & aktif: https://${node_ip}:8443${NC}"
-            echo -e "       (self-signed cert, accept browser warning)"
-            echo -e "       Password: ${WEBSERVER_PASSWORD}"
-        else
-            echo -e "  ${YELLOW}[!] Gagal mengunduh panel binary. Panel dilewati.${NC}"
-        fi
-    else
-        echo -e "  ${YELLOW}[!] curl tidak tersedia. Panel dilewati.${NC}"
+        systemctl daemon-reload
+        systemctl enable dnsdist-panel >/dev/null 2>&1
+        systemctl restart dnsdist-panel || true
+        local node_ip
+        node_ip=$(hostname -I | awk '{print $1}')
+        echo -e "  ${GREEN}[✓] Panel terinstall & aktif: https://${node_ip}:8443${NC}"
+        echo -e "       (self-signed cert, accept browser warning)"
+        echo -e "       Password: ${WEBSERVER_PASSWORD}"
     fi
 }
 
