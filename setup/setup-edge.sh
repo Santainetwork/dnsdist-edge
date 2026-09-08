@@ -732,6 +732,12 @@ do_install_panel() {
         return
     fi
 
+    # Hentikan service panel sementara jika sedang berjalan untuk mencegah 'Text file busy'
+    if systemctl is-active --quiet dnsdist-panel 2>/dev/null; then
+        echo "[*] Menghentikan service dnsdist-panel sementara sebelum update binary..."
+        systemctl stop dnsdist-panel || true
+    fi
+
     # Deteksi binary panel lokal terlebih dahulu (untuk paket bundle/offline)
     local panel_source=""
     if [ -f "$EDGE_DIR/dnsdist-panel" ]; then

@@ -213,6 +213,12 @@ NGINXEOF
         fi
 
         if [ -n "$panel_src" ]; then
+            # Hentikan service panel sementara jika sedang berjalan untuk mencegah 'Text file busy'
+            if systemctl is-active --quiet dnsdist-panel 2>/dev/null; then
+                echo "[*] Menghentikan service dnsdist-panel sementara sebelum update binary..."
+                systemctl stop dnsdist-panel || true
+            fi
+
             cp "$panel_src" "$panel_bin"
             chmod 0755 "$panel_bin"
             cat > /etc/systemd/system/dnsdist-panel.service << UNIT
