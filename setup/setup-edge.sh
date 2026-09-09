@@ -8,7 +8,7 @@
 set -e
 
 # --- Versi Script ---
-SCRIPT_VERSION="2.5.0"
+SCRIPT_VERSION="2.5.1"
 
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---
 CONF_DIR="/etc/dnsdist"

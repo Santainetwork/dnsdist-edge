@@ -5,6 +5,30 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [2.5.1] — 2026-09-09
+
+### 🌟 Centralized Multi-Node Monitoring (Mode A)
+- **Master Cluster Backend**:
+  - Pendaftaran node terpusat dengan token pendaftaran sementara (24 jam, sekali pakai) via CLI (`dnsdist-panel -enrollment-token`) dan Web UI modal.
+  - Endpoint ingestion telemetri live (`POST /api/cluster/heartbeat`) dengan proteksi kunci node.
+  - Snapshot status seluruh node tersimpan persisten di `/var/lib/dnsdist/cluster-nodes.json`.
+  - Deteksi otomatis status node: `online`, `degraded` (dnsdist berhenti), dan `offline` (> 3 menit tanpa heartbeat).
+  - Pelacakan dinamis perubahan alamat IP node edge saat mengirim heartbeat.
+- **Edge Telemetry Push Agent**:
+  - Agen latar belakang otomatis berjalan tiap 60 detik, mengirim data QPS, total query, total diblokir, persentase cache hit, CPU, RAM, uptime, dan hash SHA256 database blacklist aktif.
+  - Siklus hidup agen andal: otomatis mengaktifkan ticker saat didaftarkan secara dinamis lewat Web UI tanpa restart service.
+  - Graceful stop channel yang bersih dan bebas race condition.
+- **Web UI Cluster Dashboard**:
+  - Menu baru **Cluster Nodes** di mode master dengan 4 metrik agregat (Node Aktif/Total, Total Cluster QPS, Total Queries/Blocked, Rata-rata Cache Hit).
+  - Tabel node live yang aman dari injection (sanitasi HTML `esc()`) dan fungsi penghapusan node berbasis ID.
+  - Kartu koneksi master di menu **Pengaturan** pada node edge untuk menghubungkan node secara instan dari peramban.
+- **Peningkatan Installer**:
+  - `setup-edge.sh` mendukung opsi `--master-url`, `--enroll-token`, dan `--node-name`.
+  - Injeksi variabel environment systemd yang aman tanpa pemotongan newline.
+  - Konfigurasi cluster tersimpan otomatis pada `save_config` dan dimuat pada migrasi/upgrade.
+
+---
+
 ## [2.5.0] — 2026-09-08
 
 ### 🌟 Minor Release Highlights

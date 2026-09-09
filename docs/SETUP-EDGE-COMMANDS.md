@@ -4,7 +4,7 @@
 
 ---
 
-## 📊 Ringkasan Opsi CLI (19 Opsi)
+## 📊 Ringkasan Opsi CLI (22 Opsi)
 
 | No | Opsi | Argumen | Kategori | Deskripsi |
 |:---:|---|---|---|---|
@@ -26,7 +26,10 @@
 | 16 | `--uninstall` | — | **Sistem** | Hapus instalasi lengkap |
 | 17 | `--set-cdb-sources` | `<URL1,URL2,...>` | **Cluster** | Set daftar sumber CDB (central, mirror, peer) |
 | 18 | `--with-panel` | — | **Panel** | Install panel HTTPS :8443 (download binary + systemd) |
-| 19 | `-V`, `--version` / `-h`, `--help` | — | **Info** | Tampilkan versi / bantuan |
+| 19 | `--master-url` | `<URL>` | **Cluster** | URL Central Master untuk telemetri terpusat |
+| 20 | `--enroll-token` | `<TOK>` | **Cluster** | Token pendaftaran node ke master cluster |
+| 21 | `--node-name` | `<NAMA>` | **Cluster** | Nama node edge di dashboard cluster (default: hostname) |
+| 22 | `-V`, `--version` / `-h`, `--help` | — | **Info** | Tampilkan versi / bantuan |
 
 ---
 
@@ -47,6 +50,13 @@ sudo ./setup-edge.sh --install \
   --password "AdminRahasia123" \
   --apikey "apikey-edge-01" \
   --with-panel
+
+# Terhubung ke Central Master Cluster (Mode A)
+sudo ./setup-edge.sh --install \
+  --url "http://10.10.10.1:8084/files/trust.db" \
+  --master-url "http://10.10.10.1:8084" \
+  --enroll-token "enroll-abc123" \
+  --node-name "edge-jakarta-01"
 ```
 
 ---
