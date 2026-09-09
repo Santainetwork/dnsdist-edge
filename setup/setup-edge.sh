@@ -63,6 +63,9 @@ show_help() {
     echo "Opsi Utama:"
     echo "  -i, --install         Install DNSDist, sertifikat, dan konfigurasi Edge Node"
     echo "  -u, --url <URL>       Set URL Central Manager untuk sinkronisasi blacklist.db"
+    echo "  --master-url <URL>    Set URL Central Master untuk telemetri terpusat"
+    echo "  --enroll-token <TOK>  Token pendaftaran node ke master cluster"
+    echo "  --node-name <NAMA>    Nama node edge di dashboard cluster (default: hostname)"
     echo "  -s, --sync-only       Jalankan sinkronisasi database manual sekarang"
     echo "  -f, --force-update    Sama seperti sinkronisasi manual, tetapi melewati cache"
     echo "      --set-upstream    Ubah upstream DNS tanpa install ulang"
@@ -837,6 +840,17 @@ PYEOF
         fi
 
         # Install systemd unit (baris Environment dari template)
+        local extra_env=""
+        if [ "$MASTER_URL_EXPLICIT" = true ] && [ -n "$MASTER_URL" ]; then
+            extra_env="${extra_env}Environment=PANEL_MASTER_URL=${MASTER_URL}\n"
+        fi
+        if [ "$ENROLL_TOKEN_EXPLICIT" = true ] && [ -n "$ENROLL_TOKEN" ]; then
+            extra_env="${extra_env}Environment=PANEL_ENROLL_TOKEN=${ENROLL_TOKEN}\n"
+        fi
+        if [ "$NODE_NAME_EXPLICIT" = true ] && [ -n "$NODE_NAME" ]; then
+            extra_env="${extra_env}Environment=PANEL_NODE_NAME=${NODE_NAME}\n"
+        fi
+
         cat > /etc/systemd/system/dnsdist-panel.service <<UNIT
 [Unit]
 Description=DNSDist Management Panel
@@ -857,7 +871,7 @@ Environment=PANEL_CERT=/var/lib/dnsdist/panel-cert.pem
 Environment=PANEL_KEY=/var/lib/dnsdist/panel-key.pem
 Environment=DNSDIST_CONF=/etc/dnsdist/dnsdist.conf
 Environment=DNSDIST_UPSTREAMS=/etc/dnsdist/upstreams.conf
-LimitNOFILE=65536
+$(echo -e "$extra_env")LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
@@ -1088,6 +1102,13 @@ PASSWORD_EXPLICIT=false
 APIKEY_EXPLICIT=false
 SET_WEBSERVER=false
 
+MASTER_URL_EXPLICIT=false
+ENROLL_TOKEN_EXPLICIT=false
+NODE_NAME_EXPLICIT=false
+MASTER_URL=""
+ENROLL_TOKEN=""
+NODE_NAME=""
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -h|--help)
@@ -1123,6 +1144,36 @@ while [ "$#" -gt 0 ]; do
                 shift
             else
                 echo -e "${RED}[!] Argumen --url membutuhkan sebuah URL.${NC}"
+                exit 1
+            fi
+            ;;
+        --master-url)
+            if [ -n "$2" ]; then
+                MASTER_URL="$2"
+                MASTER_URL_EXPLICIT=true
+                shift
+            else
+                echo -e "${RED}[!] Argumen --master-url membutuhkan URL master.${NC}"
+                exit 1
+            fi
+            ;;
+        --enroll-token)
+            if [ -n "$2" ]; then
+                ENROLL_TOKEN="$2"
+                ENROLL_TOKEN_EXPLICIT=true
+                shift
+            else
+                echo -e "${RED}[!] Argumen --enroll-token membutuhkan token.${NC}"
+                exit 1
+            fi
+            ;;
+        --node-name)
+            if [ -n "$2" ]; then
+                NODE_NAME="$2"
+                NODE_NAME_EXPLICIT=true
+                shift
+            else
+                echo -e "${RED}[!] Argumen --node-name membutuhkan nama.${NC}"
                 exit 1
             fi
             ;;

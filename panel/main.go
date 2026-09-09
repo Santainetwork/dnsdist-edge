@@ -57,9 +57,16 @@ var (
 	flagWhitelistFile = flag.String("whitelist-file", envOr("PANEL_WHITELIST_FILE", "/etc/dnsdist-master/whitelist.txt"), "Path to whitelist.txt")
 	flagCustomBLFile  = flag.String("custom-bl-file", envOr("PANEL_CUSTOM_BL_FILE", "/etc/dnsdist-master/custom-blacklist.txt"), "Path to custom-blacklist.txt")
 	flagBuildInterval = flag.Duration("build-interval", 6*time.Hour, "Automatic build interval (0 to disable auto-build)")
-	flagBuildNow      = flag.Bool("build-now", false, "Compile CDB immediately and exit (CLI builder mode)")
-	flagDnsdistAPI    = flag.String("dnsdist-api", envOr("DNSDIST_API_URL", "http://127.0.0.1:8083"), "dnsdist web API base URL")
-	flagDnsdistKey    = flag.String("dnsdist-key", envOr("DNSDIST_API_KEY", ""), "dnsdist web API key (X-API-Key)")
+	flagBuildNow          = flag.Bool("build-now", false, "Compile CDB immediately and exit (CLI builder mode)")
+	flagDnsdistAPI        = flag.String("dnsdist-api", envOr("DNSDIST_API_URL", "http://127.0.0.1:8083"), "dnsdist web API base URL")
+	flagDnsdistKey        = flag.String("dnsdist-key", envOr("DNSDIST_API_KEY", ""), "dnsdist web API key (X-API-Key)")
+	flagClusterNodesFile  = flag.String("cluster-nodes-file", envOr("PANEL_CLUSTER_NODES_FILE", "/var/lib/dnsdist/cluster-nodes.json"), "Path to cluster nodes persistence JSON")
+	flagMasterURL         = flag.String("master-url", envOr("PANEL_MASTER_URL", ""), "Master URL for edge telemetry and enrollment (e.g. http://10.10.10.1:8084)")
+	flagEnrollToken       = flag.String("enroll-token", envOr("PANEL_ENROLL_TOKEN", ""), "Enrollment token for connecting edge node to central master")
+	flagNodeName          = flag.String("node-name", envOr("PANEL_NODE_NAME", ""), "Human-readable name of this edge node (defaults to hostname)")
+	flagAgentStateFile    = flag.String("agent-state-file", envOr("PANEL_AGENT_STATE_FILE", "/var/lib/dnsdist/cluster-agent.json"), "Path to edge agent state JSON")
+	flagHeartbeatInterval = flag.Duration("heartbeat-interval", 60*time.Second, "Edge telemetry heartbeat interval to master")
+	flagGenEnrollToken    = flag.Bool("enrollment-token", false, "Generate an enrollment token and exit (CLI mode)")
 )
 
 func envOr(key, def string) string {
@@ -533,6 +540,7 @@ type SafeSearch struct {
 }
 
 type NodeConfig struct {
+	IsMaster    bool       `json:"is_master"`
 	BlockMode   string     `json:"block_mode"`
 	SinkholeIPs []string   `json:"sinkhole_ips"`
 	Upstreams   []string   `json:"upstreams"`
@@ -565,6 +573,7 @@ func parseSinkholeIPs(raw string) []string {
 func loadNodeConfig() NodeConfig {
 	cd := confDir()
 	cfg := NodeConfig{
+		IsMaster:  *flagMaster,
 		BlockMode: "rpz",
 		CertPath:  filepath.Join(cd, "certs", "server.crt"),
 		KeyPath:   filepath.Join(cd, "certs", "server.key"),
@@ -998,6 +1007,14 @@ func main() {
 		os.Exit(0)
 	}
 
+	if *flagGenEnrollToken {
+		cs := newClusterStore(*flagClusterNodesFile)
+		tok := cs.GenerateEnrollmentToken(24 * time.Hour)
+		fmt.Printf("Enrollment token (berlaku 24 jam):\n%s\n", tok)
+		fmt.Printf("\nGunakan di edge node:\n  setup-edge.sh --master-url <MASTER_URL> --enroll-token %s\n", tok)
+		os.Exit(0)
+	}
+
 	var err error
 	jwtSecret, err = loadOrGenSecret(*flagSecret)
 	if err != nil {
@@ -1034,6 +1051,20 @@ func main() {
 	mux.HandleFunc("/api/master/status", auth(handleMasterStatus))
 	mux.HandleFunc("/api/master/build", auth(handleMasterBuild))
 	mux.HandleFunc("/api/master/sources", auth(handleMasterSources))
+
+	// Master Cluster Management
+	if *flagMaster {
+		initClusterStore(*flagClusterNodesFile)
+		mux.HandleFunc("/api/cluster/token", auth(handleClusterToken))
+		mux.HandleFunc("/api/cluster/nodes", auth(handleClusterNodes))
+		// Public Cluster Ingestion
+		mux.HandleFunc("/api/cluster/register", handleClusterRegister)
+		mux.HandleFunc("/api/cluster/heartbeat", handleClusterHeartbeat)
+	}
+
+	// Edge Cluster Agent & Config (available on all nodes)
+	initEdgeAgent(*flagAgentStateFile, *flagMasterURL, *flagEnrollToken, *flagNodeName, *flagHeartbeatInterval)
+	mux.HandleFunc("/api/cluster/config", auth(handleEdgeClusterConfig))
 
 	// File Publisher (for Master Mode: serves trust.db, manifest.json)
 	fs := http.FileServer(http.Dir(*flagFilesDir))

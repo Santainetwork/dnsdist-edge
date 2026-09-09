@@ -471,6 +471,71 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
   #sidebar.open { transform: translateX(0); }
   #main { margin-left: 0; padding: 1.25rem; max-width: 100%; }
 }
+/* ── Node Table & Cluster Styles ── */
+.node-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  margin-top: 1rem;
+}
+.node-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  text-align: left;
+}
+.node-table th {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--text-sub);
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.node-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  white-space: nowrap;
+}
+.node-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.badge-online { background: rgba(16, 185, 129, 0.15); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-degraded { background: rgba(245, 158, 11, 0.15); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-offline { background: rgba(244, 63, 94, 0.15); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.3); }
+
+/* ── Modal ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  max-width: 540px;
+  width: 90%;
+  padding: 1.75rem;
+  box-shadow: var(--shadow-modal);
+}
 </style>
 </head>
 <body>
@@ -529,9 +594,13 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
       <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       <span>DoT / DoH</span>
     </a>
-    <a href="#" onclick="nav('master',this)">
+    <a href="#" id="nav-master" onclick="nav('master',this)">
       <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       <span>Central Master</span>
+    </a>
+    <a href="#" id="nav-cluster" onclick="nav('cluster',this)">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Cluster Nodes</span>
     </a>
     <a href="#" onclick="nav('settings',this)">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -936,6 +1005,98 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
     </div>
   </div>
 
+  <!-- Cluster Page (Master Mode) -->
+  <div id="page-cluster" class="page">
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>Cluster Edge Nodes</h2>
+        <p>Pemantauan terpusat metrik dan status sinkronisasi seluruh node edge</p>
+      </div>
+      <div style="display:flex;gap:0.75rem;">
+        <button class="btn btn-secondary" onclick="fetchClusterNodes()">
+          <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>Segarkan</span>
+        </button>
+        <button class="btn btn-primary" onclick="openTokenModal()">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Buat Token Pendaftaran</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Cluster Aggregate Cards -->
+    <div class="metrics-grid">
+      <div class="metric-card accent-sky">
+        <div class="metric-header">
+          <span class="metric-label">Node Aktif / Total</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="metric-val tabular" id="cl-nodes" style="font-size:1.5rem">0 / 0</div>
+        <div class="metric-sub" id="cl-nodes-sub">0 online, 0 offline</div>
+      </div>
+
+      <div class="metric-card accent-indigo">
+        <div class="metric-header">
+          <span class="metric-label">Total Cluster QPS</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div class="metric-val tabular" id="cl-qps">0</div>
+        <div class="metric-sub">Query / detik seluruh node</div>
+      </div>
+
+      <div class="metric-card accent-emerald">
+        <div class="metric-header">
+          <span class="metric-label">Total Queries</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+        </div>
+        <div class="metric-val tabular" id="cl-queries">0</div>
+        <div class="metric-sub" id="cl-blocked-sub">0 diblokir</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Rata-rata Cache Hit</span>
+          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        </div>
+        <div class="metric-val tabular" id="cl-cache">0.0%</div>
+        <div class="metric-sub">Efisiensi cache cluster</div>
+      </div>
+    </div>
+
+    <!-- Node Table -->
+    <div class="card-box" style="margin-top:1.5rem">
+      <div class="card-box-header">
+        <div>
+          <h3>Daftar Node Terhubung</h3>
+          <p>Status telemetri live yang dilaporkan edge setiap interval heartbeat</p>
+        </div>
+      </div>
+      <div class="node-table-wrap">
+        <table class="node-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Nama Node</th>
+              <th>IP Node</th>
+              <th>QPS</th>
+              <th>Total Query</th>
+              <th>Ditolak</th>
+              <th>Cache Hit</th>
+              <th>Hash CDB</th>
+              <th>Last Seen</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="cluster-nodes-tbody">
+            <tr>
+              <td colspan="10" style="text-align:center;color:var(--text-sub);padding:2rem;">Belum ada edge node yang terhubung ke master ini.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings Page -->
   <div id="page-settings" class="page">
     <div class="top-bar">
@@ -945,10 +1106,35 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
       </div>
     </div>
 
-    <div class="card-box">
+    <!-- Edge Cluster Enrollment Card -->
+    <div class="card-box" id="edge-cluster-card">
       <div class="card-box-header">
         <div>
-          <h3>Mode Pemblokiran Utama</h3>
+          <h3>Koneksi ke Central Master</h3>
+          <p>Hubungkan edge node ini ke master untuk monitoring terpusat</p>
+        </div>
+        <div id="edge-cluster-status-badge"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1rem;">
+        <div class="form-group">
+          <label>URL Central Master</label>
+          <input type="text" id="edge-m-url" placeholder="http://10.10.10.1:8084">
+        </div>
+        <div class="form-group">
+          <label>Token Pendaftaran (Enrollment Token)</label>
+          <input type="text" id="edge-m-token" placeholder="enroll-...">
+        </div>
+        <div class="form-group">
+          <label>Nama Node (Opsional)</label>
+          <input type="text" id="edge-m-name" placeholder="Biarkan kosong untuk default hostname">
+        </div>
+      </div>
+      <div id="edge-cluster-info" style="font-size:0.8rem;color:var(--text-sub);margin-bottom:1rem;"></div>
+      <button class="btn btn-primary" onclick="connectEdgeToMaster()">
+        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span>Hubungkan ke Master</span>
+      </button>
+    </div>
           <p>Tentukan perilaku responder saat mendeteksi domain terlarang</p>
         </div>
       </div>
@@ -1003,6 +1189,40 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
     </div>
   </div>
 
+</div>
+
+<!-- Token Modal -->
+<div id="token-modal" class="modal-backdrop" style="display:none">
+  <div class="modal-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <h3 style="color:#fff;font-size:1.15rem;font-weight:700">Token Pendaftaran Node Baru</h3>
+      <button class="copy-btn" onclick="closeTokenModal()" style="padding:0.25rem;">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <p style="color:var(--text-sub);font-size:0.85rem;margin-bottom:1.25rem;">
+      Token ini dipakai oleh edge node untuk mendaftar otomatis ke master ini. Token bersifat satu kali pakai.
+    </p>
+    <div class="form-group">
+      <label>Enrollment Token</label>
+      <div style="display:flex;gap:0.5rem;">
+        <input type="text" id="modal-token-val" readonly style="font-family:ui-monospace,monospace;font-size:0.9rem;background:#07090e;">
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('modal-token-val').value)">Salin</button>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:1rem;">
+      <label>Contoh Perintah CLI di Edge Node:</label>
+      <div style="background:#07090e;border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.75rem;font-family:ui-monospace,monospace;font-size:0.78rem;color:var(--text-sub);position:relative;">
+        <div id="modal-cli-cmd" style="word-break:break-all;"></div>
+        <button class="copy-btn" onclick="copyText(document.getElementById('modal-cli-cmd').textContent)" style="position:absolute;top:0.5rem;right:0.5rem;" title="Salin">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1.5rem;">
+      <button class="btn btn-primary" onclick="closeTokenModal()">Tutup</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast-container"></div>
@@ -1134,6 +1354,12 @@ function nav(page, el) {
   } else {
     if (masterPoller) { clearInterval(masterPoller); masterPoller = null; }
   }
+  if (page === 'cluster') {
+    fetchClusterNodes();
+    if (!clusterPoller) clusterPoller = setInterval(fetchClusterNodes, 5000);
+  } else {
+    if (clusterPoller) { clearInterval(clusterPoller); clusterPoller = null; }
+  }
   if (page === 'rpz' || page === 'upstream' || page === 'safesearch' || page === 'dotdoh' || page === 'settings') {
     fetchConfig();
   }
@@ -1248,6 +1474,24 @@ async function fetchConfig() {
   try {
     const cfg = await api('/api/config');
     
+    // Sesuaikan navigasi sidebar berdasarkan mode node
+    const navMaster = document.getElementById('nav-master');
+    const navCluster = document.getElementById('nav-cluster');
+    const edgeCard = document.getElementById('edge-cluster-card');
+
+    if (cfg.is_master) {
+      if (navMaster) navMaster.style.display = 'flex';
+      if (navCluster) navCluster.style.display = 'flex';
+      if (edgeCard) edgeCard.style.display = 'none'; // master tidak perlu enroll ke master lain
+    } else {
+      if (navMaster) navMaster.style.display = 'none';
+      if (navCluster) navCluster.style.display = 'none';
+      if (edgeCard) {
+        edgeCard.style.display = 'block';
+        fetchEdgeClusterStatus();
+      }
+    }
+
     // RPZ Chips
     const rpzBox = document.getElementById('rpz-current');
     if (cfg.sinkhole_ips && cfg.sinkhole_ips.length) {
@@ -1392,6 +1636,136 @@ async function savePassword() {
 
 // ── Master Mode Handler ──
 let masterPoller = null;
+let clusterPoller = null;
+
+// ── Cluster Management ──
+async function fetchClusterNodes() {
+  try {
+    const d = await api('/api/cluster/nodes');
+    const agg = d.aggregate || {};
+    const nodes = d.nodes || [];
+
+    // Update aggregate cards
+    document.getElementById('cl-nodes').textContent = `${agg.online_nodes || 0} / ${agg.total_nodes || 0}`;
+    document.getElementById('cl-nodes-sub').textContent = `${agg.online_nodes || 0} online, ${agg.offline_nodes || 0} offline${agg.degraded_nodes ? ', ' + agg.degraded_nodes + ' degraded' : ''}`;
+    document.getElementById('cl-qps').textContent = fmtNum(agg.total_qps || 0);
+    document.getElementById('cl-queries').textContent = fmtNum(agg.total_queries || 0);
+    document.getElementById('cl-blocked-sub').textContent = `${fmtNum(agg.total_blocked || 0)} diblokir`;
+    document.getElementById('cl-cache').textContent = (agg.avg_cache_hit_pct || 0).toFixed(1) + '%';
+
+    // Render table
+    const tbody = document.getElementById('cluster-nodes-tbody');
+    if (!nodes.length) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-sub);padding:2rem;">Belum ada edge node yang terhubung ke master ini.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = nodes.map(n => {
+      let badgeClass = 'badge-offline';
+      let badgeText = 'Offline';
+      if (n.status === 'online') {
+        badgeClass = 'badge-online';
+        badgeText = 'Online';
+      } else if (n.status === 'degraded') {
+        badgeClass = 'badge-degraded';
+        badgeText = 'Degraded';
+      }
+
+      const hashShort = n.db_hash ? `${n.db_hash.substring(0, 8)}...` : '—';
+      const lastSeenStr = n.last_seen_at ? new Date(n.last_seen_at).toLocaleTimeString() : '—';
+
+      return `
+        <tr>
+          <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+          <td style="font-weight:600">${n.name || n.id}</td>
+          <td style="font-family:ui-monospace,monospace">${n.ip || '—'}</td>
+          <td class="tabular">${fmtNum(n.qps)}</td>
+          <td class="tabular">${fmtNum(n.queries_total)}</td>
+          <td class="tabular" style="color:var(--amber)">${fmtNum(n.blocked_total)}</td>
+          <td class="tabular">${(n.cache_hit_pct || 0).toFixed(1)}%</td>
+          <td style="font-family:ui-monospace,monospace;font-size:0.75rem" title="${n.db_hash || ''}">${hashShort}</td>
+          <td class="tabular" style="color:var(--text-sub);font-size:0.75rem">${lastSeenStr}</td>
+          <td>
+            <button class="btn btn-secondary" style="padding:0.25rem 0.5rem;font-size:0.72rem;color:var(--rose)" onclick="deleteClusterNode('${n.id}','${n.name || n.id}')">Hapus</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (e) {
+    // Cluster API not available if not master mode
+  }
+}
+
+async function deleteClusterNode(id, name) {
+  if (!confirm(`Hapus node "${name}" dari cluster?`)) return;
+  try {
+    await api('/api/cluster/nodes?id=' + encodeURIComponent(id), 'DELETE');
+    toast('Node berhasil dihapus');
+    fetchClusterNodes();
+  } catch (e) {
+    toast('Gagal menghapus node: ' + e.message, 'error');
+  }
+}
+
+async function openTokenModal() {
+  try {
+    const d = await api('/api/cluster/token', 'POST', { hours: 24 });
+    document.getElementById('modal-token-val').value = d.token;
+    const origin = window.location.origin;
+    document.getElementById('modal-cli-cmd').textContent = `sudo ./setup-edge.sh --master-url ${origin} --enroll-token ${d.token}`;
+    document.getElementById('token-modal').style.display = 'flex';
+  } catch (e) {
+    toast('Gagal membuat token: ' + e.message, 'error');
+  }
+}
+
+function closeTokenModal() {
+  document.getElementById('token-modal').style.display = 'none';
+}
+
+// ── Edge Cluster Agent Config ──
+async function fetchEdgeClusterStatus() {
+  try {
+    const d = await api('/api/cluster/config');
+    const badge = document.getElementById('edge-cluster-status-badge');
+    const info = document.getElementById('edge-cluster-info');
+    if (d.enrolled) {
+      badge.innerHTML = '<span class="badge badge-online">Terhubung ke Master</span>';
+      info.innerHTML = `Node ID: <code>${d.node_id}</code> &bull; Master: <code>${d.master_url}</code>${d.last_heartbeat ? ' &bull; Terakhir sync: ' + new Date(d.last_heartbeat).toLocaleTimeString() : ''}`;
+      document.getElementById('edge-m-url').value = d.master_url || '';
+      document.getElementById('edge-m-name').value = d.name || '';
+    } else {
+      badge.innerHTML = '<span class="badge badge-offline">Belum Terhubung</span>';
+      info.textContent = d.last_error ? 'Status: ' + d.last_error : 'Node ini beroperasi independen (belum tergabung cluster).';
+    }
+  } catch (e) {
+    // Ignore if not edge
+  }
+}
+
+async function connectEdgeToMaster() {
+  const masterURL = document.getElementById('edge-m-url').value.trim();
+  const enrollToken = document.getElementById('edge-m-token').value.trim();
+  const nodeName = document.getElementById('edge-m-name').value.trim();
+
+  if (!masterURL || !enrollToken) {
+    toast('URL Master dan Enrollment Token wajib diisi', 'error');
+    return;
+  }
+
+  try {
+    await api('/api/cluster/config', 'POST', {
+      master_url: masterURL,
+      enroll_token: enrollToken,
+      node_name: nodeName,
+    });
+    toast('Node berhasil didaftarkan ke Master!');
+    document.getElementById('edge-m-token').value = '';
+    fetchEdgeClusterStatus();
+  } catch (e) {
+    toast('Gagal menghubungkan: ' + e.message, 'error');
+  }
+}
 
 async function fetchMasterStatus() {
   try {

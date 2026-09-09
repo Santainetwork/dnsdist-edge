@@ -266,8 +266,17 @@ UNIT
     echo -e " - Whitelist File    : ${CONF_DIR}/whitelist.txt"
     echo -e " - Manual Build      : sudo ${BUILD_SCRIPT}"
     echo -e ""
-    echo -e " Cara pasang di Edge Node:"
+    echo -e " Cara pasang di Edge Node (Sync Blacklist Saja):"
     echo -e "   sudo ./setup-edge.sh --install --url http://${master_ip}:${PORT_HTTP}/files/trust.db"
+    echo -e ""
+    echo -e " Cara pasang di Edge Node (Dengan Monitoring Terpusat Cluster):"
+    echo -e "   1. Buat token di master:  sudo /usr/local/bin/dnsdist-panel -enrollment-token"
+    echo -e "      (atau buka menu 'Cluster Nodes' di panel web: http://${master_ip}:8084)"
+    echo -e "   2. Jalankan di edge node:"
+    echo -e "      sudo ./setup-edge.sh --install \\"
+    echo -e "        --url http://${master_ip}:${PORT_HTTP}/files/trust.db \\"
+    echo -e "        --master-url http://${master_ip}:8084 \\"
+    echo -e "        --enroll-token <TOKEN>"
     echo -e "${GREEN}============================================================${NC}\n"
 }
 
