@@ -1403,6 +1403,16 @@ function copyText(text) {
   });
 }
 
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ── Stats Poller ──
 function fmtNum(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
@@ -1637,6 +1647,7 @@ async function savePassword() {
 // ── Master Mode Handler ──
 let masterPoller = null;
 let clusterPoller = null;
+let currentClusterNodes = [];
 
 // ── Cluster Management ──
 async function fetchClusterNodes() {
@@ -1644,6 +1655,7 @@ async function fetchClusterNodes() {
     const d = await api('/api/cluster/nodes');
     const agg = d.aggregate || {};
     const nodes = d.nodes || [];
+    currentClusterNodes = nodes;
 
     // Update aggregate cards
     document.getElementById('cl-nodes').textContent = `${agg.online_nodes || 0} / ${agg.total_nodes || 0}`;
@@ -1671,22 +1683,26 @@ async function fetchClusterNodes() {
         badgeText = 'Degraded';
       }
 
-      const hashShort = n.db_hash ? `${n.db_hash.substring(0, 8)}...` : '—';
-      const lastSeenStr = n.last_seen_at ? new Date(n.last_seen_at).toLocaleTimeString() : '—';
+      const nodeID = esc(n.id);
+      const nodeName = esc(n.name || n.id);
+      const nodeIP = esc(n.ip || '—');
+      const hashShort = n.db_hash ? esc(n.db_hash.substring(0, 8)) + '...' : '—';
+      const dbHashFull = esc(n.db_hash || '');
+      const lastSeenStr = n.last_seen_at ? esc(new Date(n.last_seen_at).toLocaleTimeString()) : '—';
 
       return `
         <tr>
           <td><span class="badge ${badgeClass}">${badgeText}</span></td>
-          <td style="font-weight:600">${n.name || n.id}</td>
-          <td style="font-family:ui-monospace,monospace">${n.ip || '—'}</td>
+          <td style="font-weight:600">${nodeName}</td>
+          <td style="font-family:ui-monospace,monospace">${nodeIP}</td>
           <td class="tabular">${fmtNum(n.qps)}</td>
           <td class="tabular">${fmtNum(n.queries_total)}</td>
           <td class="tabular" style="color:var(--amber)">${fmtNum(n.blocked_total)}</td>
           <td class="tabular">${(n.cache_hit_pct || 0).toFixed(1)}%</td>
-          <td style="font-family:ui-monospace,monospace;font-size:0.75rem" title="${n.db_hash || ''}">${hashShort}</td>
+          <td style="font-family:ui-monospace,monospace;font-size:0.75rem" title="${dbHashFull}">${hashShort}</td>
           <td class="tabular" style="color:var(--text-sub);font-size:0.75rem">${lastSeenStr}</td>
           <td>
-            <button class="btn btn-secondary" style="padding:0.25rem 0.5rem;font-size:0.72rem;color:var(--rose)" onclick="deleteClusterNode('${n.id}','${n.name || n.id}')">Hapus</button>
+            <button class="btn btn-secondary" style="padding:0.25rem 0.5rem;font-size:0.72rem;color:var(--rose)" onclick="deleteClusterNode('${nodeID}')">Hapus</button>
           </td>
         </tr>
       `;
@@ -1696,7 +1712,9 @@ async function fetchClusterNodes() {
   }
 }
 
-async function deleteClusterNode(id, name) {
+async function deleteClusterNode(id) {
+  const node = currentClusterNodes.find(n => n.id === id);
+  const name = (node && node.name) ? node.name : id;
   if (!confirm(`Hapus node "${name}" dari cluster?`)) return;
   try {
     await api('/api/cluster/nodes?id=' + encodeURIComponent(id), 'DELETE');
@@ -1712,7 +1730,7 @@ async function openTokenModal() {
     const d = await api('/api/cluster/token', 'POST', { hours: 24 });
     document.getElementById('modal-token-val').value = d.token;
     const origin = window.location.origin;
-    document.getElementById('modal-cli-cmd').textContent = `sudo ./setup-edge.sh --master-url ${origin} --enroll-token ${d.token}`;
+    document.getElementById('modal-cli-cmd').textContent = `sudo ./setup-edge.sh --install --master-url ${origin} --enroll-token ${d.token}`;
     document.getElementById('token-modal').style.display = 'flex';
   } catch (e) {
     toast('Gagal membuat token: ' + e.message, 'error');
@@ -1731,7 +1749,7 @@ async function fetchEdgeClusterStatus() {
     const info = document.getElementById('edge-cluster-info');
     if (d.enrolled) {
       badge.innerHTML = '<span class="badge badge-online">Terhubung ke Master</span>';
-      info.innerHTML = `Node ID: <code>${d.node_id}</code> &bull; Master: <code>${d.master_url}</code>${d.last_heartbeat ? ' &bull; Terakhir sync: ' + new Date(d.last_heartbeat).toLocaleTimeString() : ''}`;
+      info.innerHTML = `Node ID: <code>${esc(d.node_id)}</code> &bull; Master: <code>${esc(d.master_url)}</code>${d.last_heartbeat ? ' &bull; Terakhir sync: ' + esc(new Date(d.last_heartbeat).toLocaleTimeString()) : ''}`;
       document.getElementById('edge-m-url').value = d.master_url || '';
       document.getElementById('edge-m-name').value = d.name || '';
     } else {
@@ -1803,7 +1821,7 @@ async function fetchMasterStatus() {
     // Update logs
     const logBox = document.getElementById('master-logs-box');
     if (d.build_logs && d.build_logs.length) {
-      logBox.innerHTML = d.build_logs.map(l => `<div>${l}</div>`).join('');
+      logBox.innerHTML = d.build_logs.map(l => `<div>${esc(l)}</div>`).join('');
       logBox.scrollTop = logBox.scrollHeight;
     }
   } catch (e) {

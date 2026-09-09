@@ -223,6 +223,9 @@ func clientIP(r *http.Request) string {
 	if err == nil && net.ParseIP(host) != nil {
 		return host
 	}
+	if ip := net.ParseIP(r.RemoteAddr); ip != nil {
+		return r.RemoteAddr
+	}
 	return r.RemoteAddr
 }
 
@@ -284,7 +287,7 @@ func (cs *ClusterStore) ProcessHeartbeat(req HeartbeatRequest, remoteIP string) 
 	}
 	if req.ReportedIP != "" {
 		rec.IP = req.ReportedIP
-	} else if rec.IP == "" {
+	} else if remoteIP != "" {
 		rec.IP = remoteIP
 	}
 	if req.Version != "" {
@@ -514,11 +517,39 @@ type EdgeClusterAgent struct {
 	enrollTok  string
 	nodeName   string
 	interval   time.Duration
+	running    bool
+	stopCh     chan struct{}
 	state      EdgeAgentState
 	httpClient *http.Client
 }
 
 var edgeAgent *EdgeClusterAgent
+
+func (a *EdgeClusterAgent) ensureRunning() {
+	a.mu.Lock()
+	if a.running || a.interval <= 0 {
+		a.mu.Unlock()
+		return
+	}
+	a.running = true
+	stopCh := make(chan struct{})
+	a.stopCh = stopCh
+	a.mu.Unlock()
+	go a.run(stopCh)
+}
+
+func (a *EdgeClusterAgent) Stop() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !a.running {
+		return
+	}
+	a.running = false
+	if a.stopCh != nil {
+		close(a.stopCh)
+		a.stopCh = nil
+	}
+}
 
 func initEdgeAgent(stateFile, masterURL, enrollTok, nodeName string, interval time.Duration) {
 	edgeAgent = &EdgeClusterAgent{
@@ -533,7 +564,7 @@ func initEdgeAgent(stateFile, masterURL, enrollTok, nodeName string, interval ti
 
 	// Jika masterURL dikonfigurasi via flag atau state, jalankan loop agent
 	if edgeAgent.masterURL != "" || edgeAgent.state.MasterURL != "" {
-		go edgeAgent.run()
+		edgeAgent.ensureRunning()
 	}
 }
 
@@ -666,6 +697,8 @@ func (a *EdgeClusterAgent) Register(targetURL, token, name string) error {
 	a.mu.Unlock()
 
 	log.Printf("[cluster-agent] Berhasil mendaftar ke Master (%s) dengan Node ID: %s", targetURL, regResp.NodeID)
+	// Pastikan background heartbeat runner aktif
+	a.ensureRunning()
 	// Kirim heartbeat perdana
 	_ = a.sendHeartbeat()
 	return nil
@@ -752,7 +785,7 @@ func (a *EdgeClusterAgent) sendHeartbeat() error {
 	return nil
 }
 
-func (a *EdgeClusterAgent) run() {
+func (a *EdgeClusterAgent) run(stopCh <-chan struct{}) {
 	log.Printf("[cluster-agent] Edge cluster agent aktif (interval: %v)", a.interval)
 
 	// Cek apakah perlu auto-register saat startup
@@ -772,29 +805,34 @@ func (a *EdgeClusterAgent) run() {
 	ticker := time.NewTicker(a.interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		a.mu.RLock()
-		enrolled := a.state.NodeID != "" && a.state.NodeKey != ""
-		a.mu.RUnlock()
-
-		if !enrolled {
+	for {
+		select {
+		case <-stopCh:
+			return
+		case <-ticker.C:
 			a.mu.RLock()
-			canRetryReg := a.enrollTok != "" && a.masterURL != ""
-			mURL := a.masterURL
-			tok := a.enrollTok
-			name := a.nodeName
+			enrolled := a.state.NodeID != "" && a.state.NodeKey != ""
 			a.mu.RUnlock()
 
-			if canRetryReg {
-				if err := a.Register(mURL, tok, name); err != nil {
-					log.Printf("[cluster-agent] Retry register gagal: %v", err)
-				}
-			}
-			continue
-		}
+			if !enrolled {
+				a.mu.RLock()
+				canRetryReg := a.enrollTok != "" && a.masterURL != ""
+				mURL := a.masterURL
+				tok := a.enrollTok
+				name := a.nodeName
+				a.mu.RUnlock()
 
-		if err := a.sendHeartbeat(); err != nil {
-			log.Printf("[cluster-agent] Heartbeat warning: %v", err)
+				if canRetryReg {
+					if err := a.Register(mURL, tok, name); err != nil {
+						log.Printf("[cluster-agent] Retry register gagal: %v", err)
+					}
+				}
+				continue
+			}
+
+			if err := a.sendHeartbeat(); err != nil {
+				log.Printf("[cluster-agent] Heartbeat warning: %v", err)
+			}
 		}
 	}
 }

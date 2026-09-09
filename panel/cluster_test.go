@@ -145,6 +145,7 @@ func TestEdgeAgentRegistrationAndHeartbeat(t *testing.T) {
 		interval:   500 * time.Millisecond,
 		httpClient: ts.Client(),
 	}
+	defer agent.Stop()
 
 	// Register edge to master
 	err := agent.Register(ts.URL, tok, "edge-jakarta-01")
@@ -185,5 +186,96 @@ func TestEdgeAgentRegistrationAndHeartbeat(t *testing.T) {
 	agent2.loadState()
 	if agent2.state.NodeID != agent.state.NodeID || agent2.state.NodeKey != agent.state.NodeKey {
 		t.Fatalf("agent state persistence mismatch: expected %s, got %s", agent.state.NodeID, agent2.state.NodeID)
+	}
+}
+
+func TestDynamicRegistrationEnsuresRunning(t *testing.T) {
+	tmpDir := t.TempDir()
+	storeFile := filepath.Join(tmpDir, "cluster-nodes.json")
+	agentStateFile := filepath.Join(tmpDir, "cluster-agent.json")
+
+	cs := newClusterStore(storeFile)
+	clusterStore = cs
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/cluster/register", handleClusterRegister)
+	mux.HandleFunc("/api/cluster/heartbeat", handleClusterHeartbeat)
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	tok := cs.GenerateEnrollmentToken(1 * time.Hour)
+
+	// Inisialisasi agent tanpa master URL awal
+	agent := &EdgeClusterAgent{
+		stateFile:  agentStateFile,
+		masterURL:  "",
+		interval:   50 * time.Millisecond,
+		httpClient: ts.Client(),
+	}
+	defer agent.Stop()
+
+	if agent.running {
+		t.Fatal("agent should not be running before registration")
+	}
+
+	// Dynamic register via web panel
+	err := agent.Register(ts.URL, tok, "dynamic-edge")
+	if err != nil {
+		t.Fatalf("dynamic register failed: %v", err)
+	}
+
+	agent.mu.RLock()
+	isRunning := agent.running
+	agent.mu.RUnlock()
+
+	if !isRunning {
+		t.Fatal("agent should be running after dynamic registration")
+	}
+
+	// Tunggu ticker mengirim heartbeat
+	time.Sleep(120 * time.Millisecond)
+
+	agent.mu.RLock()
+	lastHB := agent.state.LastHeartbeat
+	agent.mu.RUnlock()
+
+	if lastHB == "" {
+		t.Fatal("expected heartbeat to be recorded by background ticker")
+	}
+}
+
+func TestMasterTracksEdgeRemoteIP(t *testing.T) {
+	tmpDir := t.TempDir()
+	storeFile := filepath.Join(tmpDir, "cluster-nodes.json")
+
+	cs := newClusterStore(storeFile)
+
+	tok := cs.GenerateEnrollmentToken(1 * time.Hour)
+	rec, err := cs.RegisterNode(RegisterRequest{
+		EnrollToken: tok,
+		Name:        "ip-track-node",
+	}, "10.0.0.1")
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	if rec.IP != "10.0.0.1" {
+		t.Fatalf("expected initial IP 10.0.0.1, got %s", rec.IP)
+	}
+
+	// Heartbeat dari IP baru (misal migrasi/DHCP) tanpa reported_ip eksplisit
+	err = cs.ProcessHeartbeat(HeartbeatRequest{
+		NodeID:         rec.ID,
+		NodeKey:        rec.Key,
+		DnsdistRunning: true,
+	}, "10.0.0.99")
+	if err != nil {
+		t.Fatalf("heartbeat failed: %v", err)
+	}
+
+	nodes, _ := cs.ListNodes()
+	if nodes[0].IP != "10.0.0.99" {
+		t.Fatalf("expected updated IP 10.0.0.99, got %s", nodes[0].IP)
 	}
 }

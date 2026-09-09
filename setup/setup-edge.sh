@@ -113,6 +113,9 @@ SAVED_CERT_DOMAIN="${CERT_DOMAIN:-}"
 SAVED_CERT_EMAIL="${CERT_EMAIL:-}"
 SAVED_WEBSERVER_PASSWORD="${WEBSERVER_PASSWORD}"
 SAVED_WEBSERVER_APIKEY="${WEBSERVER_APIKEY}"
+SAVED_MASTER_URL="${MASTER_URL:-}"
+SAVED_ENROLL_TOKEN="${ENROLL_TOKEN:-}"
+SAVED_NODE_NAME="${NODE_NAME:-}"
 SAVED_INSTALL_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 EOF
     echo -e "${GREEN}[✓] Konfigurasi disimpan ke $CONFIG_SAVE_FILE (v${SCRIPT_VERSION})${NC}"
@@ -141,6 +144,9 @@ load_config() {
             [ -n "$SAVED_CERT_EMAIL" ] && CERT_EMAIL="$SAVED_CERT_EMAIL"
             [ -n "$SAVED_WEBSERVER_PASSWORD" ] && [ "$PASSWORD_EXPLICIT" != true ] && WEBSERVER_PASSWORD="$SAVED_WEBSERVER_PASSWORD"
             [ -n "$SAVED_WEBSERVER_APIKEY" ] && [ "$APIKEY_EXPLICIT" != true ] && WEBSERVER_APIKEY="$SAVED_WEBSERVER_APIKEY"
+            [ -n "$SAVED_MASTER_URL" ] && [ "$MASTER_URL_EXPLICIT" != true ] && MASTER_URL="$SAVED_MASTER_URL"
+            [ -n "$SAVED_ENROLL_TOKEN" ] && [ "$ENROLL_TOKEN_EXPLICIT" != true ] && ENROLL_TOKEN="$SAVED_ENROLL_TOKEN"
+            [ -n "$SAVED_NODE_NAME" ] && [ "$NODE_NAME_EXPLICIT" != true ] && NODE_NAME="$SAVED_NODE_NAME"
             echo -e "${GREEN}[✓] Konfigurasi lama berhasil dimuat.${NC}"
             return 0
         fi
@@ -163,6 +169,9 @@ load_config_silent() {
         [ -n "$SAVED_CERT_EMAIL" ] && CERT_EMAIL="$SAVED_CERT_EMAIL"
         [ -n "$SAVED_WEBSERVER_PASSWORD" ] && WEBSERVER_PASSWORD="$SAVED_WEBSERVER_PASSWORD"
         [ -n "$SAVED_WEBSERVER_APIKEY" ] && WEBSERVER_APIKEY="$SAVED_WEBSERVER_APIKEY"
+        [ -n "$SAVED_MASTER_URL" ] && MASTER_URL="$SAVED_MASTER_URL"
+        [ -n "$SAVED_ENROLL_TOKEN" ] && ENROLL_TOKEN="$SAVED_ENROLL_TOKEN"
+        [ -n "$SAVED_NODE_NAME" ] && NODE_NAME="$SAVED_NODE_NAME"
     fi
     return 0
 }
@@ -842,13 +851,16 @@ PYEOF
         # Install systemd unit (baris Environment dari template)
         local extra_env=""
         if [ "$MASTER_URL_EXPLICIT" = true ] && [ -n "$MASTER_URL" ]; then
-            extra_env="${extra_env}Environment=PANEL_MASTER_URL=${MASTER_URL}\n"
+            extra_env="${extra_env}
+Environment=PANEL_MASTER_URL=${MASTER_URL}"
         fi
         if [ "$ENROLL_TOKEN_EXPLICIT" = true ] && [ -n "$ENROLL_TOKEN" ]; then
-            extra_env="${extra_env}Environment=PANEL_ENROLL_TOKEN=${ENROLL_TOKEN}\n"
+            extra_env="${extra_env}
+Environment=PANEL_ENROLL_TOKEN=${ENROLL_TOKEN}"
         fi
         if [ "$NODE_NAME_EXPLICIT" = true ] && [ -n "$NODE_NAME" ]; then
-            extra_env="${extra_env}Environment=PANEL_NODE_NAME=${NODE_NAME}\n"
+            extra_env="${extra_env}
+Environment=PANEL_NODE_NAME=${NODE_NAME}"
         fi
 
         cat > /etc/systemd/system/dnsdist-panel.service <<UNIT
@@ -870,8 +882,8 @@ Environment=PANEL_SECRET_FILE=/var/lib/dnsdist/panel.secret
 Environment=PANEL_CERT=/var/lib/dnsdist/panel-cert.pem
 Environment=PANEL_KEY=/var/lib/dnsdist/panel-key.pem
 Environment=DNSDIST_CONF=/etc/dnsdist/dnsdist.conf
-Environment=DNSDIST_UPSTREAMS=/etc/dnsdist/upstreams.conf
-$(echo -e "$extra_env")LimitNOFILE=65536
+Environment=DNSDIST_UPSTREAMS=/etc/dnsdist/upstreams.conf${extra_env}
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
