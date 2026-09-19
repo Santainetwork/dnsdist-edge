@@ -2,9 +2,21 @@ package main
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 )
+
+func TestSettingsBlockModeCardMarkup(t *testing.T) {
+	page := string(indexHTML)
+	settings := regexp.MustCompile(`(?s)<div id="page-settings".*?<h3>Mode Pemblokiran Utama</h3>.*?<input type="checkbox" id="set-mode"`).FindString(page)
+	if settings == "" {
+		t.Fatal("block mode controls must be inside a named card on the Settings page")
+	}
+	if strings.Count(settings, `<div class="card-box">`) < 1 {
+		t.Fatal("block mode controls are missing their card container")
+	}
+}
 
 func TestRuleMatchingLogic(t *testing.T) {
 	sampleJSON := `{
