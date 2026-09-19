@@ -106,7 +106,7 @@ func TestEndToEndClusterWorkflow(t *testing.T) {
 	t.Logf("[E2E CHECK 3] Master JWT Authentication: SUCCESS")
 
 	// Step 4: Generate Enrollment Token via API
-	reqTok, _ := http.NewRequest(http.MethodPost, masterURL+"/api/cluster/token", bytes.NewReader([]byte(`{"hours":12}`)))
+	reqTok, _ := http.NewRequest(http.MethodPost, masterURL+"/api/cluster/token", bytes.NewReader([]byte(`{"minutes":10}`)))
 	reqTok.Header.Set("Authorization", "Bearer "+jwtToken)
 	reqTok.Header.Set("Content-Type", "application/json")
 	respTok, err := client.Do(reqTok)
