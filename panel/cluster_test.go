@@ -119,7 +119,7 @@ func TestClusterStore(t *testing.T) {
 	node1, err := cs.RegisterNode(RegisterRequest{
 		EnrollToken: tok,
 		Name:        "edge-01",
-		Version:     "2.5.0",
+		Version:     "2.6.0",
 	}, "192.168.1.100")
 	if err != nil {
 		t.Fatalf("expected successful registration, got error: %v", err)

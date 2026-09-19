@@ -5,6 +5,16 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [2.6.0] — 2026-09-19
+
+### 🌟 Web Node Enrollment & Storage Cleanup
+- **Web enrollment:** Master membuat token sekali pakai 10 menit, membuka handoff aman ke panel Edge via URL fragment, lalu Edge meminta konfirmasi sebelum register.
+- **Cluster validation:** Master dan Edge menerima telemetry setelah enrollment; token replay serta URL tidak aman ditolak.
+- **Storage:** Edge updater dan Master publisher menghapus CDB hash lama setelah atomic symlink swap. DB aktif serta backup manual non-hash dipertahankan.
+- **Release:** Panel, installer Edge/Master, dan telemetry runtime disinkronkan ke v2.6.0. `update-blacklist.sh` v3.1.1.
+
+---
+
 ## [3.1.1] — update-blacklist.sh — 2026-09-19
 
 - Hapus otomatis file CDB hash lama setelah atomic symlink swap berhasil.
