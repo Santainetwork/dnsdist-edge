@@ -18,6 +18,10 @@ config/secrets.*
 cluster-nodes.json
 cluster-agent.json
 
+# Internal agent instructions
+AGENTS.md
+agents.md
+
 # Temporary files
 *.tmp
 *.swp

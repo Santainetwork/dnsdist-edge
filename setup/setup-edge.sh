@@ -23,8 +23,8 @@ UPSTREAMS_CONF="${CONF_DIR}/upstreams.conf"
 # --- Default Variabel ---
 EDGE_DIR=$(pwd)
 CENTRAL_DB_URL="http://central-manager.local/blacklist.db"
-PANEL_RELEASE_URL="${PANEL_RELEASE_URL:-https://github.com/Santainetwork/dnsdist-panel/releases/latest/download/dnsdist-panel}"
-WITH_PANEL=${WITH_PANEL:-false}
+PANEL_RELEASE_URL="${PANEL_RELEASE_URL:-https://github.com/Santainetwork/dnsdist-edge/releases/latest/download/dnsdist-panel}"
+WITH_PANEL=${WITH_PANEL:-true}
 WEBSERVER_PASSWORD="trust-ng-admin"
 WEBSERVER_APIKEY="trust-ng-apikey-changeme"
 
@@ -71,7 +71,8 @@ show_help() {
     echo "      --set-upstream    Ubah upstream DNS tanpa install ulang"
     echo "      --set-rpz         Ubah IP Sinkhole RPZ"
     echo "      --set-cdb-sources   Ubah daftar sumber CDB (central, mirror, peer) dipisah koma"
-    echo "      --with-panel        Pasang/aktifkan DNSDist Panel (bisa untuk node baru atau yang sudah jalan)"
+    echo "      --with-panel        Pasang/aktifkan DNSDist Panel (default: aktif)"
+    echo "      --no-panel          Lewati pemasangan DNSDist Panel"
     echo "  -c, --check-config    Periksa status dan validitas konfigurasi saat ini"
     echo "      --update-config   Perbarui setting Mode, RPZ, dan Upstream secara interaktif"
     echo "      --upgrade         Upgrade script dan config ke versi terbaru (migrasi otomatis)"
@@ -737,10 +738,10 @@ do_set_cdb_sources() {
 }
 
 do_install_panel() {
-    echo -e "\n${CYAN}=== [6/6] DNSDist Panel (Opsional) ===${NC}"
+    echo -e "\n${CYAN}=== [6/6] DNSDist Management Panel ===${NC}"
     local panel_bin="/usr/local/bin/dnsdist-panel"
     if [ "$WITH_PANEL" != "true" ]; then
-        echo -e "  ${YELLOW}[i] Panel dilewati (pakai --with-panel untuk mengaktifkan)${NC}"
+        echo -e "  ${YELLOW}[i] Panel dilewati (dinonaktifkan via --no-panel)${NC}"
         return
     fi
 
@@ -1211,6 +1212,9 @@ while [ "$#" -gt 0 ]; do
             ;;
         --with-panel|--add-panel)
             WITH_PANEL=true
+            ;;
+        --no-panel)
+            WITH_PANEL=false
             ;;
         --set-cdb-sources)
             if [ -z "$2" ] || [[ "$2" == -* ]]; then
