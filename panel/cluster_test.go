@@ -22,7 +22,7 @@ func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 		"parseEdgePanelURL",
 		"readEnrollmentHandoff",
 		"history.replaceState",
-		"popup.opener = null",
+		"window.open(handoff.href, '_blank', 'noopener,noreferrer')",
 		"{ minutes: 10 }",
 	} {
 		if !strings.Contains(html, marker) {
@@ -31,6 +31,9 @@ func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 	}
 	if strings.Contains(html, "?dnsdist-enroll=") {
 		t.Fatal("enrollment token must not be placed in URL query")
+	}
+	if strings.Contains(html, "window.open('', '_blank', 'noopener,noreferrer')") {
+		t.Fatal("noopener blank popup returns null and cannot receive the handoff URL")
 	}
 }
 
