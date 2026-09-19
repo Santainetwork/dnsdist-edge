@@ -14,14 +14,37 @@ func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 	html := string(indexHTML)
 	for _, marker := range []string{
 		"master-edge-url",
+		"add-node-token",
+		"add-node-cli",
+		"add-node-handoff",
 		"createNodeHandoff",
 		"dnsdist-enroll=",
 		"parseEdgePanelURL",
 		"readEnrollmentHandoff",
+		"history.replaceState",
+		"{ minutes: 10 }",
 	} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("index HTML missing enrollment marker %q", marker)
 		}
+	}
+	if strings.Contains(html, "?dnsdist-enroll=") {
+		t.Fatal("enrollment token must not be placed in URL query")
+	}
+}
+
+func TestValidateMasterURL(t *testing.T) {
+	for _, raw := range []string{"ftp://master.example", "http://user:pass@master.example", "not-a-url"} {
+		if _, err := validateMasterURL(raw); err == nil {
+			t.Errorf("validateMasterURL(%q) accepted unsafe URL", raw)
+		}
+	}
+	got, err := validateMasterURL(" https://master.example:8084/path/ ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "https://master.example:8084/path" {
+		t.Fatalf("validated URL = %q", got)
 	}
 }
 

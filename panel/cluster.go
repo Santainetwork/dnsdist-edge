@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -227,6 +228,14 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return r.RemoteAddr
+}
+
+func validateMasterURL(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return "", errors.New("master URL harus memakai HTTP/HTTPS tanpa kredensial")
+	}
+	return strings.TrimRight(u.String(), "/"), nil
 }
 
 // RegisterNode enrolls a new edge node using an enrollment token
@@ -881,7 +890,12 @@ func handleEdgeClusterConfig(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, http.StatusBadRequest, "master_url dan enroll_token wajib diisi")
 			return
 		}
-		if err := edgeAgent.Register(body.MasterURL, body.EnrollToken, body.NodeName); err != nil {
+		masterURL, err := validateMasterURL(body.MasterURL)
+		if err != nil {
+			jsonErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := edgeAgent.Register(masterURL, body.EnrollToken, body.NodeName); err != nil {
 			jsonErr(w, http.StatusBadRequest, "pendaftaran gagal: "+err.Error())
 			return
 		}

@@ -1017,9 +1017,9 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
           <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
           <span>Segarkan</span>
         </button>
-        <button class="btn btn-primary" onclick="openTokenModal()">
+        <button class="btn btn-primary" onclick="openAddNodeModal()">
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          <span>Buat Token Pendaftaran</span>
+          <span>Tambah Node</span>
         </button>
       </div>
     </div>
@@ -1189,6 +1189,29 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
     </div>
   </div>
 
+</div>
+
+<!-- Add Node Modal -->
+<div id="add-node-modal" class="modal-backdrop" style="display:none">
+  <div class="modal-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <h3 style="color:#fff;font-size:1.15rem;font-weight:700">Tambah Node Edge</h3>
+      <button class="copy-btn" onclick="closeAddNodeModal()" style="padding:0.25rem;">×</button>
+    </div>
+    <p style="color:var(--text-sub);font-size:0.85rem;margin-bottom:1.25rem;">Buat token sekali pakai, lalu buka panel Edge untuk konfirmasi pendaftaran.</p>
+    <div class="form-group"><label>URL Panel Edge</label><input type="url" id="master-edge-url" placeholder="https://edge.example.com:8084"></div>
+    <div class="form-group"><label>Nama Node (Opsional)</label><input type="text" id="master-edge-name" placeholder="edge-jakarta-01"></div>
+    <div id="add-node-result" style="display:none;margin-top:1rem;">
+      <p style="color:var(--emerald);font-size:0.8rem;margin-bottom:0.75rem">Token siap. Berlaku 10 menit dan sekali pakai.</p>
+      <div class="form-group"><label>Token Manual</label><div style="display:flex;gap:0.5rem"><input id="add-node-token" readonly><button class="btn btn-secondary" onclick="copyText(document.getElementById('add-node-token').value)">Salin</button></div></div>
+      <div class="form-group"><label>Perintah CLI Edge</label><div id="add-node-cli" style="font-family:ui-monospace,monospace;font-size:0.75rem;word-break:break-all"></div></div>
+      <a id="add-node-handoff" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Buka Panel Edge Lagi</a>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
+      <button class="btn btn-secondary" onclick="closeAddNodeModal()">Tutup</button>
+      <button class="btn btn-primary" onclick="createNodeHandoff()">Buat &amp; Buka Panel Edge</button>
+    </div>
+  </div>
 </div>
 
 <!-- Token Modal -->
@@ -1501,6 +1524,7 @@ async function fetchConfig() {
         fetchEdgeClusterStatus();
       }
     }
+    if (enrollmentHandoff) fillEnrollmentHandoff(enrollmentHandoff);
 
     // RPZ Chips
     const rpzBox = document.getElementById('rpz-current');
@@ -1650,6 +1674,48 @@ let clusterPoller = null;
 let currentClusterNodes = [];
 
 // ── Cluster Management ──
+function parseEdgePanelURL(raw) {
+  const u = new URL(raw.trim());
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('URL Edge harus memakai HTTP atau HTTPS');
+  if (u.username || u.password) throw new Error('URL Edge tidak boleh berisi kredensial');
+  return u;
+}
+
+function openAddNodeModal() {
+  document.getElementById('add-node-modal').style.display = 'flex';
+  document.getElementById('master-edge-url').focus();
+}
+
+function closeAddNodeModal() { document.getElementById('add-node-modal').style.display = 'none'; }
+
+function encodeEnrollmentHandoff(value) { return btoa(unescape(encodeURIComponent(JSON.stringify(value)))); }
+
+async function createNodeHandoff() {
+  const result = document.getElementById('add-node-result');
+  result.style.display = 'none';
+  let edgeURL;
+  try { edgeURL = parseEdgePanelURL(document.getElementById('master-edge-url').value); }
+  catch (e) { toast(e.message, 'error'); return; }
+  const popup = window.open('', '_blank', 'noopener,noreferrer');
+  try {
+    const d = await api('/api/cluster/token', 'POST', { minutes: 10 });
+    const handoff = new URL(edgeURL.href);
+    handoff.hash = 'dnsdist-enroll=' + encodeEnrollmentHandoff({
+      master_url: window.location.origin, enroll_token: d.token,
+      node_name: document.getElementById('master-edge-name').value.trim()
+    });
+    document.getElementById('add-node-token').value = d.token;
+    document.getElementById('add-node-cli').textContent = `sudo ./setup-edge.sh --install --master-url ${window.location.origin} --enroll-token ${d.token}`;
+    document.getElementById('add-node-handoff').href = handoff.href;
+    result.style.display = 'block';
+    if (popup) popup.location.href = handoff.href;
+    else toast('Popup diblokir. Gunakan tombol Buka Panel Edge Lagi.', 'error');
+  } catch (e) {
+    if (popup) popup.close();
+    toast('Gagal membuat token: ' + e.message, 'error');
+  }
+}
+
 async function fetchClusterNodes() {
   try {
     const d = await api('/api/cluster/nodes');
@@ -1761,6 +1827,35 @@ async function fetchEdgeClusterStatus() {
   }
 }
 
+function readEnrollmentHandoff() {
+  const prefix = '#dnsdist-enroll=';
+  if (!location.hash.startsWith(prefix)) return null;
+  try {
+    const value = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(prefix.length)))));
+    const masterURL = parseEdgePanelURL(String(value.master_url || '')).href.replace(/\/$/, '');
+    if (!value.enroll_token || !String(value.enroll_token).startsWith('enroll-')) return null;
+    history.replaceState(null, '', location.pathname + location.search);
+    return { master_url: masterURL, enroll_token: String(value.enroll_token), node_name: String(value.node_name || '') };
+  } catch (_) { return null; }
+}
+
+let enrollmentHandoff = null;
+
+function fillEnrollmentHandoff(value) {
+  document.getElementById('edge-m-url').value = value.master_url;
+  document.getElementById('edge-m-token').value = value.enroll_token;
+  document.getElementById('edge-m-name').value = value.node_name || '';
+  document.getElementById('edge-cluster-info').textContent = 'Data enrollment diterima. Periksa URL dan nama node, lalu klik Hubungkan ke Master.';
+}
+
+function applyEnrollmentHandoff() {
+  const value = readEnrollmentHandoff();
+  if (!value) return;
+  enrollmentHandoff = value;
+  nav('settings', document.querySelector('a[onclick*="nav(\'settings\'"]'));
+  fillEnrollmentHandoff(value);
+}
+
 async function connectEdgeToMaster() {
   const masterURL = document.getElementById('edge-m-url').value.trim();
   const enrollToken = document.getElementById('edge-m-token').value.trim();
@@ -1864,6 +1959,7 @@ function onLogin() {
   initChart();
   if (statsInterval) clearInterval(statsInterval);
   statsInterval = setInterval(fetchStats, 5000);
+  applyEnrollmentHandoff();
 }
 
 if (isLoggedIn()) {
