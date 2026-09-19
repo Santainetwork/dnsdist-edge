@@ -1,12 +1,95 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
+	html := string(indexHTML)
+	for _, marker := range []string{
+		"master-edge-url",
+		"add-node-token",
+		"add-node-cli",
+		"add-node-handoff",
+		"createNodeHandoff",
+		"dnsdist-enroll=",
+		"parseEdgePanelURL",
+		"readEnrollmentHandoff",
+		"history.replaceState",
+		"popup.opener = null",
+		"{ minutes: 10 }",
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("index HTML missing enrollment marker %q", marker)
+		}
+	}
+	if strings.Contains(html, "?dnsdist-enroll=") {
+		t.Fatal("enrollment token must not be placed in URL query")
+	}
+}
+
+func TestValidateMasterURL(t *testing.T) {
+	for _, raw := range []string{"ftp://master.example", "http://user:pass@master.example", "not-a-url"} {
+		if _, err := validateMasterURL(raw); err == nil {
+			t.Errorf("validateMasterURL(%q) accepted unsafe URL", raw)
+		}
+	}
+	got, err := validateMasterURL(" https://master.example:8084/path/ ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "https://master.example:8084/path" {
+		t.Fatalf("validated URL = %q", got)
+	}
+}
+
+func TestClusterTokenTTL(t *testing.T) {
+	tmpDir := t.TempDir()
+	clusterStore = newClusterStore(filepath.Join(tmpDir, "nodes.json"))
+
+	before := time.Now()
+	req := httptest.NewRequest(http.MethodPost, "/api/cluster/token", strings.NewReader(`{"minutes":10}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handleClusterToken(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("minutes token status = %d, want 200", rec.Code)
+	}
+	var response struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	clusterStore.mu.RLock()
+	expires := clusterStore.tokens[response.Token]
+	clusterStore.mu.RUnlock()
+	if expires.Before(before.Add(9*time.Minute)) || expires.After(time.Now().Add(11*time.Minute)) {
+		t.Fatalf("minutes token expiry = %v, want about 10 minutes", expires)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/cluster/token", strings.NewReader(`{"hours":1}`))
+	rec = httptest.NewRecorder()
+	handleClusterToken(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("hours token status = %d, want 200", rec.Code)
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	clusterStore.mu.RLock()
+	expires = clusterStore.tokens[response.Token]
+	clusterStore.mu.RUnlock()
+	if expires.Before(time.Now().Add(59*time.Minute)) || expires.After(time.Now().Add(61*time.Minute)) {
+		t.Fatalf("hours token expiry = %v, want about 1 hour", expires)
+	}
+}
 
 func TestClusterStore(t *testing.T) {
 	tmpDir := t.TempDir()

@@ -59,6 +59,15 @@ sudo ./setup-edge.sh --install \
   --node-name "edge-jakarta-01"
 ```
 
+#### Tambah Node melalui Web
+
+1. Buka panel Master, lalu pilih **Cluster Nodes → Tambah Node**.
+2. Isi URL panel Edge dan nama node. Master membuat token sekali pakai yang berlaku 10 menit.
+3. Klik **Buat & Buka Panel Edge**, login ke panel Edge, lalu periksa data pada **Pengaturan**.
+4. Klik **Hubungkan ke Master**. Node muncul pada daftar Master setelah heartbeat pertama.
+
+Data enrollment dibawa melalui URL fragment agar tidak masuk access log HTTP. Jika popup gagal dibuka, gunakan tombol **Buka Panel Edge Lagi**, salin token manual, atau pakai perintah CLI yang ditampilkan.
+
 ---
 
 ### 2. RPZ Sinkhole — Multi-IP + IPv6 (v2.4.0)

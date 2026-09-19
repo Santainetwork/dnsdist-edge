@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -229,6 +230,14 @@ func clientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
+func validateMasterURL(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return "", errors.New("master URL harus memakai HTTP/HTTPS tanpa kredensial")
+	}
+	return strings.TrimRight(u.String(), "/"), nil
+}
+
 // RegisterNode enrolls a new edge node using an enrollment token
 func (cs *ClusterStore) RegisterNode(req RegisterRequest, remoteIP string) (*NodeRecord, error) {
 	if !cs.ValidateAndConsumeToken(req.EnrollToken) {
@@ -397,17 +406,24 @@ func handleClusterToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Hours int `json:"hours"`
+		Minutes int `json:"minutes"`
+		Hours   int `json:"hours"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	if body.Hours <= 0 {
-		body.Hours = 24
+	var duration time.Duration
+	switch {
+	case body.Minutes > 0:
+		duration = time.Duration(body.Minutes) * time.Minute
+	case body.Hours > 0:
+		duration = time.Duration(body.Hours) * time.Hour
+	default:
+		duration = 24 * time.Hour
 	}
-	tok := clusterStore.GenerateEnrollmentToken(time.Duration(body.Hours) * time.Hour)
+	tok := clusterStore.GenerateEnrollmentToken(duration)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"token":      tok,
-		"expires_in": fmt.Sprintf("%dh", body.Hours),
+		"expires_in": duration.String(),
 	})
 }
 
@@ -874,7 +890,12 @@ func handleEdgeClusterConfig(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, http.StatusBadRequest, "master_url dan enroll_token wajib diisi")
 			return
 		}
-		if err := edgeAgent.Register(body.MasterURL, body.EnrollToken, body.NodeName); err != nil {
+		masterURL, err := validateMasterURL(body.MasterURL)
+		if err != nil {
+			jsonErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := edgeAgent.Register(masterURL, body.EnrollToken, body.NodeName); err != nil {
 			jsonErr(w, http.StatusBadRequest, "pendaftaran gagal: "+err.Error())
 			return
 		}
@@ -884,4 +905,3 @@ func handleEdgeClusterConfig(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusMethodNotAllowed, "GET or POST only")
 	}
 }
-
