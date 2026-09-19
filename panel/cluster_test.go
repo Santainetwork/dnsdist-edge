@@ -22,6 +22,7 @@ func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 		"parseEdgePanelURL",
 		"readEnrollmentHandoff",
 		"history.replaceState",
+		"popup.opener = null",
 		"{ minutes: 10 }",
 	} {
 		if !strings.Contains(html, marker) {
