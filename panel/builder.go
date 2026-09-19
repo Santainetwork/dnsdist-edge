@@ -37,6 +37,28 @@ type MasterState struct {
 
 var masterState MasterState
 
+func cleanupVersionedDBs(dir, prefix, active string) (int, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for _, entry := range entries {
+		if entry.IsDir() || entry.Name() == filepath.Base(active) || !strings.HasPrefix(entry.Name(), prefix+".") || !strings.HasSuffix(entry.Name(), ".db") {
+			continue
+		}
+		name := strings.TrimSuffix(strings.TrimPrefix(entry.Name(), prefix+"."), ".db")
+		if len(name) != 64 || strings.Trim(name, "0123456789abcdef") != "" {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil {
+			return removed, err
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 func appendMasterLog(msg string) {
 	masterState.mu.Lock()
 	defer masterState.mu.Unlock()
@@ -440,12 +462,13 @@ func BuildMasterCDB(outputDir, sourcesFile, whitelistFile, customBLFile string, 
 	_ = os.Symlink(filepath.Base(finalHashed), tmpLink)
 	_ = os.Rename(tmpLink, finalLink)
 
-	// Version calculation (count of distinct trust.*.db)
-	matches, _ := filepath.Glob(filepath.Join(outputDir, "trust.*.db"))
-	versionCount := len(matches)
-	if versionCount == 0 {
-		versionCount = 1
+	// Retain only the active content-addressed DB after the atomic swap.
+	if removed, err := cleanupVersionedDBs(outputDir, "trust", finalHashed); err != nil {
+		appendMasterLog(fmt.Sprintf("Peringatan cleanup DB lama: %v", err))
+	} else if removed > 0 {
+		appendMasterLog(fmt.Sprintf("Cleanup DB lama: %d file", removed))
 	}
+	versionCount := 1
 
 	builtAt := time.Now().UTC().Format(time.RFC3339)
 	manifestData := fmt.Sprintf(`{

@@ -80,7 +80,19 @@ if [ -x "$BUILDER_BIN" ]; then
     ln -sfn "trust.${SHA}.db" "${FINAL_LINK}.tmp"
     mv "${FINAL_LINK}.tmp" "$FINAL_LINK"
 
-    VERSION_COUNT=$(ls -1 "${SERVE_DIR}"/trust.*.db 2>/dev/null | wc -l)
+    # Symlink aktif sudah menunjuk file baru. Hapus hanya file hash lama;
+    # file non-hash seperti backup manual tidak disentuh.
+    for OLD_DB in "${SERVE_DIR}"/trust.*.db; do
+        [ -f "$OLD_DB" ] || continue
+        [ "$OLD_DB" = "$FINAL_HASHED" ] && continue
+        OLD_HASH=$(basename "$OLD_DB")
+        OLD_HASH=${OLD_HASH#trust.}
+        OLD_HASH=${OLD_HASH%.db}
+        [[ "$OLD_HASH" =~ ^[0-9a-f]{64}$ ]] || continue
+        rm -f -- "$OLD_DB"
+    done
+
+    VERSION_COUNT=1
     BUILT_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     cat > "${MANIFEST_FILE}.tmp" << JSONEOF

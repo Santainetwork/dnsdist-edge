@@ -5,6 +5,14 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [3.1.1] — update-blacklist.sh — 2026-09-19
+
+- Hapus otomatis file CDB hash lama setelah atomic symlink swap berhasil.
+- Berlaku pada Edge, publisher Master Go, dan fallback builder shell.
+- File aktif dan backup manual dengan nama non-hash tidak disentuh.
+
+---
+
 ## [2.5.1] — 2026-09-09
 
 ### 🌟 Centralized Multi-Node Monitoring (Mode A)

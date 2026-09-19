@@ -1,10 +1,10 @@
 #!/bin/bash
 # ============================================================
-# DNSDist Edge Node - DB Sync Script (v3.1.0)
+# DNSDist Edge Node - DB Sync Script (v3.1.1)
 # Konsep: Edge hanya menerima file blacklist.db (pre-compiled)
 # Fitur baru: Multi-URL failover (central + mirror + peer)
 # ============================================================
-SCRIPT_VERSION="3.1.0"
+SCRIPT_VERSION="3.1.1"
 
 # --- Konfigurasi Default ---
 DB_DIR="${DB_DIR:-/var/lib/dnsdist}"
@@ -163,6 +163,21 @@ generate_status_html() {
 EOF
 }
 
+cleanup_old_dbs() {
+    local active_file="$1" entry hash removed=0
+    for entry in "${DB_DIR}"/blacklist.*.db; do
+        [ -f "$entry" ] || continue
+        [ "$entry" = "$active_file" ] && continue
+        hash=$(basename "$entry")
+        hash=${hash#blacklist.}
+        hash=${hash%.db}
+        [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || continue
+        rm -f -- "$entry"
+        removed=$((removed + 1))
+    done
+    [ "$removed" -gt 0 ] && echo "[*] Cleanup DB lama: $removed file dihapus."
+}
+
 # --- Proses hasil ---
 if [ "$success" = "1" ] && [ -f "$TMP_FILE" ]; then
     # Fase 2: content-addressed — simpan sebagai blacklist.<sha>.db + symlink
@@ -182,8 +197,12 @@ if [ "$success" = "1" ] && [ -f "$TMP_FILE" ]; then
     mv "${DB_FILE}.tmp-link" "$DB_FILE"
     chown -h "${DNSDIST_USER}:${DNSDIST_USER}" "$DB_FILE" 2>/dev/null || true
 
-    # Manifest sidecar (version = number of distinct DBs)
-    version=$(ls "${DB_DIR}"/blacklist.*.db 2>/dev/null | wc -l)
+    # File aktif sudah dapat dibuka melalui symlink. Unlink versi lama aman
+    # untuk proses yang masih memegang file descriptor lama.
+    cleanup_old_dbs "$hashed_file"
+
+    # Manifest sidecar
+    version=1
     built_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     cat > "${DB_FILE}.manifest.json" <<EOF
 {
