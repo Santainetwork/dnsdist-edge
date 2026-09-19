@@ -13,6 +13,10 @@ certs/*.key
 
 # Configuration secrets
 config/secrets.*
+*.secret
+*.password
+cluster-nodes.json
+cluster-agent.json
 
 # Temporary files
 *.tmp

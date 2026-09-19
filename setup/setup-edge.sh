@@ -83,7 +83,7 @@ show_help() {
     echo "      --uninstall       Hapus instalasi DNSDist beserta konfigurasi Trust-NG"
     echo ""
     echo "Contoh:"
-    echo "  ./setup-edge.sh --install --url https://db-dns.alsava.my.id/trust.db"
+    echo "  ./setup-edge.sh --install --url http://central-manager.local:8080/files/trust.db"
     echo "  ./setup-edge.sh --sync-only"
     echo "  ./setup-edge.sh --upgrade"
     exit 0

@@ -13,13 +13,13 @@ func TestRuleMatchingLogic(t *testing.T) {
 				"id": 0,
 				"matches": 43,
 				"rule": "(lookup key-value store based on 'qname in wire format') && (qtype==A)",
-				"action": "spoof in 103.155.191.161"
+				"action": "spoof in 192.0.2.1"
 			},
 			{
 				"id": 1,
 				"matches": 4,
 				"rule": "(lookup key-value store based on 'qname in wire format') && (qtype==AAAA)",
-				"action": "spoof in 2406:7540:1600:0:192:168:106:81"
+				"action": "spoof in 2001:db8::1"
 			},
 			{
 				"id": 2,
