@@ -397,17 +397,24 @@ func handleClusterToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Hours int `json:"hours"`
+		Minutes int `json:"minutes"`
+		Hours   int `json:"hours"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	if body.Hours <= 0 {
-		body.Hours = 24
+	var duration time.Duration
+	switch {
+	case body.Minutes > 0:
+		duration = time.Duration(body.Minutes) * time.Minute
+	case body.Hours > 0:
+		duration = time.Duration(body.Hours) * time.Hour
+	default:
+		duration = 24 * time.Hour
 	}
-	tok := clusterStore.GenerateEnrollmentToken(time.Duration(body.Hours) * time.Hour)
+	tok := clusterStore.GenerateEnrollmentToken(duration)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"token":      tok,
-		"expires_in": fmt.Sprintf("%dh", body.Hours),
+		"expires_in": duration.String(),
 	})
 }
 
@@ -884,4 +891,3 @@ func handleEdgeClusterConfig(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusMethodNotAllowed, "GET or POST only")
 	}
 }
-
