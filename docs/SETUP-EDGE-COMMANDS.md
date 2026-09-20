@@ -4,7 +4,7 @@
 
 ---
 
-## 📊 Ringkasan Opsi CLI (22 Opsi)
+## 📊 Ringkasan Opsi CLI
 
 | No | Opsi | Argumen | Kategori | Deskripsi |
 |:---:|---|---|---|---|
@@ -30,6 +30,10 @@
 | 20 | `--enroll-token` | `<TOK>` | **Cluster** | Token pendaftaran node ke master cluster |
 | 21 | `--node-name` | `<NAMA>` | **Cluster** | Nama node edge di dashboard cluster (default: hostname) |
 | 22 | `-V`, `--version` / `-h`, `--help` | — | **Info** | Tampilkan versi / bantuan |
+| 23 | `--transparent-dns` | `<off\|auto\|tproxy>` | **Jaringan** | Rencana/atur transparent DNS; `auto` hanya diagnostik |
+| 24 | `--transparent-interface` | `<IFACE>` | **Jaringan** | Interface LAN untuk TPROXY |
+| 25 | `--transparent-subnet` | `<CIDR>` | **Jaringan** | Subnet klien IPv4 untuk TPROXY |
+| 26 | `--apply-transparent` | — | **Jaringan** | Izinkan perubahan nftables/routing; tanpa ini hanya plan |
 
 ---
 
@@ -131,9 +135,13 @@ Panel tersedia di `https://YOUR_IP:8443` dengan self-signed cert (otomatis).
 - DoT/DoH: enable/disable + cert path, restart otomatis
 - Settings: block mode, ganti password panel
 
-**Password panel:** sama dengan `--password` saat install. Ganti via Settings atau:
+**Password panel:** sama dengan `--password` saat install. Jika opsi itu tidak diberikan pada instalasi baru, default-nya `trust-ng-admin`. File autentikasi panel berada di `/var/lib/dnsdist/panel.password`.
+
+Reset dari shell lalu restart panel:
 ```bash
-echo "passwordbaru" > /var/lib/dnsdist/panel.password
+printf '%s\n' 'passwordbaru' | sudo tee /var/lib/dnsdist/panel.password >/dev/null
+sudo chmod 600 /var/lib/dnsdist/panel.password
+sudo systemctl restart dnsdist-panel
 ```
 
 ---
@@ -148,6 +156,26 @@ Output:
 - Versi terpasang vs script
 - Mode blokir (`rpz` / `adguard`)
 - IP Sinkhole aktif (bullet list, multi-IP)
+
+### 6. Transparent DNS
+
+```bash
+# MikroTik sudah force-DNS ke IP Edge: tidak perlu TPROXY
+sudo ./setup-edge.sh --transparent-dns off
+
+# Diagnostik lokal. Tidak membaca konfigurasi MikroTik dan tidak mengubah host
+sudo ./setup-edge.sh --transparent-dns auto \
+  --transparent-interface eth1 --transparent-subnet 192.168.88.0/24
+
+# Lihat rencana, lalu terapkan hanya bila Edge menjadi gateway trafik klien
+sudo ./setup-edge.sh --transparent-dns tproxy \
+  --transparent-interface eth1 --transparent-subnet 192.168.88.0/24
+sudo ./setup-edge.sh --transparent-dns tproxy \
+  --transparent-interface eth1 --transparent-subnet 192.168.88.0/24 \
+  --apply-transparent
+```
+
+Mode TPROXY awal mendukung IPv4 UDP/TCP port 53. Detail prasyarat, rollback, dan verifikasi MikroTik: [TRANSPARENT-DNS.md](TRANSPARENT-DNS.md).
 - Upstream DNS aktif
 - Ukuran & path `blacklist.db`
 - Hasil `dnsdist --check-config`
@@ -155,7 +183,7 @@ Output:
 
 ---
 
-### 6. Cluster / Multi-source CDB
+### 7. Cluster / Multi-source CDB
 
 ```bash
 # Set sumber (central + mirror + peer)
@@ -167,7 +195,7 @@ Urutan failover: central → mirror → peer. DB lama dipertahankan jika semua g
 
 ---
 
-### 7. Upgrade
+### 8. Upgrade
 
 ```bash
 sudo ./setup-edge.sh --upgrade
@@ -177,7 +205,7 @@ Otomatis: update `update-blacklist.sh` + `dnsdist.conf` + migrasi path + restart
 
 ---
 
-### 8. Sync Database
+### 9. Sync Database
 
 ```bash
 # Normal (ETag cache)
@@ -189,7 +217,7 @@ sudo ./setup-edge.sh --force-update
 
 ---
 
-### 9. Uninstall
+### 10. Uninstall
 
 ```bash
 sudo ./setup-edge.sh --uninstall
@@ -202,6 +230,7 @@ sudo ./setup-edge.sh --uninstall
 
 | Versi | Perubahan Utama |
 |---|---|
+| v2.8.0 | Transparent DNS E2 (`off|auto|tproxy`), proxy IPv4 UDP/TCP, dan sinkronisasi password panel |
 | v2.7.0 | Perbaikan layout kartu Pengaturan Edge dan regression test markup |
 | v2.6.0 | Web enrollment node, cleanup DB hash lama, browser-validated cluster flow |
 | v2.5.0 | Central Master installer, Dual HTTP/HTTPS panel, Redesigned UI |

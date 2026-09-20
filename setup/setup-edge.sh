@@ -8,13 +8,14 @@
 set -e
 
 # --- Versi Script ---
-SCRIPT_VERSION="2.7.0"
+SCRIPT_VERSION="2.8.0"
 
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---
 CONF_DIR="/etc/dnsdist"
 CERTS_DIR="${CONF_DIR}/certs"
 DB_DIR="/var/lib/dnsdist"
 DB_FILE="${DB_DIR}/blacklist.db"
+PANEL_PASSWORD_FILE="${DB_DIR}/panel.password"
 SCRIPT_UPDATE="/usr/local/bin/update-blacklist.sh"
 CONFIG_SAVE_FILE="${CONF_DIR}/node.conf"
 DNSDIST_CONF="${CONF_DIR}/dnsdist.conf"
@@ -27,6 +28,9 @@ PANEL_RELEASE_URL="${PANEL_RELEASE_URL:-https://github.com/Santainetwork/dnsdist
 WITH_PANEL=${WITH_PANEL:-true}
 WEBSERVER_PASSWORD="trust-ng-admin"
 WEBSERVER_APIKEY="trust-ng-apikey-changeme"
+TRANSPARENT_MODE="${TRANSPARENT_MODE:-}"
+TRANSPARENT_INTERFACE="${TRANSPARENT_INTERFACE:-}"
+TRANSPARENT_SUBNET="${TRANSPARENT_SUBNET:-}"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -73,6 +77,10 @@ show_help() {
     echo "      --set-cdb-sources   Ubah daftar sumber CDB (central, mirror, peer) dipisah koma"
     echo "      --with-panel        Pasang/aktifkan DNSDist Panel (default: aktif)"
     echo "      --no-panel          Lewati pemasangan DNSDist Panel"
+    echo "      --transparent-dns <off|auto|tproxy>  Mode transparent DNS (default: off)"
+    echo "      --transparent-interface <IFACE>      Interface LAN untuk mode tproxy"
+    echo "      --transparent-subnet <CIDR>          Subnet IPv4 klien untuk mode tproxy"
+    echo "      --apply-transparent                  Terapkan perubahan jaringan (wajib untuk tproxy/off)"
     echo "  -c, --check-config    Periksa status dan validitas konfigurasi saat ini"
     echo "      --update-config   Perbarui setting Mode, RPZ, dan Upstream secara interaktif"
     echo "      --upgrade         Upgrade script dan config ke versi terbaru (migrasi otomatis)"
@@ -117,6 +125,9 @@ SAVED_WEBSERVER_APIKEY="${WEBSERVER_APIKEY}"
 SAVED_MASTER_URL="${MASTER_URL:-}"
 SAVED_ENROLL_TOKEN="${ENROLL_TOKEN:-}"
 SAVED_NODE_NAME="${NODE_NAME:-}"
+SAVED_TRANSPARENT_MODE="${TRANSPARENT_MODE:-off}"
+SAVED_TRANSPARENT_INTERFACE="${TRANSPARENT_INTERFACE:-}"
+SAVED_TRANSPARENT_SUBNET="${TRANSPARENT_SUBNET:-}"
 SAVED_INSTALL_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 EOF
     echo -e "${GREEN}[✓] Konfigurasi disimpan ke $CONFIG_SAVE_FILE (v${SCRIPT_VERSION})${NC}"
@@ -148,6 +159,9 @@ load_config() {
             [ -n "$SAVED_MASTER_URL" ] && [ "$MASTER_URL_EXPLICIT" != true ] && MASTER_URL="$SAVED_MASTER_URL"
             [ -n "$SAVED_ENROLL_TOKEN" ] && [ "$ENROLL_TOKEN_EXPLICIT" != true ] && ENROLL_TOKEN="$SAVED_ENROLL_TOKEN"
             [ -n "$SAVED_NODE_NAME" ] && [ "$NODE_NAME_EXPLICIT" != true ] && NODE_NAME="$SAVED_NODE_NAME"
+            [ -n "$SAVED_TRANSPARENT_MODE" ] && TRANSPARENT_MODE="$SAVED_TRANSPARENT_MODE"
+            [ -n "$SAVED_TRANSPARENT_INTERFACE" ] && TRANSPARENT_INTERFACE="$SAVED_TRANSPARENT_INTERFACE"
+            [ -n "$SAVED_TRANSPARENT_SUBNET" ] && TRANSPARENT_SUBNET="$SAVED_TRANSPARENT_SUBNET"
             echo -e "${GREEN}[✓] Konfigurasi lama berhasil dimuat.${NC}"
             return 0
         fi
@@ -173,6 +187,9 @@ load_config_silent() {
         [ -n "$SAVED_MASTER_URL" ] && MASTER_URL="$SAVED_MASTER_URL"
         [ -n "$SAVED_ENROLL_TOKEN" ] && ENROLL_TOKEN="$SAVED_ENROLL_TOKEN"
         [ -n "$SAVED_NODE_NAME" ] && NODE_NAME="$SAVED_NODE_NAME"
+        [ -n "$SAVED_TRANSPARENT_MODE" ] && TRANSPARENT_MODE="$SAVED_TRANSPARENT_MODE"
+        [ -n "$SAVED_TRANSPARENT_INTERFACE" ] && TRANSPARENT_INTERFACE="$SAVED_TRANSPARENT_INTERFACE"
+        [ -n "$SAVED_TRANSPARENT_SUBNET" ] && TRANSPARENT_SUBNET="$SAVED_TRANSPARENT_SUBNET"
     fi
     return 0
 }
@@ -308,6 +325,13 @@ PYEOF
 
     # 3. Jalankan migrasi otomatis
     do_migrate
+
+    # Restore optional TPROXY state after replacing dnsdist.conf during upgrade.
+    if [ -f /etc/dnsdist/tproxy.conf ] && [ -x /usr/local/bin/dnsdist-tproxy-setup ] && \
+       [ -n "$TRANSPARENT_INTERFACE" ] && [ -n "$TRANSPARENT_SUBNET" ]; then
+        /usr/local/bin/dnsdist-tproxy-setup --mode tproxy \
+            --interface "$TRANSPARENT_INTERFACE" --subnet "$TRANSPARENT_SUBNET" --apply
+    fi
 
     # 4. Set/restore webserver credentials & update node.conf
     do_set_webserver
@@ -472,6 +496,15 @@ do_set_webserver() {
         if [ -d "$CONF_DIR" ]; then
             save_config
         fi
+
+        if [ "$PASSWORD_EXPLICIT" = true ]; then
+            detect_dnsdist_user
+            mkdir -p "$DB_DIR"
+            install_panel_password
+            if systemctl is-active --quiet dnsdist-panel 2>/dev/null; then
+                systemctl restart dnsdist-panel
+            fi
+        fi
         
         if systemctl is-active --quiet dnsdist; then
             systemctl restart dnsdist
@@ -479,6 +512,77 @@ do_set_webserver() {
         fi
     else
         echo -e "${RED}[!] File konfigurasi dnsdist.conf tidak ditemukan.${NC}"
+    fi
+}
+
+do_configure_transparent_dns() {
+    local tproxy_helper="$EDGE_DIR/../addons/dnsdist-tproxy.sh"
+    local tproxy_binary="$EDGE_DIR/../tools/dnsdist-tproxy/dnsdist-tproxy"
+    [ ! -f "$tproxy_helper" ] && tproxy_helper="$EDGE_DIR/dnsdist-tproxy.sh"
+    [ ! -x "$tproxy_binary" ] && tproxy_binary="$EDGE_DIR/../tools/dnsdist-tproxy-bin"
+    [ ! -x "$tproxy_binary" ] && tproxy_binary="$EDGE_DIR/dnsdist-tproxy-bin"
+    [ -x "$tproxy_helper" ] || {
+        echo -e "${RED}[!] Addon dnsdist-tproxy.sh tidak ditemukan atau tidak executable.${NC}"
+        exit 1
+    }
+
+    if [ "$TRANSPARENT_MODE" = tproxy ]; then
+        [ -x "$tproxy_binary" ] || {
+            echo -e "${RED}[!] Binary dnsdist-tproxy tidak ditemukan. Build tools/dnsdist-tproxy/build.sh terlebih dahulu.${NC}"
+            exit 1
+        }
+        if [ "$TRANSPARENT_APPLY" = true ]; then
+            install -m 0755 "$tproxy_binary" /usr/local/bin/dnsdist-tproxy
+            install -m 0755 "$tproxy_helper" /usr/local/bin/dnsdist-tproxy-setup
+            if ! grep -Fq '/etc/dnsdist/tproxy.conf' "$DNSDIST_CONF"; then
+                cp "$DNSDIST_CONF" "${DNSDIST_CONF}.bak.$(date +%Y%m%d%H%M%S)"
+                python3 - "$DNSDIST_CONF" <<'PYEOF'
+import os
+import sys
+
+path = sys.argv[1]
+with open(path) as source:
+    content = source.read()
+listeners = "addLocal('0.0.0.0:53')\naddLocal('[::]:53')"
+hook = '''local tproxyFile = "/etc/dnsdist/tproxy.conf"
+local _tp = io.open(tproxyFile, "r")
+if _tp then
+  _tp:close()
+  dofile(tproxyFile)
+else
+  addLocal('0.0.0.0:53')
+  addLocal('[::]:53')
+end'''
+if listeners not in content:
+    raise SystemExit("listener DNS port 53 tidak ditemukan; migrasi TPROXY dibatalkan")
+tmp = path + '.tmp'
+with open(tmp, 'w') as target:
+    target.write(content.replace(listeners, hook, 1))
+os.replace(tmp, path)
+PYEOF
+            fi
+        fi
+    fi
+
+    local args=(--mode "$TRANSPARENT_MODE")
+    [ -n "$TRANSPARENT_INTERFACE" ] && args+=(--interface "$TRANSPARENT_INTERFACE")
+    [ -n "$TRANSPARENT_SUBNET" ] && args+=(--subnet "$TRANSPARENT_SUBNET")
+    [ "$TRANSPARENT_APPLY" = true ] && args+=(--apply)
+    "$tproxy_helper" "${args[@]}"
+    if [ -d "$CONF_DIR" ]; then
+        save_config
+    fi
+}
+
+install_panel_password() {
+    if [ ! -f "$PANEL_PASSWORD_FILE" ] || [ "$PASSWORD_EXPLICIT" = true ]; then
+        local password_tmp
+        password_tmp=$(mktemp "${DB_DIR}/.panel.password.XXXXXX")
+        trap 'rm -f "$password_tmp"' RETURN
+        printf '%s\n' "$WEBSERVER_PASSWORD" > "$password_tmp"
+        install -m 0600 -o "$DNSDIST_USER" -g "$DNSDIST_USER" "$password_tmp" "$PANEL_PASSWORD_FILE"
+        rm -f "$password_tmp"
+        trap - RETURN
     fi
 }
 
@@ -799,6 +903,7 @@ do_install_panel() {
         mkdir -p /var/lib/dnsdist
         detect_dnsdist_user
         chown -R "${DNSDIST_USER}:${DNSDIST_USER}" /var/lib/dnsdist 2>/dev/null || true
+        install_panel_password
 
         # Pastikan hook safesearch.conf dan dotdoh.conf ada di dnsdist.conf jika node sudah terpasang
         if [ -f "$DNSDIST_CONF" ]; then
@@ -1114,6 +1219,8 @@ URL_EXPLICIT=false
 PASSWORD_EXPLICIT=false
 APIKEY_EXPLICIT=false
 SET_WEBSERVER=false
+TRANSPARENT_APPLY=false
+TRANSPARENT_EXPLICIT=false
 
 MASTER_URL_EXPLICIT=false
 ENROLL_TOKEN_EXPLICIT=false
@@ -1215,6 +1322,24 @@ while [ "$#" -gt 0 ]; do
             ;;
         --no-panel)
             WITH_PANEL=false
+            ;;
+        --transparent-dns)
+            case "${2:-}" in
+                off|auto|tproxy) TRANSPARENT_MODE="$2"; shift ;;
+                *) echo -e "${RED}[!] --transparent-dns membutuhkan off, auto, atau tproxy.${NC}"; exit 1 ;;
+            esac
+            TRANSPARENT_EXPLICIT=true
+            ;;
+        --transparent-interface)
+            [ -n "${2:-}" ] || { echo -e "${RED}[!] --transparent-interface membutuhkan nama interface.${NC}"; exit 1; }
+            TRANSPARENT_INTERFACE="$2"; shift
+            ;;
+        --transparent-subnet)
+            [ -n "${2:-}" ] || { echo -e "${RED}[!] --transparent-subnet membutuhkan CIDR IPv4.${NC}"; exit 1; }
+            TRANSPARENT_SUBNET="$2"; shift
+            ;;
+        --apply-transparent)
+            TRANSPARENT_APPLY=true
             ;;
         --set-cdb-sources)
             if [ -z "$2" ] || [[ "$2" == -* ]]; then
@@ -1345,6 +1470,13 @@ fi
 
 if [ "$SET_WEBSERVER" = true ]; then
     do_set_webserver
+fi
+
+if [ "$TRANSPARENT_EXPLICIT" = true ]; then
+    if [ "$TRANSPARENT_APPLY" = true ] || [ "$TRANSPARENT_MODE" = off ]; then
+        check_root
+    fi
+    do_configure_transparent_dns
 fi
 
 if [ "$WITH_PANEL" = true ]; then

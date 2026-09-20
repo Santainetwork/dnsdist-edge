@@ -2,7 +2,7 @@
 
 **High-Performance DNS Filtering & Blocking Resolver** untuk deployment production-ready tanpa Docker.
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Debian%20%7C%20Ubuntu-lightgrey.svg)]()
 
@@ -57,6 +57,7 @@ sudo ./setup-master.sh --install --no-dnsdist --with-panel
 | [**PANEL-PLAN.md**](docs/PANEL-PLAN.md) | Rencana management panel web (mode central download + local CDB gen) |
 | [**CLUSTER-PLAN.md**](docs/CLUSTER-PLAN.md) | Rencana CDB redundancy & cluster (failover antar node, peer-to-peer) |
 | [**QUICK_REFERENCE.md**](docs/QUICK_REFERENCE.md) | Command cheatsheet & troubleshooting tips |
+| [**TRANSPARENT-DNS.md**](docs/TRANSPARENT-DNS.md) | Mode E2: MikroTik diagnostics dan IPv4 UDP/TCP TPROXY opt-in |
 | [**EDGE-README.md**](EDGE-README.md) | Architecture overview & konsep pemisahan beban Central vs Edge |
 | [**TOPSTATS-README.md**](TOPSTATS-README.md) | Dokumentasi Top Stats module untuk monitoring |
 
@@ -154,6 +155,7 @@ dnsdist-edge/
 ├── addons/                      # ⭐ OPSIONAL — modul tambahan
 │   ├── top-stats.lua           # Statistics tracking module
 │   ├── build-asn-db.sh         # ASN compiler
+│   ├── dnsdist-tproxy.sh       # Helper E2 nftables/policy routing (opsional)
 │   └── asn-toolkit/            # ASN database data (ipinfo, dnsdist.conf)
 ├── certs/                       # SSL/TLS certificates
 ├── monitoring/                  # Grafana & Prometheus configs
@@ -161,6 +163,8 @@ dnsdist-edge/
 │   └── prometheus/
 ├── tools/                       # Utility scripts
 │   ├── trust-builder/           # CDB generator Go (multi-part + ETag cache)
+│   ├── dnsdist-tproxy/          # Source proxy DNS Linux TPROXY
+│   ├── dnsdist-tproxy-bin       # Binary deployment TPROXY
 │   ├── gen-cdb.py              # CDB generator (wire-format, list kecil)
 │   └── dnsdist-health.sh       # Health check node
 ├── docs/                        # Documentation
@@ -281,4 +285,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Built with ❤️ for Trust-NG Project**
 
-*Last Updated: September 2026 | Version: v2.7.0*
+*Last Updated: September 2026 | Version: v2.8.0*

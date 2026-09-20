@@ -7,7 +7,7 @@
 
 set -e
 
-SCRIPT_VERSION="2.7.0"
+SCRIPT_VERSION="2.8.0"
 MASTER_DIR=$(pwd)
 CONF_DIR="/etc/dnsdist-master"
 SERVE_DIR="/var/www/html/files"

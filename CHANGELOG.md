@@ -5,6 +5,20 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [2.8.0] — 2026-09-21
+
+### Transparent DNS E2
+- Menambahkan proxy TPROXY IPv4 UDP/TCP port 53 dengan PROXY protocol v2 ke listener dnsdist terisolasi.
+- Menambahkan mode `off`, diagnostik read-only `auto`, dan `tproxy` opt-in dengan `--apply-transparent`.
+- Rule nftables, policy route, systemd unit, dan rollback hanya mengelola objek milik Trust-NG.
+- Menambahkan panduan verifikasi force-DNS MikroTik tanpa mengklaim dapat membaca konfigurasi router dari Edge.
+
+### Panel
+- Installer kini menulis password panel ke `/var/lib/dnsdist/panel.password` dan mempertahankan password existing kecuali `--password` diberikan eksplisit.
+
+### Validation
+- Unit test Proxy v2/OOB, mocked installer/helper, build Go, dan acceptance TPROXY UDP/TCP dalam network namespace lulus.
+
 ## [2.7.0] — 2026-09-20
 
 ### 🛠️ Edge Settings UI

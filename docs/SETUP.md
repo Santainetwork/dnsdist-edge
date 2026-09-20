@@ -154,10 +154,13 @@ https://YOUR_SERVER_IP:8443
 
 > ⚠️ Self-signed cert — browser akan warning, klik "Accept" / "Proceed".
 
-Password default: sama dengan password web console dnsdist (`trust-ng-admin`).
-Ganti di halaman **Settings** atau:
+Password default: sama dengan `--password` saat install. Jika tidak diberikan pada instalasi baru, default-nya `trust-ng-admin`. File autentikasi: `/var/lib/dnsdist/panel.password`.
+
+Reset dari shell:
 ```bash
-echo "passwordbaru" > /var/lib/dnsdist/panel.password
+printf '%s\n' 'passwordbaru' | sudo tee /var/lib/dnsdist/panel.password >/dev/null
+sudo chmod 600 /var/lib/dnsdist/panel.password
+sudo systemctl restart dnsdist-panel
 ```
 
 ### Fitur Panel
@@ -311,5 +314,5 @@ systemctl restart dnsdist-panel  # auto-generate baru
 
 ---
 
-**Version:** v2.7.0
+**Version:** v2.8.0
 **Last Updated:** September 2026
