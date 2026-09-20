@@ -128,7 +128,7 @@ func TestEndToEndClusterWorkflow(t *testing.T) {
 	regBody := map[string]string{
 		"enroll_token": enrollToken,
 		"name":         "edge-integration-01",
-		"version":      "2.6.0",
+		"version":      "2.7.0",
 	}
 	bReg, _ := json.Marshal(regBody)
 	respReg, err := client.Post(masterURL+"/api/cluster/register", "application/json", bytes.NewReader(bReg))
@@ -162,7 +162,7 @@ func TestEndToEndClusterWorkflow(t *testing.T) {
 		"node_id":         regData.NodeID,
 		"node_key":        regData.NodeKey,
 		"name":            "edge-integration-01",
-		"version":         "2.6.0",
+		"version":         "2.7.0",
 		"qps":             125,
 		"queries_total":   50000,
 		"blocked_total":   1420,

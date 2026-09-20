@@ -664,7 +664,7 @@ func (a *EdgeClusterAgent) Register(targetURL, token, name string) error {
 	reqBody := RegisterRequest{
 		EnrollToken: token,
 		Name:        name,
-		Version:     "2.6.0",
+		Version:     "2.7.0",
 	}
 	b, err := json.Marshal(reqBody)
 	if err != nil {
@@ -744,7 +744,7 @@ func (a *EdgeClusterAgent) sendHeartbeat() error {
 		NodeID:         nodeID,
 		NodeKey:        nodeKey,
 		Name:           nodeName,
-		Version:        "2.6.0",
+		Version:        "2.7.0",
 		QPS:            stats.qps.Load(),
 		QueriesTotal:   qTotal,
 		BlockedTotal:   stats.blockedTotal.Load(),

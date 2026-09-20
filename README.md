@@ -2,7 +2,7 @@
 
 **High-Performance DNS Filtering & Blocking Resolver** untuk deployment production-ready tanpa Docker.
 
-[![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Debian%20%7C%20Ubuntu-lightgrey.svg)]()
 
@@ -281,4 +281,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Built with ❤️ for Trust-NG Project**
 
-*Last Updated: September 2026 | Version: v2.6.0*
+*Last Updated: September 2026 | Version: v2.7.0*

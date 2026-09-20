@@ -5,6 +5,19 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [2.7.0] — 2026-09-20
+
+### 🛠️ Edge Settings UI
+- Memulihkan struktur card halaman Pengaturan Edge setelah penambahan koneksi Central Master.
+- Memisahkan card enrollment, mode pemblokiran, sandi panel, dan informasi sistem agar layout kembali rapi.
+- Menambahkan regression test untuk memastikan kontrol Settings tetap berada di card yang benar.
+
+### ✅ Validation
+- Panel HTTP, login, API terproteksi, dan urutan card Settings lulus acceptance.
+- Test Go, build panel, validasi shell, dan package check lulus.
+
+---
+
 ## [2.6.0] — 2026-09-19
 
 ### 🌟 Web Node Enrollment & Storage Cleanup

@@ -202,6 +202,7 @@ sudo ./setup-edge.sh --uninstall
 
 | Versi | Perubahan Utama |
 |---|---|
+| v2.7.0 | Perbaikan layout kartu Pengaturan Edge dan regression test markup |
 | v2.6.0 | Web enrollment node, cleanup DB hash lama, browser-validated cluster flow |
 | v2.5.0 | Central Master installer, Dual HTTP/HTTPS panel, Redesigned UI |
 | v2.4.2 | Aria2c fast download, standalone --add-panel, update-blacklist dash fix |
