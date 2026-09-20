@@ -594,11 +594,11 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
       <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       <span>DoT / DoH</span>
     </a>
-    <a href="#" id="nav-master" onclick="nav('master',this)">
+    <a href="#" id="nav-master" style="display:none" onclick="nav('master',this)">
       <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       <span>Central Master</span>
     </a>
-    <a href="#" id="nav-cluster" onclick="nav('cluster',this)">
+    <a href="#" id="nav-cluster" style="display:none" onclick="nav('cluster',this)">
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span>Cluster Nodes</span>
     </a>
@@ -1016,7 +1016,7 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
           <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
           <span>Segarkan</span>
         </button>
-        <button class="btn btn-primary" onclick="openAddNodeModal()">
+        <button class="btn btn-primary" id="add-node-button" style="display:none" onclick="openAddNodeModal()">
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
           <span>Tambah Node</span>
         </button>
@@ -1404,7 +1404,13 @@ async function api(path, method = 'GET', body = null) {
     doLogout();
     throw new Error('Sesi berakhir');
   }
-  const d = await r.json();
+  const text = await r.text();
+  let d;
+  try {
+    d = JSON.parse(text);
+  } catch (_) {
+    throw new Error(`HTTP ${r.status}: Respons server bukan JSON`);
+  }
   if (!r.ok) throw new Error(d.error || r.statusText);
   return d;
 }
@@ -1514,7 +1520,9 @@ async function fetchConfig() {
     // Sesuaikan navigasi sidebar berdasarkan mode node
     const navMaster = document.getElementById('nav-master');
     const navCluster = document.getElementById('nav-cluster');
+    const addNodeButton = document.getElementById('add-node-button');
     const edgeCard = document.getElementById('edge-cluster-card');
+    addNodeButton.style.display = cfg.is_master ? '' : 'none';
 
     if (cfg.is_master) {
       if (navMaster) navMaster.style.display = 'flex';
@@ -1957,6 +1965,7 @@ async function saveMasterSources() {
 
 // ── Startup ──
 function onLogin() {
+  fetchConfig();
   fetchStats();
   initChart();
   if (statsInterval) clearInterval(statsInterval);

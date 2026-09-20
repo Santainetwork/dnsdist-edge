@@ -37,6 +37,34 @@ func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 	}
 }
 
+func TestWebAPIReportsNonJSONErrorResponse(t *testing.T) {
+	html := string(indexHTML)
+	for _, marker := range []string{
+		"const text = await r.text()",
+		"JSON.parse(text)",
+		"Respons server bukan JSON",
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("API wrapper missing non-JSON response handling marker %q", marker)
+		}
+	}
+}
+
+func TestClusterControlsAreHiddenUntilMasterModeConfirmed(t *testing.T) {
+	html := string(indexHTML)
+	for _, marker := range []string{
+		`id="nav-master" style="display:none"`,
+		`id="nav-cluster" style="display:none"`,
+		`id="add-node-button" style="display:none"`,
+		"addNodeButton.style.display = cfg.is_master ? '' : 'none'",
+		"function onLogin() {\n  fetchConfig();",
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("master-only UI missing guarded marker %q", marker)
+		}
+	}
+}
+
 func TestValidateMasterURL(t *testing.T) {
 	for _, raw := range []string{"ftp://master.example", "http://user:pass@master.example", "not-a-url"} {
 		if _, err := validateMasterURL(raw); err == nil {
