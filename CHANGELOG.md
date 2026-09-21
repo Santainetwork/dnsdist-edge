@@ -7,9 +7,17 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ## [2.9.0] — 2026-09-21
 
+### Web Whitelist Master
+- Menambahkan editor whitelist terautentikasi di panel Central Master dengan pencarian, jumlah entri, preview perubahan, serta alur Simpan dan Simpan & Build CDB.
+- Menambahkan normalisasi domain/IP exact-match, pelaporan baris invalid, deduplikasi, batas payload 1 MiB, backup `whitelist.txt.bak`, dan atomic write.
+- Menambahkan acceptance test yang memastikan whitelist dikecualikan dari CDB serta route Master tetap 404 pada Edge.
+
 ### Installer
 - `setup-edge.sh --upgrade` dan `setup-master.sh --upgrade` mengunduh installer terbaru dari GitHub ke file sementara, memvalidasi sintaks serta checksum SHA-256 jika sidecar tersedia, lalu mengganti installer secara atomik dan melanjutkan proses upgrade lewat `exec`.
 - Kegagalan unduhan, sintaks, atau checksum tidak mengubah installer, konfigurasi, maupun data yang aktif.
+
+### Dokumentasi
+- Memperbarui panduan Master, referensi upgrade, README, dan roadmap Central Policy Hub.
 
 ## [2.8.0] — 2026-09-21
 
