@@ -5,6 +5,12 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [2.9.0] — 2026-09-21
+
+### Installer
+- `setup-edge.sh --upgrade` dan `setup-master.sh --upgrade` mengunduh installer terbaru dari GitHub ke file sementara, memvalidasi sintaks serta checksum SHA-256 jika sidecar tersedia, lalu mengganti installer secara atomik dan melanjutkan proses upgrade lewat `exec`.
+- Kegagalan unduhan, sintaks, atau checksum tidak mengubah installer, konfigurasi, maupun data yang aktif.
+
 ## [2.8.0] — 2026-09-21
 
 ### Transparent DNS E2
