@@ -53,6 +53,25 @@ Semua konfigurasi sumber berada di `/etc/dnsdist-master/`:
 | `/etc/dnsdist-master/whitelist.txt` | Daftar domain yang dikecualikan (tidak akan diblokir) |
 | `/etc/dnsdist-master/custom-blacklist.txt` | Daftar domain lokal tambahan yang ingin diblokir |
 
+### API Whitelist Master
+
+Panel Master menyediakan endpoint terautentikasi berikut:
+
+- `GET /api/master/whitelist`: membaca isi `whitelist.txt` dan jumlah entri.
+- `POST /api/master/whitelist`: menyimpan objek JSON `{"whitelist":"example.com\n192.0.2.1\n"}` setelah validasi dan normalisasi.
+
+Format whitelist:
+
+- Satu domain atau alamat IP polos per baris, dengan pencocokan exact-match.
+- Baris yang diawali `#` dipertahankan sebagai komentar; baris kosong diabaikan.
+- Subdomain tidak tercakup otomatis. Tulis setiap subdomain sebagai entri terpisah.
+- Jangan masukkan credential, URL, format hosts/AdGuard, atau wildcard.
+- Ukuran body `POST` maksimum 1 MiB. Input invalid ditolak tanpa mengubah file aktif.
+
+Sebelum penyimpanan berhasil, file lama disalin secara atomik ke
+`/etc/dnsdist-master/whitelist.txt.bak`. Hasil normalisasi kemudian ditulis secara
+atomik ke `whitelist.txt`.
+
 ### Contoh Isi `sources.txt`:
 ```text
 # Trust Positif Kominfo (Mirror)

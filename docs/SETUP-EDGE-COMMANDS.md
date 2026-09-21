@@ -197,11 +197,31 @@ Urutan failover: central → mirror → peer. DB lama dipertahankan jika semua g
 
 ### 8. Upgrade
 
+#### Edge Node
+
 ```bash
 sudo ./setup-edge.sh --upgrade
 ```
 
-Otomatis: update `update-blacklist.sh` + `dnsdist.conf` + migrasi path + restart.
+Installer mengunduh `setup-edge.sh` terbaru lebih dahulu, menjalankan `bash -n`,
+lalu mencoba membaca `SHA256SUMS` dari direktori release yang sama. Jika checksum
+tersedia, entri harus cocok dengan nama file installer, berformat SHA-256 valid,
+dan sama dengan hash hasil unduhan. Format atau hash yang tidak cocok membatalkan
+upgrade tanpa mengganti installer lama. Jika `SHA256SUMS` belum dipublikasikan,
+upgrade tetap memakai hasil validasi `bash -n`. Installer diganti secara atomik,
+mempertahankan mode dan owner, lalu argumen `--upgrade` dijalankan kembali.
+
+Setelah self-update: update `update-blacklist.sh` + `dnsdist.conf` + migrasi path + restart.
+
+#### Central Master
+
+```bash
+sudo ./setup-master.sh --upgrade
+```
+
+Perintah Master memakai validasi checksum dan penggantian atomik yang sama. Saat
+ini `--upgrade` memperbarui installer Master saja; jalankan `--install` terpisah
+jika perlu menerapkan ulang konfigurasi layanan.
 
 ---
 
@@ -230,6 +250,7 @@ sudo ./setup-edge.sh --uninstall
 
 | Versi | Perubahan Utama |
 |---|---|
+| v2.9.0 | Web Whitelist Master dan self-update installer dengan verifikasi SHA-256 |
 | v2.8.0 | Transparent DNS E2 (`off|auto|tproxy`), proxy IPv4 UDP/TCP, dan sinkronisasi password panel |
 | v2.7.0 | Perbaikan layout kartu Pengaturan Edge dan regression test markup |
 | v2.6.0 | Web enrollment node, cleanup DB hash lama, browser-validated cluster flow |

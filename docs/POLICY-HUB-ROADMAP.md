@@ -16,7 +16,7 @@ Pusat pengelolaan kebijakan DNS di Central Master. Pengembangan bertahap, setiap
 | Rilis | Scope | Status |
 |---|---|---|
 | `v2.8.0` | Baseline panel, builder, publisher, cluster | Selesai |
-| `v2.9.0` | Web Whitelist MVP | Berikutnya |
+| `v2.9.0` | Web Whitelist MVP | Selesai setelah v2.9.0 acceptance |
 | `v2.10.0` | Policy Management: whitelist, blacklist, sources | Rencana |
 | `v2.11.0` | Versioning dan Audit | Rencana |
 | `v2.12.0` | Policy per grup Edge dan distribusi | Rencana |
