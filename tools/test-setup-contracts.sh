@@ -28,8 +28,17 @@ require 'do_configure_transparent_dns'
 require 'SAVED_TRANSPARENT_MODE="${TRANSPARENT_MODE:-off}"'
 
 dispatch=$(sed -n '/if \[ "$TRANSPARENT_EXPLICIT" = true \]/,$p' "$installer")
-sync_line=$(grep -n 'if \[ "$SYNC_ONLY" = true \]' <<< "$dispatch" | head -1 | cut -d: -f1)
+[[ "$dispatch" == *$'    do_configure_transparent_dns\n    exit 0\nfi'* ]] || {
+    echo "standalone transparent DNS dispatch must exit before default panel install" >&2
+    exit 1
+}
+transparent_line=$(grep -n 'if \[ "$TRANSPARENT_EXPLICIT" = true \]' <<< "$dispatch" | head -1 | cut -d: -f1)
 panel_line=$(grep -n 'if \[ "$WITH_PANEL" = true \]' <<< "$dispatch" | head -1 | cut -d: -f1)
+[ -n "$transparent_line" ] && [ -n "$panel_line" ] && [ "$transparent_line" -lt "$panel_line" ] || {
+    echo "transparent dispatch must precede default panel dispatch" >&2
+    exit 1
+}
+sync_line=$(grep -n 'if \[ "$SYNC_ONLY" = true \]' <<< "$dispatch" | head -1 | cut -d: -f1)
 [ -n "$sync_line" ] && [ -n "$panel_line" ] && [ "$sync_line" -lt "$panel_line" ] || {
     echo "sync-only dispatch must run before default panel dispatch" >&2
     exit 1

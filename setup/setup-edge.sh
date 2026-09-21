@@ -1528,6 +1528,7 @@ if [ "$TRANSPARENT_EXPLICIT" = true ]; then
         check_root
     fi
     do_configure_transparent_dns
+    exit 0
 fi
 
 if [ "$SYNC_ONLY" = true ]; then
