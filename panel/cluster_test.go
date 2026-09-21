@@ -37,6 +37,20 @@ func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 	}
 }
 
+func TestMasterWhitelistUI(t *testing.T) {
+	html := string(indexHTML)
+	for _, marker := range []string{
+		`id="master-whitelist-search"`, `id="master-whitelist-input"`, `id="master-whitelist-count"`,
+		`id="master-whitelist-preview"`, "updateWhitelistPreview", "findWhitelistEntry",
+		"fetchMasterWhitelist", "saveMasterWhitelist", "Simpan & Build CDB",
+		"if (page === 'master') {\n    fetchMasterStatus();\n    fetchMasterSources();\n    fetchMasterWhitelist();",
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("master whitelist UI missing marker %q", marker)
+		}
+	}
+}
+
 func TestWebAPIReportsNonJSONErrorResponse(t *testing.T) {
 	html := string(indexHTML)
 	for _, marker := range []string{

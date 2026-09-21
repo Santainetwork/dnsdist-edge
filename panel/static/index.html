@@ -990,6 +990,28 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
       </button>
     </div>
 
+    <!-- Master Whitelist Editor -->
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
+          <h3>Master Whitelist</h3>
+          <p>Domain yang tidak boleh masuk blacklist CDB master</p>
+        </div>
+      </div>
+      <div class="form-group">
+        <input id="master-whitelist-search" type="search" placeholder="Cari domain lalu tekan Enter">
+        <textarea id="master-whitelist-input" placeholder="example.com" style="min-height:130px"></textarea>
+        <div class="hint">Satu domain/IP per baris. Baris <code>#</code> adalah komentar. Whitelist memakai exact match setelah normalisasi lowercase dan trailing dot.</div>
+        <div id="master-whitelist-count" class="hint">0 entri</div>
+        <pre id="master-whitelist-preview" style="margin:0;color:var(--text-muted);white-space:pre-wrap"></pre>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="saveMasterWhitelist(false)">Simpan</button>
+        <button class="btn btn-primary" onclick="saveMasterWhitelist(true)">Simpan & Build CDB</button>
+        <button class="btn btn-secondary" onclick="findWhitelistEntry()">Cari Berikutnya</button>
+      </div>
+    </div>
+
     <!-- Build Logs Card -->
     <div class="card-box">
       <div class="card-box-header">
@@ -1377,6 +1399,7 @@ function nav(page, el) {
   if (page === 'master') {
     fetchMasterStatus();
     fetchMasterSources();
+    fetchMasterWhitelist();
     if (!masterPoller) masterPoller = setInterval(fetchMasterStatus, 3000);
   } else {
     if (masterPoller) { clearInterval(masterPoller); masterPoller = null; }
@@ -1420,7 +1443,9 @@ function toast(msg, type = 'success') {
   const c = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = 'toast ' + type;
-  el.innerHTML = `<span>${msg}</span>`;
+  const text = document.createElement('span');
+  text.textContent = msg;
+  el.appendChild(text);
   c.appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0';
@@ -1960,6 +1985,79 @@ async function saveMasterSources() {
     toast('Daftar sumber blacklist berhasil disimpan!');
   } catch (e) {
     toast('Gagal menyimpan sumber: ' + e.message, 'error');
+  }
+}
+
+let masterWhitelistBaseline = new Set();
+
+function normalizeWhitelistEntry(value) {
+  return value.trim().toLowerCase().replace(/\.+$/, '');
+}
+
+function whitelistEntries(value) {
+  return new Set(value.split(/\r?\n/).map(normalizeWhitelistEntry).filter(entry => entry && !entry.startsWith('#')));
+}
+
+function updateWhitelistPreview() {
+  const current = whitelistEntries(document.getElementById('master-whitelist-input').value);
+  const added = [...current].filter(entry => !masterWhitelistBaseline.has(entry));
+  const removed = [...masterWhitelistBaseline].filter(entry => !current.has(entry));
+  document.getElementById('master-whitelist-count').textContent = `${current.size} entri ( +${added.length} / -${removed.length} )`;
+  const preview = document.getElementById('master-whitelist-preview');
+  preview.textContent = [...added.map(entry => '+ ' + entry), ...removed.map(entry => '- ' + entry)].join('\n') || 'Tidak ada perubahan.';
+}
+
+function findWhitelistEntry() {
+  const input = document.getElementById('master-whitelist-input');
+  const query = normalizeWhitelistEntry(document.getElementById('master-whitelist-search').value);
+  if (!query) return;
+  const text = input.value;
+  const start = input.selectionEnd || 0;
+  const match = text.toLowerCase().indexOf(query, start);
+  const wrapped = match < 0 ? text.toLowerCase().indexOf(query) : match;
+  if (wrapped < 0) { toast('Domain tidak ditemukan', 'error'); return; }
+  input.focus();
+  input.setSelectionRange(wrapped, wrapped + query.length);
+}
+
+document.getElementById('master-whitelist-input').addEventListener('input', updateWhitelistPreview);
+document.getElementById('master-whitelist-search').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); findWhitelistEntry(); }
+});
+
+async function fetchMasterWhitelist() {
+  try {
+    const d = await api('/api/master/whitelist');
+    const value = d.whitelist || '';
+    document.getElementById('master-whitelist-input').value = value;
+    masterWhitelistBaseline = whitelistEntries(value);
+    updateWhitelistPreview();
+    return d;
+  } catch (e) {
+    toast('Gagal memuat whitelist: ' + e.message, 'error');
+    return null;
+  }
+}
+
+async function saveMasterWhitelist(build) {
+  const input = document.getElementById('master-whitelist-input');
+  let saved;
+  try {
+    saved = await api('/api/master/whitelist', 'POST', { whitelist: input.value });
+  } catch (e) {
+    toast('Gagal menyimpan whitelist: ' + e.message, 'error');
+    return;
+  }
+  await fetchMasterWhitelist();
+  toast(`Whitelist tersimpan: ${saved.count} entri`);
+  if (build) {
+    try {
+      await api('/api/master/build', 'POST');
+      toast('Kompilasi CDB dimulai di background!');
+      fetchMasterStatus();
+    } catch (e) {
+      toast('Whitelist tersimpan, tetapi build gagal: ' + e.message, 'error');
+    }
   }
 }
 
