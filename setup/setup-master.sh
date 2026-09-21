@@ -179,11 +179,8 @@ do_install() {
     if [ ! -f "$CONF_DIR/sources.txt" ]; then
         cat > "$CONF_DIR/sources.txt" << 'SOURCESEOF'
 # Daftar URL sumber blacklist (satu per baris)
-# 1. Trust Positif Kominfo (Mirror)
-https://raw.githubusercontent.com/Santainetwork/trust-positif-mirror/main/domains.txt
-
-# 2. AdGuard DNS Filter (Opsional — hapus tanda pagar untuk mengaktifkan)
-# https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+# AdGuard DNS Filter
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
 SOURCESEOF
         echo -e "  ${GREEN}[✓] Template sumber blacklist dibuat di $CONF_DIR/sources.txt${NC}"
     fi

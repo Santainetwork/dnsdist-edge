@@ -3,6 +3,8 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 installer="$root/setup/setup-edge.sh"
+master_installer="$root/setup/setup-master.sh"
+master_builder="$root/setup/build-master-cdb.sh"
 
 require() {
     grep -Fq -- "$1" "$installer" || {
@@ -66,5 +68,16 @@ WEBSERVER_PASSWORD='explicit-secret'
 PASSWORD_EXPLICIT=true
 install_panel_password
 [ "$(cat "$PANEL_PASSWORD_FILE")" = 'explicit-secret' ]
+
+for file in "$master_installer" "$master_builder"; do
+    grep -Fq 'https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt' "$file" || {
+        echo "$file must ship a reachable default blacklist source" >&2
+        exit 1
+    }
+    if grep -Fq 'https://raw.githubusercontent.com/Santainetwork/trust-positif-mirror/main/domains.txt' "$file"; then
+        echo "$file must not ship the removed trust-positif-mirror source" >&2
+        exit 1
+    fi
+done
 
 echo "setup installer contracts PASS"

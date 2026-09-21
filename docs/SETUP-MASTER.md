@@ -74,10 +74,7 @@ atomik ke `whitelist.txt`.
 
 ### Contoh Isi `sources.txt`:
 ```text
-# Trust Positif Kominfo (Mirror)
-https://raw.githubusercontent.com/Santainetwork/trust-positif-mirror/main/domains.txt
-
-# AdGuard DNS Filter (opsional)
+# AdGuard DNS Filter
 https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
 ```
 

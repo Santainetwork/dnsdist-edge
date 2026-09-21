@@ -20,11 +20,8 @@ mkdir -p "$MASTER_CONF_DIR" "$SERVE_DIR"
 if [ ! -f "$SOURCES_FILE" ]; then
     cat > "$SOURCES_FILE" << 'EOF'
 # Daftar URL sumber blacklist (satu per baris)
-# 1. Trust Positif Kominfo (Mirror raw domain list):
-https://raw.githubusercontent.com/Santainetwork/trust-positif-mirror/main/domains.txt
-
-# 2. AdGuard DNS Filter (opsional)
-# https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+# AdGuard DNS Filter
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
 EOF
 fi
 
