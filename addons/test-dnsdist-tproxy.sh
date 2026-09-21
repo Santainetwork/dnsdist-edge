@@ -50,7 +50,7 @@ mkdir -p "$ROOT/etc/dnsdist" "$ROOT/etc/sysctl.d" "$ROOT/etc/systemd/system" \
   "$ROOT/proc/net/ipv4/conf/eth0" "$MOCK"
 printf '#!/bin/sh\nprintf 0\n' > "$MOCK/id"
 printf '#!/bin/sh\nprintf "nft %%s\\n" "$*" >> "$MOCK_LOG"\n[ "$1 $2" = "list table" ] && exit 1\n[ "$1 $2" = "-c -f" ] && cat "$3" >> "$MOCK_LOG"\nexit 0\n' > "$MOCK/nft"
-printf '#!/bin/sh\nprintf "ip %%s\\n" "$*" >> "$MOCK_LOG"\n[ "$1 $2" = "rule show" ] && exit 0\n[ "$1 $2 $3 $4" = "route show table 130" ] && exit 0\nexit 0\n' > "$MOCK/ip"
+printf '#!/bin/sh\nprintf "ip %%s\\n" "$*" >> "$MOCK_LOG"\n[ "$1 $2" = "rule show" ] && { printf "13001: from all fwmark 0x1 lookup 130\\n"; exit 0; }\n[ "$1 $2 $3 $4" = "route show table 130" ] && { printf "local default dev lo scope host\\n"; exit 0; }\nexit 0\n' > "$MOCK/ip"
 printf '#!/bin/sh\nprintf "systemctl %%s\\n" "$*" >> "$MOCK_LOG"\n' > "$MOCK/systemctl"
 printf '#!/bin/sh\nprintf "dnsdist %%s\\n" "$*" >> "$MOCK_LOG"\n' > "$MOCK/dnsdist"
 chmod +x "$MOCK"/*
@@ -70,11 +70,29 @@ PROC_SYS_ROOT="$ROOT/proc" \
   "$SCRIPT" --mode tproxy --interface eth0 --subnet 192.168.10.7/24 --apply >/dev/null
 
 grep -Fq "ip saddr 192.168.10.0/24" "$LOG" || fail "CIDR is canonicalized in nft rules"
+grep -Fq "udp dport 53 counter tproxy" "$LOG" || fail "UDP interception exposes nft counters"
+grep -Fq "tcp dport 53 counter tproxy" "$LOG" || fail "TCP interception exposes nft counters"
 grep -Fq "nft -c -f" "$LOG" || fail "nft rules are checked before apply"
 grep -Fq -- "--source 127.0.0.2" "$ROOT/etc/systemd/system/tproxy.service" || fail "proxy source is isolated"
 grep -Fq "setProxyProtocolACL({'127.0.0.2/32'})" "$ROOT/etc/dnsdist/tproxy.conf" || fail "dnsdist PROXY ACL is isolated"
 grep -Fq 'net.ipv4.conf.eth0.rp_filter = 0' "$ROOT/etc/sysctl.d/tproxy.conf" || fail "interface sysctl drop-in rendered"
 pass "mocked apply renders owned state without host mutation"
+
+output=$(PATH="$MOCK:$PATH" MOCK_LOG="$LOG" DNSDIST_INCLUDE="$ROOT/etc/dnsdist/tproxy.conf" \
+  SYSCTL_FILE="$ROOT/etc/sysctl.d/tproxy.conf" UNIT_FILE="$ROOT/etc/systemd/system/tproxy.service" \
+  "$SCRIPT" status)
+printf '%s\n' "$output" | grep -Fq 'local route: present' || fail "modern iproute2 default route is detected"
+pass "status detects the local policy route"
+
+PATH="$MOCK:$PATH" MOCK_LOG="$LOG" \
+DNSDIST_TPROXY_BIN="$ROOT/dnsdist-tproxy" \
+DNSDIST_CONF="$ROOT/etc/dnsdist/dnsdist.conf" \
+DNSDIST_INCLUDE="$ROOT/etc/dnsdist/tproxy.conf" \
+SYSCTL_FILE="$ROOT/etc/sysctl.d/tproxy.conf" \
+UNIT_FILE="$ROOT/etc/systemd/system/tproxy.service" \
+PROC_SYS_ROOT="$ROOT/proc" \
+  "$SCRIPT" --mode tproxy --interface eth0 --subnet 192.168.10.0/24 --apply >/dev/null
+pass "managed Lua include is accepted on reapply"
 
 sed -i '/dofile/d' "$ROOT/etc/dnsdist/dnsdist.conf"
 if PATH="$MOCK:$PATH" MOCK_LOG="$LOG" DNSDIST_TPROXY_BIN="$ROOT/dnsdist-tproxy" \

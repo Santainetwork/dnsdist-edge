@@ -104,13 +104,13 @@ parse_args() {
 }
 
 owned_file() {
-    [ ! -e "$1" ] || grep -Fq '# Managed by dnsdist-tproxy.sh' "$1" || \
+    [ ! -e "$1" ] || grep -Eq '^(#|--) Managed by dnsdist-tproxy\.sh$' "$1" || \
         err "refusing to replace non-owned file: $1"
 }
 
 owned_nft_table() {
     nft list table inet "$NFT_TABLE" 2>/dev/null | \
-        grep -Fq 'comment "Managed by dnsdist-tproxy.sh"'
+        grep -F 'comment "Managed by dnsdist-tproxy.sh"' >/dev/null
 }
 
 show_status() {
@@ -126,7 +126,7 @@ show_status() {
         else
             log "ip rule: absent (pref $NFT_RULE_PREF, mark $NFT_MARK, table $NFT_TABLE_ID)"
         fi
-        if ip route show table "$NFT_TABLE_ID" | grep -Fq 'local 0.0.0.0/0 dev lo'; then
+        if ip route show table "$NFT_TABLE_ID" | grep -Eq '^local (default|0\.0\.0\.0/0) dev lo([[:space:]]|$)'; then
             log "local route: present (table $NFT_TABLE_ID)"
         else
             log "local route: absent (table $NFT_TABLE_ID)"
@@ -166,8 +166,8 @@ write_nft_file() {
    chain prerouting {
      type filter hook prerouting priority mangle; policy accept;
      fib daddr type local return
-     iifname "$INTERFACE" ip saddr $SUBNET meta mark != $NFT_MARK ip protocol udp udp dport 53 tproxy ip to 127.0.0.1:53 meta mark set $NFT_MARK accept
-     iifname "$INTERFACE" ip saddr $SUBNET meta mark != $NFT_MARK ip protocol tcp tcp dport 53 tproxy ip to 127.0.0.1:53 meta mark set $NFT_MARK accept
+     iifname "$INTERFACE" ip saddr $SUBNET meta mark != $NFT_MARK ip protocol udp udp dport 53 counter tproxy ip to 127.0.0.1:53 meta mark set $NFT_MARK accept
+     iifname "$INTERFACE" ip saddr $SUBNET meta mark != $NFT_MARK ip protocol tcp tcp dport 53 counter tproxy ip to 127.0.0.1:53 meta mark set $NFT_MARK accept
    }
  }
 EOF
@@ -305,7 +305,8 @@ apply_on() {
 remove_owned_file() {
     local file=$1
     [ ! -e "$file" ] && return 0
-    grep -Fq '# Managed by dnsdist-tproxy.sh' "$file" || err "refusing to remove non-owned file: $file"
+    grep -Eq '^(#|--) Managed by dnsdist-tproxy\.sh$' "$file" || \
+        err "refusing to remove non-owned file: $file"
     rm -f "$file"
 }
 
