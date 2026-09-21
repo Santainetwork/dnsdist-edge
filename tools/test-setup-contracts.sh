@@ -27,6 +27,14 @@ require '"$tproxy_helper" "${args[@]}"'
 require 'do_configure_transparent_dns'
 require 'SAVED_TRANSPARENT_MODE="${TRANSPARENT_MODE:-off}"'
 
+dispatch=$(sed -n '/if \[ "$TRANSPARENT_EXPLICIT" = true \]/,$p' "$installer")
+sync_line=$(grep -n 'if \[ "$SYNC_ONLY" = true \]' <<< "$dispatch" | head -1 | cut -d: -f1)
+panel_line=$(grep -n 'if \[ "$WITH_PANEL" = true \]' <<< "$dispatch" | head -1 | cut -d: -f1)
+[ -n "$sync_line" ] && [ -n "$panel_line" ] && [ "$sync_line" -lt "$panel_line" ] || {
+    echo "sync-only dispatch must run before default panel dispatch" >&2
+    exit 1
+}
+
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 functions="$scratch/functions.sh"

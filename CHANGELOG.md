@@ -18,6 +18,7 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ### Validation
 - Unit test Proxy v2/OOB, mocked installer/helper, build Go, dan acceptance TPROXY UDP/TCP dalam network namespace lulus.
+- Memperbaiki dispatch `-f` / `--force-update` agar langsung sinkronisasi database, bukan memasang ulang panel.
 
 ## [2.7.0] — 2026-09-20
 

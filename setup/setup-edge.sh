@@ -1479,12 +1479,12 @@ if [ "$TRANSPARENT_EXPLICIT" = true ]; then
     do_configure_transparent_dns
 fi
 
-if [ "$WITH_PANEL" = true ]; then
-    do_install_panel
+if [ "$SYNC_ONLY" = true ]; then
+    do_sync
     exit 0
 fi
 
-if [ "$SYNC_ONLY" = true ]; then
-    do_sync
+if [ "$WITH_PANEL" = true ]; then
+    do_install_panel
     exit 0
 fi
