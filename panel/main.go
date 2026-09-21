@@ -1054,7 +1054,7 @@ func handleMasterWhitelist(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		var body *struct {
-			Whitelist string `json:"whitelist"`
+			Whitelist *string `json:"whitelist"`
 		}
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
@@ -1076,7 +1076,11 @@ func handleMasterWhitelist(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, http.StatusBadRequest, "request must contain one JSON object")
 			return
 		}
-		normalized, invalid, count, duplicates := normalizeWhitelist(body.Whitelist)
+		if body == nil || body.Whitelist == nil {
+			jsonErr(w, http.StatusBadRequest, "whitelist field is required")
+			return
+		}
+		normalized, invalid, count, duplicates := normalizeWhitelist(*body.Whitelist)
 		if len(invalid) > 0 {
 			jsonErr(w, http.StatusBadRequest, fmt.Sprintf("invalid whitelist lines: %v", invalid))
 			return

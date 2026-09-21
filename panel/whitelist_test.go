@@ -196,6 +196,26 @@ func TestHandleMasterWhitelistRejectsMalformedOversizedAndWrongMethod(t *testing
 	}
 }
 
+func TestHandleMasterWhitelistRequiresFieldButAllowsEmpty(t *testing.T) {
+	t.Run("missing field", func(t *testing.T) {
+		w, _ := whitelistRequest(t, http.MethodPost, `{}`)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", w.Code)
+		}
+	})
+
+	t.Run("explicit empty string", func(t *testing.T) {
+		w, path := whitelistRequest(t, http.MethodPost, `{"whitelist":""}`)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200: %s", w.Code, w.Body)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil || len(data) != 0 {
+			t.Fatalf("file = %q, err = %v; want empty", data, err)
+		}
+	})
+}
+
 func TestRegisterMasterRoutes(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		mux := http.NewServeMux()
