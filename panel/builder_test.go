@@ -14,7 +14,7 @@ import (
 )
 
 func TestBuildMasterCDBAppliesWhitelist(t *testing.T) {
-	body := []byte("||blocked.example^\n||allowed.example^\n")
+	body := []byte("||blocked.example^\n||allowed.example^\n2001:0db8::1\n2001:0db8::2\n")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 		if r.Method != http.MethodHead {
@@ -29,7 +29,7 @@ func TestBuildMasterCDBAppliesWhitelist(t *testing.T) {
 	if err := os.WriteFile(sources, []byte(server.URL+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(whitelist, []byte("allowed.example\n"), 0o600); err != nil {
+	if err := os.WriteFile(whitelist, []byte("allowed.example\n2001:db8::1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	oldLocalDBDir := localDBDir
@@ -66,6 +66,17 @@ func TestBuildMasterCDBAppliesWhitelist(t *testing.T) {
 	allowed, err := reader.Get(key("allowed.example"))
 	if err != nil || allowed != nil {
 		t.Fatalf("whitelisted entry present: value=%v err=%v", allowed, err)
+	}
+	ipKey := func(ip string) []byte { return append([]byte(ip), 0) }
+	for _, ip := range []string{"2001:0db8::1", "2001:db8::1"} {
+		allowedIP, err := reader.Get(ipKey(ip))
+		if err != nil || allowedIP != nil {
+			t.Fatalf("whitelisted IPv6 entry %q present: value=%v err=%v", ip, allowedIP, err)
+		}
+	}
+	blockedIP, err := reader.Get(ipKey("2001:db8::2"))
+	if err != nil || blockedIP == nil {
+		t.Fatalf("blocked IPv6 entry missing: value=%v err=%v", blockedIP, err)
 	}
 }
 

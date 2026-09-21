@@ -399,6 +399,7 @@ func BuildMasterCDB(outputDir, sourcesFile, whitelistFile, customBLFile string, 
 
 			var wireKey []byte
 			if ip := net.ParseIP(line); ip != nil {
+				line = ip.String()
 				if _, ok := whitelist[line]; ok {
 					countWhitelisted++
 					continue
