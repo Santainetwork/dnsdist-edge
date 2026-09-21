@@ -1,6 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -75,5 +81,135 @@ func TestNormalizeWhitelist(t *testing.T) {
 				t.Fatalf("count/duplicates = %d/%d, want %d/%d", count, duplicates, tt.count, tt.duplicates)
 			}
 		})
+	}
+}
+
+func whitelistRequest(t *testing.T, method, body string) (*httptest.ResponseRecorder, string) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested", "whitelist.txt")
+	old := *flagWhitelistFile
+	*flagWhitelistFile = path
+	t.Cleanup(func() { *flagWhitelistFile = old })
+	r := httptest.NewRequest(method, "/api/master/whitelist", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	handleMasterWhitelist(w, r)
+	return w, path
+}
+
+func TestHandleMasterWhitelistCanonicalSaveAndBackup(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "whitelist.txt")
+	if err := os.WriteFile(path, []byte("old.example\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := *flagWhitelistFile
+	*flagWhitelistFile = path
+	t.Cleanup(func() { *flagWhitelistFile = old })
+	w := httptest.NewRecorder()
+	handleMasterWhitelist(w, httptest.NewRequest(http.MethodPost, "/api/master/whitelist", strings.NewReader(`{"whitelist":" Example.COM.\nexample.com\n192.0.2.1\n"}`)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != "example.com\n192.0.2.1\n" {
+		t.Fatalf("saved = %q, err = %v", data, err)
+	}
+	backup, err := os.ReadFile(path + ".bak")
+	if err != nil || string(backup) != "old.example\n" {
+		t.Fatalf("backup = %q, err = %v", backup, err)
+	}
+	var got struct {
+		OK      bool `json:"ok"`
+		Count   int  `json:"count"`
+		Removed int  `json:"removed_duplicates"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil || !got.OK || got.Count != 2 || got.Removed != 1 {
+		t.Fatalf("response = %s, err = %v", w.Body, err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %v, err = %v", info.Mode().Perm(), err)
+	}
+	backupInfo, err := os.Stat(path + ".bak")
+	if err != nil || backupInfo.Mode().Perm() != 0o600 {
+		t.Fatalf("backup mode = %v, err = %v", backupInfo.Mode().Perm(), err)
+	}
+}
+
+func TestHandleMasterWhitelistInvalidLeavesExistingUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "whitelist.txt")
+	if err := os.WriteFile(path, []byte("keep.example\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := *flagWhitelistFile
+	*flagWhitelistFile = path
+	t.Cleanup(func() { *flagWhitelistFile = old })
+	w := httptest.NewRecorder()
+	handleMasterWhitelist(w, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"whitelist":"bad value\n"}`)))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", w.Code)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != "keep.example\n" {
+		t.Fatalf("file changed: %q, %v", data, err)
+	}
+}
+
+func TestHandleMasterWhitelistGET(t *testing.T) {
+	w, path := whitelistRequest(t, http.MethodGet, "")
+	if w.Code != http.StatusOK || w.Body.String() != "{\"count\":0,\"whitelist\":\"\"}\n" {
+		t.Fatalf("missing GET = %d %q", w.Code, w.Body)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("one.example\ntwo.example\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	w = httptest.NewRecorder()
+	handleMasterWhitelist(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"count":2`) || !strings.Contains(w.Body.String(), `"whitelist":"one.example\ntwo.example\n"`) {
+		t.Fatalf("GET = %d %q", w.Code, w.Body)
+	}
+}
+
+func TestHandleMasterWhitelistRejectsMalformedOversizedAndWrongMethod(t *testing.T) {
+	for _, tc := range []struct {
+		name, method, body string
+		code               int
+	}{
+		{"invalid JSON", http.MethodPost, `{"whitelist":`, http.StatusBadRequest},
+		{"not an object", http.MethodPost, `null`, http.StatusBadRequest},
+		{"trailing", http.MethodPost, `{"whitelist":"a.example"}{}`, http.StatusBadRequest},
+		{"unknown", http.MethodPost, `{"whitelist":"a.example","extra":true}`, http.StatusBadRequest},
+		{"oversized", http.MethodPost, `{"whitelist":"` + strings.Repeat("a", 1<<20) + `"}`, http.StatusRequestEntityTooLarge},
+		{"method", http.MethodDelete, "", http.StatusMethodNotAllowed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := whitelistRequest(t, tc.method, tc.body)
+			if w.Code != tc.code {
+				t.Fatalf("status = %d, want %d", w.Code, tc.code)
+			}
+		})
+	}
+}
+
+func TestRegisterMasterRoutes(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		mux := http.NewServeMux()
+		registerMasterRoutes(mux, enabled)
+		for _, path := range []string{"/api/master/status", "/api/master/build", "/api/master/sources", "/api/master/whitelist"} {
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+			want := http.StatusNotFound
+			if enabled {
+				want = http.StatusUnauthorized
+			}
+			if w.Code != want {
+				t.Fatalf("enabled=%v %s status=%d, want %d", enabled, path, w.Code, want)
+			}
+		}
 	}
 }

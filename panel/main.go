@@ -1040,6 +1040,82 @@ func handleMasterSources(w http.ResponseWriter, r *http.Request) {
 	jsonErr(w, http.StatusMethodNotAllowed, "GET or POST only")
 }
 
+func handleMasterWhitelist(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		content, err := os.ReadFile(*flagWhitelistFile)
+		if err != nil && !os.IsNotExist(err) {
+			jsonErr(w, http.StatusInternalServerError, "cannot read whitelist: "+err.Error())
+			return
+		}
+		_, _, count, _ := normalizeWhitelist(string(content))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"whitelist": string(content), "count": count})
+	case http.MethodPost:
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		var body *struct {
+			Whitelist string `json:"whitelist"`
+		}
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&body); err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				jsonErr(w, http.StatusRequestEntityTooLarge, "whitelist exceeds 1 MiB")
+				return
+			}
+			jsonErr(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		if body == nil {
+			jsonErr(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		var extra any
+		if dec.Decode(&extra) != io.EOF {
+			jsonErr(w, http.StatusBadRequest, "request must contain one JSON object")
+			return
+		}
+		normalized, invalid, count, duplicates := normalizeWhitelist(body.Whitelist)
+		if len(invalid) > 0 {
+			jsonErr(w, http.StatusBadRequest, fmt.Sprintf("invalid whitelist lines: %v", invalid))
+			return
+		}
+		path := *flagWhitelistFile
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			jsonErr(w, http.StatusInternalServerError, "cannot create whitelist directory: "+err.Error())
+			return
+		}
+		if old, err := os.ReadFile(path); err == nil {
+			if err := atomicWrite(path+".bak", old, 0o600); err != nil {
+				jsonErr(w, http.StatusInternalServerError, "cannot backup whitelist: "+err.Error())
+				return
+			}
+		} else if !os.IsNotExist(err) {
+			jsonErr(w, http.StatusInternalServerError, "cannot read whitelist for backup: "+err.Error())
+			return
+		}
+		if err := atomicWriteString(path, normalized, 0o600); err != nil {
+			jsonErr(w, http.StatusInternalServerError, "cannot save whitelist: "+err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"ok": true, "count": count, "removed_duplicates": duplicates})
+	default:
+		jsonErr(w, http.StatusMethodNotAllowed, "GET or POST only")
+	}
+}
+
+func registerMasterRoutes(mux *http.ServeMux, enabled bool) {
+	if !enabled {
+		return
+	}
+	mux.HandleFunc("/api/master/status", auth(handleMasterStatus))
+	mux.HandleFunc("/api/master/build", auth(handleMasterBuild))
+	mux.HandleFunc("/api/master/sources", auth(handleMasterSources))
+	mux.HandleFunc("/api/master/whitelist", auth(handleMasterWhitelist))
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 func main() {
@@ -1097,9 +1173,7 @@ func main() {
 	mux.HandleFunc("/api/settings", auth(handleSettings))
 
 	// Master API Endpoints
-	mux.HandleFunc("/api/master/status", auth(handleMasterStatus))
-	mux.HandleFunc("/api/master/build", auth(handleMasterBuild))
-	mux.HandleFunc("/api/master/sources", auth(handleMasterSources))
+	registerMasterRoutes(mux, *flagMaster)
 
 	// Master Cluster Management
 	if *flagMaster {
