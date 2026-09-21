@@ -1,11 +1,73 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/colinmarc/cdb"
+	"github.com/miekg/dns"
 )
+
+func TestBuildMasterCDBAppliesWhitelist(t *testing.T) {
+	body := []byte("||blocked.example^\n||allowed.example^\n")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		if r.Method != http.MethodHead {
+			_, _ = w.Write(body)
+		}
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	sources := filepath.Join(dir, "sources.txt")
+	whitelist := filepath.Join(dir, "whitelist.txt")
+	if err := os.WriteFile(sources, []byte(server.URL+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(whitelist, []byte("allowed.example\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	oldLocalDBDir := localDBDir
+	localDBDir = filepath.Join(dir, "local-db")
+	defer func() { localDBDir = oldLocalDBDir }()
+	if err := os.MkdirAll(localDBDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := BuildMasterCDB(dir, sources, whitelist, "", 1, true); err != nil {
+		t.Fatal(err)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(dir, "trust.*.db"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("hashed CDB files = %v, err = %v", matches, err)
+	}
+	reader, err := cdb.Open(matches[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	key := func(domain string) []byte {
+		buf := make([]byte, 256)
+		n, err := dns.PackDomainName(domain+".", buf, 0, nil, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return buf[:n]
+	}
+	blocked, err := reader.Get(key("blocked.example"))
+	if err != nil || blocked == nil {
+		t.Fatalf("blocked entry missing: value=%v err=%v", blocked, err)
+	}
+	allowed, err := reader.Get(key("allowed.example"))
+	if err != nil || allowed != nil {
+		t.Fatalf("whitelisted entry present: value=%v err=%v", allowed, err)
+	}
+}
 
 func TestCleanupVersionedDBsKeepsActiveFileOnly(t *testing.T) {
 	dir := t.TempDir()

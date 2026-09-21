@@ -37,6 +37,8 @@ type MasterState struct {
 
 var masterState MasterState
 
+var localDBDir = "/var/lib/dnsdist"
+
 func cleanupVersionedDBs(dir, prefix, active string) (int, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -484,9 +486,9 @@ func BuildMasterCDB(outputDir, sourcesFile, whitelistFile, customBLFile string, 
 	_ = atomicWriteString(manifestPath, manifestData, 0644)
 
 	// Update local node if exists
-	if _, err := os.Stat("/var/lib/dnsdist"); err == nil {
-		_ = os.Symlink(finalHashed, "/var/lib/dnsdist/blacklist.db.tmp")
-		_ = os.Rename("/var/lib/dnsdist/blacklist.db.tmp", "/var/lib/dnsdist/blacklist.db")
+	if _, err := os.Stat(localDBDir); err == nil {
+		_ = os.Symlink(finalHashed, filepath.Join(localDBDir, "blacklist.db.tmp"))
+		_ = os.Rename(filepath.Join(localDBDir, "blacklist.db.tmp"), filepath.Join(localDBDir, "blacklist.db"))
 	}
 
 	duration := time.Since(start).Round(time.Millisecond)
