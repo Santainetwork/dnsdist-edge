@@ -50,6 +50,30 @@ assert_preserved_on_bad_update() {
     fi
 }
 
+assert_preserved_without_valid_checksum() {
+    local name=$1
+    local checksum_source=${2:-}
+    local target="$scratch/$name"
+    cp "$root/setup/$name" "$target"
+    cp "$target" "$target.before"
+    printf '#!/bin/bash\nexit 0\n' > "$scratch/download"
+
+    if PATH="$scratch/bin:$PATH" DOWNLOAD_SOURCE="$scratch/download" \
+        CHECKSUM_SOURCE="$checksum_source" \
+        SELF_UPDATE_URL="https://example.test/$name" bash "$target" --upgrade >/dev/null 2>&1; then
+        echo "$name accepted unavailable or invalid SHA256SUMS" >&2
+        exit 1
+    fi
+    cmp -s "$target.before" "$target" || {
+        echo "$name replaced itself without a valid SHA256SUMS entry" >&2
+        exit 1
+    }
+    if compgen -G "$scratch/.${name}.tmp.*" >/dev/null; then
+        echo "$name left a temporary file after checksum validation failed" >&2
+        exit 1
+    fi
+}
+
 assert_checksum_and_reexec() {
     local name=$1
     local target="$scratch/$name"
@@ -80,6 +104,11 @@ UPDATED
 
 for installer in setup-edge.sh setup-master.sh; do
     assert_preserved_on_bad_update "$installer"
+    assert_preserved_without_valid_checksum "$installer"
+    printf '%064d  other.sh\n' 0 > "$scratch/missing-entry.sha256"
+    assert_preserved_without_valid_checksum "$installer" "$scratch/missing-entry.sha256"
+    printf 'not-a-checksum  %s\n' "$installer" > "$scratch/malformed.sha256"
+    assert_preserved_without_valid_checksum "$installer" "$scratch/malformed.sha256"
     assert_checksum_and_reexec "$installer"
 done
 

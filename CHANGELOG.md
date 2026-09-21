@@ -13,7 +13,7 @@ Format: [versi] — tanggal, deskripsi singkat.
 - Menambahkan acceptance test yang memastikan whitelist dikecualikan dari CDB serta route Master tetap 404 pada Edge.
 
 ### Installer
-- `setup-edge.sh --upgrade` dan `setup-master.sh --upgrade` mengunduh installer terbaru dari GitHub ke file sementara, memvalidasi sintaks serta checksum SHA-256 jika sidecar tersedia, lalu mengganti installer secara atomik dan melanjutkan proses upgrade lewat `exec`.
+- `setup-edge.sh --upgrade` dan `setup-master.sh --upgrade` mengunduh installer terbaru dari GitHub ke file sementara, memvalidasi sintaks serta checksum SHA-256 dari `SHA256SUMS`, lalu mengganti installer secara atomik dan melanjutkan proses upgrade lewat `exec`.
 - Kegagalan unduhan, sintaks, atau checksum tidak mengubah installer, konfigurasi, maupun data yang aktif.
 
 ### Dokumentasi

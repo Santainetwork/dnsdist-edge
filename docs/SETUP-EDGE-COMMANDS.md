@@ -204,12 +204,12 @@ sudo ./setup-edge.sh --upgrade
 ```
 
 Installer mengunduh `setup-edge.sh` terbaru lebih dahulu, menjalankan `bash -n`,
-lalu mencoba membaca `SHA256SUMS` dari direktori release yang sama. Jika checksum
-tersedia, entri harus cocok dengan nama file installer, berformat SHA-256 valid,
-dan sama dengan hash hasil unduhan. Format atau hash yang tidak cocok membatalkan
-upgrade tanpa mengganti installer lama. Jika `SHA256SUMS` belum dipublikasikan,
-upgrade tetap memakai hasil validasi `bash -n`. Installer diganti secara atomik,
-mempertahankan mode dan owner, lalu argumen `--upgrade` dijalankan kembali.
+lalu wajib membaca `SHA256SUMS` dari direktori release yang sama. Entri harus cocok
+dengan nama file installer, berformat SHA-256 valid, dan sama dengan hash hasil
+unduhan. `SHA256SUMS` yang tidak tersedia, entri yang hilang, format tidak valid,
+atau hash yang tidak cocok membatalkan upgrade tanpa mengganti installer lama.
+Installer diganti secara atomik, mempertahankan mode dan owner, lalu argumen
+`--upgrade` dijalankan kembali.
 
 Setelah self-update: update `update-blacklist.sh` + `dnsdist.conf` + migrasi path + restart.
 

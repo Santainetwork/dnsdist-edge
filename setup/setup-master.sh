@@ -76,21 +76,21 @@ self_update() {
     curl -fsSL "$SELF_UPDATE_URL" -o "$tmp"
     bash -n "$tmp"
 
-    if curl -fsSL "$(dirname "$SELF_UPDATE_URL")/SHA256SUMS" -o "$checksum" 2>/dev/null; then
-        expected=$(awk -v file="$(basename "$SELF_UPDATE_URL")" '$2 == file { print $1; exit }' "$checksum")
-        printf '%s\n' "$expected" | grep -Eq '^[[:xdigit:]]{64}$' || {
-            echo -e "${RED}[!] Format checksum installer tidak valid.${NC}" >&2
-            return 1
-        }
-        actual=$(sha256sum "$tmp" | awk '{ print $1 }')
-        [ "$actual" = "$expected" ] || {
-            echo -e "${RED}[!] Checksum installer tidak cocok.${NC}" >&2
-            return 1
-        }
-        echo -e "  ${GREEN}[✓] Checksum SHA-256 valid.${NC}"
-    else
-        echo -e "  ${YELLOW}[i] Checksum tidak dipublikasikan; validasi bash -n digunakan.${NC}"
-    fi
+    curl -fsSL "$(dirname "$SELF_UPDATE_URL")/SHA256SUMS" -o "$checksum" 2>/dev/null || {
+        echo -e "${RED}[!] SHA256SUMS tidak tersedia; upgrade dibatalkan.${NC}" >&2
+        return 1
+    }
+    expected=$(awk -v file="$(basename "$SELF_UPDATE_URL")" '$2 == file { print $1; exit }' "$checksum")
+    printf '%s\n' "$expected" | grep -Eq '^[[:xdigit:]]{64}$' || {
+        echo -e "${RED}[!] Format checksum installer tidak valid.${NC}" >&2
+        return 1
+    }
+    actual=$(sha256sum "$tmp" | awk '{ print $1 }')
+    [ "$actual" = "$expected" ] || {
+        echo -e "${RED}[!] Checksum installer tidak cocok.${NC}" >&2
+        return 1
+    }
+    echo -e "  ${GREEN}[✓] Checksum SHA-256 valid.${NC}"
 
     chmod --reference="$self" "$tmp"
     chown --reference="$self" "$tmp"
