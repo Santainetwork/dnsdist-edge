@@ -15,6 +15,8 @@ Format: [versi] — tanggal, deskripsi singkat.
 ### Installer
 - `setup-edge.sh --upgrade` dan `setup-master.sh --upgrade` mengunduh installer terbaru dari GitHub ke file sementara, memvalidasi sintaks serta checksum SHA-256 dari `SHA256SUMS`, lalu mengganti installer secara atomik dan melanjutkan proses upgrade lewat `exec`.
 - Kegagalan unduhan, sintaks, atau checksum tidak mengubah installer, konfigurasi, maupun data yang aktif.
+- Perintah transparent DNS standalone berhenti setelah plan/apply sehingga tidak memicu instalasi panel default.
+- Status policy route, ownership file Lua, reapply, cleanup, dan counter nftables TPROXY diperketat berdasarkan acceptance network namespace.
 
 ### Dokumentasi
 - Memperbarui panduan Master, referensi upgrade, README, dan roadmap Central Policy Hub.
