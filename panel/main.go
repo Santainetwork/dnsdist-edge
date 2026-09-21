@@ -39,6 +39,55 @@ import (
 //go:embed static/index.html
 var indexHTML []byte
 
+var whitelistLabelRE = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+
+func normalizeWhitelist(raw string) (string, []int, int, int) {
+	seen := make(map[string]struct{})
+	var out []string
+	var invalid []int
+	count, duplicates := 0, 0
+	for lineNo, rawLine := range strings.Split(raw, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			out = append(out, line)
+			continue
+		}
+		line = strings.TrimSuffix(strings.ToLower(line), ".")
+		if ip := net.ParseIP(line); ip != nil {
+			line = ip.String()
+		} else if !validWhitelistDomain(line) {
+			invalid = append(invalid, lineNo+1)
+			continue
+		}
+		if _, ok := seen[line]; ok {
+			duplicates++
+			continue
+		}
+		seen[line] = struct{}{}
+		out = append(out, line)
+		count++
+	}
+	if len(out) == 0 {
+		return "", invalid, count, duplicates
+	}
+	return strings.Join(out, "\n") + "\n", invalid, count, duplicates
+}
+
+func validWhitelistDomain(value string) bool {
+	if value == "" || len(value) > 253 || strings.ContainsAny(value, "/ *\t\r\n") {
+		return false
+	}
+	for _, label := range strings.Split(value, ".") {
+		if len(label) > 63 || !whitelistLabelRE.MatchString(label) {
+			return false
+		}
+	}
+	return true
+}
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 var (
