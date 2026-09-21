@@ -217,19 +217,26 @@ func TestHandleMasterWhitelistRequiresFieldButAllowsEmpty(t *testing.T) {
 }
 
 func TestRegisterMasterRoutes(t *testing.T) {
-	for _, enabled := range []bool{false, true} {
-		mux := http.NewServeMux()
-		registerMasterRoutes(mux, enabled)
-		for _, path := range []string{"/api/master/status", "/api/master/build", "/api/master/sources", "/api/master/whitelist"} {
-			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
-			want := http.StatusNotFound
-			if enabled {
-				want = http.StatusUnauthorized
+	tests := []struct {
+		name    string
+		enabled bool
+		want    int
+	}{
+		{"disabled", false, http.StatusNotFound},
+		{"enabled", true, http.StatusUnauthorized},
+	}
+	paths := []string{"/api/master/status", "/api/master/build", "/api/master/sources", "/api/master/whitelist"}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			registerMasterRoutes(mux, tt.enabled)
+			for _, path := range paths {
+				w := httptest.NewRecorder()
+				mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+				if w.Code != tt.want {
+					t.Errorf("%s status=%d, want %d", path, w.Code, tt.want)
+				}
 			}
-			if w.Code != want {
-				t.Fatalf("enabled=%v %s status=%d, want %d", enabled, path, w.Code, want)
-			}
-		}
+		})
 	}
 }
