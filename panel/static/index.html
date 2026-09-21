@@ -2025,11 +2025,12 @@ document.getElementById('master-whitelist-search').addEventListener('keydown', e
   if (e.key === 'Enter') { e.preventDefault(); findWhitelistEntry(); }
 });
 
-async function fetchMasterWhitelist() {
+async function fetchMasterWhitelist(expectedValue) {
   try {
     const d = await api('/api/master/whitelist');
     const value = d.whitelist || '';
-    document.getElementById('master-whitelist-input').value = value;
+    const input = document.getElementById('master-whitelist-input');
+    if (expectedValue === undefined || input.value === expectedValue) input.value = value;
     masterWhitelistBaseline = whitelistEntries(value);
     updateWhitelistPreview();
     return d;
@@ -2041,14 +2042,15 @@ async function fetchMasterWhitelist() {
 
 async function saveMasterWhitelist(build) {
   const input = document.getElementById('master-whitelist-input');
+  const submittedDraft = input.value;
   let saved;
   try {
-    saved = await api('/api/master/whitelist', 'POST', { whitelist: input.value });
+    saved = await api('/api/master/whitelist', 'POST', { whitelist: submittedDraft });
   } catch (e) {
     toast('Gagal menyimpan whitelist: ' + e.message, 'error');
     return;
   }
-  await fetchMasterWhitelist();
+  await fetchMasterWhitelist(submittedDraft);
   toast(`Whitelist tersimpan: ${saved.count} entri`);
   if (build) {
     try {

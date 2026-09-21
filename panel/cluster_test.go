@@ -39,16 +39,57 @@ func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 
 func TestMasterWhitelistUI(t *testing.T) {
 	html := string(indexHTML)
-	for _, marker := range []string{
+	for _, source := range []string{
 		`id="master-whitelist-search"`, `id="master-whitelist-input"`, `id="master-whitelist-count"`,
-		`id="master-whitelist-preview"`, "updateWhitelistPreview", "findWhitelistEntry",
-		"fetchMasterWhitelist", "saveMasterWhitelist", "Simpan & Build CDB",
+		`id="master-whitelist-preview"`, `onclick="saveMasterWhitelist(true)"`,
+		"return value.trim().toLowerCase().replace(/\\.+$/, '');",
+		"value.split(/\\r?\\n/).map(normalizeWhitelistEntry).filter(entry => entry && !entry.startsWith('#'))",
+		"const added = [...current].filter(entry => !masterWhitelistBaseline.has(entry));",
+		"const removed = [...masterWhitelistBaseline].filter(entry => !current.has(entry));",
+		"const start = input.selectionEnd || 0;",
+		"const match = text.toLowerCase().indexOf(query, start);",
+		"const wrapped = match < 0 ? text.toLowerCase().indexOf(query) : match;",
+		"input.setSelectionRange(wrapped, wrapped + query.length);",
+		"if (e.key === 'Enter') { e.preventDefault(); findWhitelistEntry(); }",
 		"if (page === 'master') {\n    fetchMasterStatus();\n    fetchMasterSources();\n    fetchMasterWhitelist();",
 	} {
-		if !strings.Contains(html, marker) {
-			t.Fatalf("master whitelist UI missing marker %q", marker)
+		if !strings.Contains(html, source) {
+			t.Fatalf("master whitelist UI missing behavior source %q", source)
 		}
 	}
+
+	fetchStart := strings.Index(html, "async function fetchMasterWhitelist(")
+	saveStart := strings.Index(html, "async function saveMasterWhitelist(build) {")
+	startupStart := strings.Index(html, "// ── Startup ──")
+	if fetchStart < 0 || saveStart <= fetchStart || startupStart <= saveStart {
+		t.Fatal("master whitelist functions are missing or out of order")
+	}
+	assertOrdered := func(name, source string, ordered []string) {
+		t.Helper()
+		position := 0
+		for _, want := range ordered {
+			next := strings.Index(source[position:], want)
+			if next < 0 {
+				t.Fatalf("%s missing or misordered source %q", name, want)
+			}
+			position += next + len(want)
+		}
+	}
+	assertOrdered("canonical whitelist refetch", html[fetchStart:saveStart], []string{
+		"const value = d.whitelist || '';",
+		"if (expectedValue === undefined || input.value === expectedValue) input.value = value;",
+		"masterWhitelistBaseline = whitelistEntries(value);",
+		"updateWhitelistPreview();",
+	})
+	assertOrdered("master whitelist save flow", html[saveStart:startupStart], []string{
+		"const submittedDraft = input.value;",
+		"saved = await api('/api/master/whitelist', 'POST', { whitelist: submittedDraft });",
+		"} catch (e) {",
+		"return;",
+		"await fetchMasterWhitelist(submittedDraft);",
+		"if (build) {",
+		"await api('/api/master/build', 'POST');",
+	})
 }
 
 func TestWebAPIReportsNonJSONErrorResponse(t *testing.T) {
