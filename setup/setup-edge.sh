@@ -387,7 +387,8 @@ PYEOF
 
     # 4.5 Sinkronisasi Database Awal
     echo -e "\n${CYAN}[*] Menjalankan sinkronisasi database awal...${NC}"
-    export CENTRAL_DB_URL
+    CENTRAL_DB_URLS="$CENTRAL_DB_URL"
+    export CENTRAL_DB_URLS
     bash "$SCRIPT_UPDATE" || echo -e "${YELLOW}[!] Peringatan: Sinkronisasi awal gagal. Pastikan Central Manager URL ($CENTRAL_DB_URL) dapat diakses.${NC}"
     [ -f "$DB_FILE" ] && chown "${DNSDIST_USER}:${DNSDIST_USER}" "$DB_FILE" 2>/dev/null || true
 
@@ -1197,7 +1198,8 @@ PYEOF
 
     echo -e "\n${CYAN}=== [4/5] Sinkronisasi Database Awal ===${NC}"
     # Export URL agar update-blacklist.sh bisa membacanya sebelum node.conf tersimpan
-    export CENTRAL_DB_URL
+    CENTRAL_DB_URLS="$CENTRAL_DB_URL"
+    export CENTRAL_DB_URLS
     bash "$SCRIPT_UPDATE" || echo -e "${YELLOW}[!] Peringatan: Sinkronisasi awal gagal. Pastikan Central Manager URL ($CENTRAL_DB_URL) dapat diakses.${NC}"
     [ -f "$DB_FILE" ] && chown "${DNSDIST_USER}:${DNSDIST_USER}" "$DB_FILE" 2>/dev/null || true
 
