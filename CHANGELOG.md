@@ -5,6 +5,18 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [Unreleased]
+
+### Central Master Multimode
+- Menambahkan source mode `feeds` (default kompatibel) dan `rpz-slave`, terpisah dari pilihan resolver `--with-dnsdist` / `--no-dnsdist`.
+- Mengintegrasikan daemon `rpz-master` untuk sinkronisasi AXFR/IXFR upstream, kompilasi CDB atomik, endpoint `/files/trust.db`, serta transfer downstream terbatas ACL/TSIG.
+- Menetapkan satu writer CDB per source mode: cron/panel builder untuk `feeds`, service `rpz-master` untuk `rpz-slave`.
+- Menambahkan hardening konfigurasi, serialisasi sync/build, graceful shutdown, dan alias CLI `-version`.
+- Memperbaiki instalasi Edge agar `--url` diteruskan melalui `CENTRAL_DB_URLS` pada sinkronisasi pertama.
+- Menambahkan test Go race/vet/build, test kontrak installer multimode, test URL Edge, dan CI terkait.
+
+---
+
 ## [2.9.0] — 2026-09-21
 
 ### Web Whitelist Master

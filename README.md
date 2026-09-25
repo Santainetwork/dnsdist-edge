@@ -42,18 +42,35 @@ Untuk command-finding cepat dan panduan mendalam:
 - **[SETUP-EDGE-COMMANDS.md](docs/SETUP-EDGE-COMMANDS.md)** - Dokumentasi lengkap CLI `setup-edge.sh`
 
 ### Central Master Server (Opsional)
-Jika Anda ingin membangun server master sendiri untuk mengompilasi blacklist CDB:
+Central Master punya dua dimensi mode yang independen:
+
+- Sumber `feeds` (default): kompilasi `sources.txt`, whitelist, dan custom blacklist.
+- Sumber `rpz-slave`: sinkronisasi zona RPZ upstream, lalu publikasi CDB dan AXFR/IXFR downstream.
+- Resolver `--no-dnsdist` atau `--with-dnsdist`: menentukan apakah host Master juga melayani resolusi DNS lokal.
+
+Mode kompatibel lama:
 ```bash
 cd setup
-sudo ./setup-master.sh --install --no-dnsdist --with-panel
+sudo ./setup-master.sh --install --source-mode feeds --no-dnsdist --with-panel
 ```
+
+Mode RPZ slave:
+```bash
+sudo ./setup-master.sh --install \
+  --source-mode rpz-slave \
+  --rpz-upstream 192.0.2.53:53 \
+  --rpz-zone rpz.example. \
+  --no-dnsdist --with-panel
+```
+
+Kedua mode menerbitkan kontrak Edge yang sama: `http://MASTER:8080/files/trust.db`.
 
 ## 📚 Dokumentasi Lengkap
 
 | Dokumentasi | Deskripsi |
 |-------------|-----------|
 | [**SETUP.md**](docs/SETUP.md) | Panduan instalasi lengkap dari awal sampai production |
-| [**SETUP-EDGE-COMMANDS.md**](docs/SETUP-EDGE-COMMANDS.md) | Panduan lengkap CLI `setup-edge.sh` & 19 daftar command |
+| [**SETUP-EDGE-COMMANDS.md**](docs/SETUP-EDGE-COMMANDS.md) | Panduan lengkap CLI `setup-edge.sh` |
 | [**PANEL-PLAN.md**](docs/PANEL-PLAN.md) | Rencana management panel web (mode central download + local CDB gen) |
 | [**CLUSTER-PLAN.md**](docs/CLUSTER-PLAN.md) | Rencana CDB redundancy & cluster (failover antar node, peer-to-peer) |
 | [**QUICK_REFERENCE.md**](docs/QUICK_REFERENCE.md) | Command cheatsheet & troubleshooting tips |

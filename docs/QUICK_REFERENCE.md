@@ -22,6 +22,26 @@ sudo ./setup-edge.sh --upgrade              # Upgrade ke versi terbaru
 sudo ./setup-edge.sh --update-config        # Wizard update config
 ```
 
+### Central Master Multimode
+```bash
+# Feeds HTTP, tanpa resolver lokal (default kompatibel)
+sudo ./setup-master.sh --install --source-mode feeds --no-dnsdist --with-panel
+
+# Secondary RPZ, tetap publish CDB untuk Edge
+sudo ./setup-master.sh --install \
+  --source-mode rpz-slave \
+  --rpz-upstream 192.0.2.53:53 \
+  --rpz-zone rpz.example. \
+  --rpz-transfer-acl "127.0.0.0/8,2001:db8:100::/48" \
+  --no-dnsdist --with-panel
+
+systemctl status rpz-master
+journalctl -u rpz-master -f
+dig +tcp @MASTER -p 5354 rpz.example. SOA
+```
+
+`--with-dnsdist` dapat dipakai pada kedua source mode. Edge selalu memakai `http://MASTER:8080/files/trust.db`.
+
 ### RPZ Sinkhole (v2.4.0 — multi-IP + IPv6)
 ```bash
 # IPv4 tunggal
@@ -144,6 +164,9 @@ curl -sk "https://127.0.0.1/dns-query?name=google.com&type=A" \
 | `/usr/local/bin/dnsdist-panel` | Binary panel |
 | `/usr/local/bin/setup-edge.sh` | Script utama |
 | `/usr/local/bin/update-blacklist.sh` | Sync CDB |
+| `/etc/dnsdist-master/rpz-master.json` | Config source mode RPZ slave |
+| `/var/lib/rpz-master/state.json` | State serial RPZ |
+| `/usr/local/bin/rpz-master` | Daemon RPZ secondary/publisher |
 
 ---
 

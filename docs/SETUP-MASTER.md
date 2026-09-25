@@ -1,18 +1,20 @@
 # 👑 Setup Guide — DNSDist Central Master Server
 
-Panduan instalasi dan konfigurasi **Central Master Server** untuk kompilasi dan distribusi database blacklist CDB (`trust.db`) ke seluruh Edge Node.
+Panduan instalasi dan konfigurasi **Central Master Server** untuk mengambil sumber `feeds` atau menjadi secondary RPZ, lalu mendistribusikan database CDB (`trust.db`) ke seluruh Edge Node.
 
 ---
 
 ## 🌟 Fitur Utama Master Server
 
-1. **Fleksibel**:
+1. **Mode resolver fleksibel**:
    - **Standalone Mode (`--no-dnsdist`)**: Murni sebagai Central Compiler & Publisher (tanpa DNSDist, port 53 bebas, sangat hemat resource).
    - **Hybrid Mode (`--with-dnsdist`)**: Berfungsi sebagai Central Compiler sekaligus DNS Resolver aktif di server tersebut.
-2. **Kompilasi Cepat CDB**: Menggunakan `trust-builder` (Go high-performance streamer).
-3. **Content-Addressed Storage**: Setiap hasil build memiliki hash SHA-256 unik (`trust.<sha>.db`) dengan atomic symlink swap ke `trust.db`.
-4. **Manifest JSON Sidecar**: Menyediakan endpoint `/files/manifest.json` berisi hash, ukuran, dan waktu build untuk verifikasi edge node.
-5. **Otomatisasi Cron**: Kompilasi terjadwal otomatis (default: setiap 6 jam).
+2. **Mode sumber fleksibel**:
+   - **`feeds` (default)**: `sources.txt`, whitelist, dan custom blacklist dikompilasi oleh panel/trust-builder.
+   - **`rpz-slave`**: `rpz-master` menarik AXFR/IXFR dari authoritative RPZ upstream dan menjadi satu-satunya writer CDB.
+3. **Kompilasi Cepat CDB**: Menggunakan wire-format key yang kompatibel dengan `KeyValueLookupKeyQName(true)`.
+4. **Output kompatibel**: Kedua source mode menerbitkan `/files/trust.db` dan `/files/manifest.json`.
+5. **Satu writer**: Cron/panel builder aktif hanya pada `feeds`; service RPZ aktif hanya pada `rpz-slave`.
 6. **Panel Terintegrasi (Dual Mode)**: Web panel mendukung HTTPS (`:8443`) dan HTTP (`:8084`) secara bersamaan.
 
 ---
@@ -28,12 +30,12 @@ cd /opt/dnsdist-edge/setup
 
 #### Opsi A: Standalone Master (Rekomendasi Central Server — Tanpa DNSDist)
 ```bash
-sudo ./setup-master.sh --install --no-dnsdist --with-panel
+sudo ./setup-master.sh --install --source-mode feeds --no-dnsdist --with-panel
 ```
 
 #### Opsi B: Hybrid Master (Dengan DNSDist)
 ```bash
-sudo ./setup-master.sh --install --with-dnsdist --with-panel
+sudo ./setup-master.sh --install --source-mode feeds --with-dnsdist --with-panel
 ```
 
 #### Opsi C: Kustom Port HTTP (Misal Port 8088)
@@ -41,9 +43,58 @@ sudo ./setup-master.sh --install --with-dnsdist --with-panel
 sudo ./setup-master.sh --install --no-dnsdist --port 8088
 ```
 
+#### Opsi D: Secondary RPZ tanpa resolver lokal
+```bash
+sudo ./setup-master.sh --install \
+  --source-mode rpz-slave \
+  --rpz-upstream 192.0.2.53:53 \
+  --rpz-zone rpz.example. \
+  --rpz-transfer-acl "127.0.0.0/8,2001:db8:100::/48" \
+  --no-dnsdist --with-panel
+```
+
+#### Opsi E: Secondary RPZ sekaligus resolver lokal
+```bash
+sudo ./setup-master.sh --install \
+  --source-mode rpz-slave \
+  --rpz-upstream 192.0.2.53:53 \
+  --rpz-zone rpz.example. \
+  --with-dnsdist --with-panel
+```
+
+`--with-dnsdist` tidak memilih sumber data. Source mode dan resolver mode selalu independen.
+
+## Mode `rpz-slave`
+
+Konfigurasi utama tersimpan di `/etc/dnsdist-master/rpz-master.json`; state dan domain mentah di `/var/lib/rpz-master/`. Service:
+
+```bash
+systemctl status rpz-master
+journalctl -u rpz-master -f
+/usr/local/bin/rpz-master -version
+```
+
+Default downstream RPZ DNS adalah `0.0.0.0:5354`. Port `5353` tidak dipakai karena dapat dimiliki backend TPROXY dnsdist. AXFR/IXFR ditolak kecuali sumber klien masuk `--rpz-transfer-acl`; default aman hanya loopback.
+
+Untuk upstream TSIG, simpan secret pada file root-only, lalu tambahkan:
+
+```bash
+sudo install -m 0600 /dev/null /etc/dnsdist-master/rpz-upstream.secret
+sudoedit /etc/dnsdist-master/rpz-upstream.secret
+
+sudo ./setup-master.sh --install \
+  --source-mode rpz-slave \
+  --rpz-upstream 192.0.2.53:53 \
+  --rpz-zone rpz.example. \
+  --rpz-tsig-key rpz-transfer. \
+  --rpz-tsig-secret-file /etc/dnsdist-master/rpz-upstream.secret
+```
+
+Jangan menaruh secret TSIG langsung pada command line atau repository. Bootstrap HTTP opsional dapat diberikan dengan `--rpz-bootstrap-url`; transfer DNS tetap sumber pembaruan authoritative.
+
 ---
 
-## ⚙️ Konfigurasi Sumber Blacklist & Whitelist
+## ⚙️ Konfigurasi Mode `feeds`
 
 Semua konfigurasi sumber berada di `/etc/dnsdist-master/`:
 
@@ -55,7 +106,7 @@ Semua konfigurasi sumber berada di `/etc/dnsdist-master/`:
 
 ### API Whitelist Master
 
-Panel Master menyediakan endpoint terautentikasi berikut:
+Pada source mode `feeds`, Panel Master menyediakan endpoint terautentikasi berikut:
 
 - `GET /api/master/whitelist`: membaca isi `whitelist.txt` dan jumlah entri.
 - `POST /api/master/whitelist`: menyimpan objek JSON `{"whitelist":"example.com\n192.0.2.1\n"}` setelah validasi dan normalisasi.
@@ -84,6 +135,8 @@ sudo /usr/local/bin/build-master-cdb.sh
 # atau
 sudo ./setup-master.sh --build-now
 ```
+
+Pada `rpz-slave`, build/source/whitelist feeds dan scheduler panel dinonaktifkan untuk mencegah dua proses menulis `trust.db` yang sama.
 
 ---
 
