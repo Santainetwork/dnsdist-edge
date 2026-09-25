@@ -44,7 +44,7 @@ Canonical paths:
 - systemd unit: `rpz-master.service`
 - downstream RPZ DNS: `0.0.0.0:5354` by default, avoiding the existing TPROXY backend on `127.0.0.1:5353`
 
-The installer prefers a bundled `rpz-master` executable. Source checkouts can build it with Go 1.24. Standalone installer releases must bundle a checksum-verified executable or refuse RPZ mode with a clear requirement; never download and run an unverified binary.
+The installer prefers a bundled `rpz-master` executable. Source checkouts can build it with Go 1.24. A standalone installer may download the official `rpz-master` release asset only after matching it against `SHA256SUMS`; missing or invalid checksums abort RPZ installation. Never run an unverified binary.
 
 ## Lifecycle and data flow
 

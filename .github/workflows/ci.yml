@@ -63,3 +63,39 @@ jobs:
               assert hit, f"lookup gagal: {name}"
           print("CDB smoke test PASS")
           EOF
+
+  test-go:
+    name: Go tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache-dependency-path: |
+            panel/go.sum
+            tools/rpz-master/go.sum
+      - name: Test panel
+        working-directory: panel
+        run: go test -race ./...
+      - name: Test RPZ master
+        working-directory: tools/rpz-master
+        run: |
+          go test -race ./...
+          go vet ./...
+          CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/rpz-master" .
+
+  test-shell:
+    name: Shell regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell syntax
+        run: |
+          bash -n setup/setup-edge.sh setup/setup-master.sh setup/update-blacklist.sh
+          bash -n tests/*.sh
+      - name: Run regression tests
+        run: |
+          for test_file in tests/*.sh; do
+            bash "$test_file"
+          done
