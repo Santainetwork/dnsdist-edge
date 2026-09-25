@@ -973,7 +973,7 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
     </div>
 
     <!-- Sources Editor -->
-    <div class="card-box">
+    <div class="card-box" id="master-sources-card">
       <div class="card-box-header">
         <div>
           <h3>Daftar URL Sumber Blacklist (sources.txt)</h3>
@@ -1006,8 +1006,8 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
         <pre id="master-whitelist-preview" style="margin:0;color:var(--text-muted);white-space:pre-wrap"></pre>
       </div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <button class="btn btn-secondary" onclick="saveMasterWhitelist(false)">Simpan</button>
-        <button class="btn btn-primary" onclick="saveMasterWhitelist(true)">Simpan & Build CDB</button>
+        <button class="btn btn-secondary" id="btn-whitelist-save" onclick="saveMasterWhitelist(false)">Simpan</button>
+        <button class="btn btn-primary" id="btn-whitelist-build" onclick="saveMasterWhitelist(true)">Simpan & Build CDB</button>
         <button class="btn btn-secondary" onclick="findWhitelistEntry()">Cari Berikutnya</button>
       </div>
     </div>
@@ -1915,9 +1915,22 @@ async function connectEdgeToMaster() {
   }
 }
 
+function applyMasterSourceMode(sourceMode) {
+  const feedsMode = sourceMode === 'feeds';
+  const buildButton = document.getElementById('btn-trigger-build');
+  const sourcesCard = document.getElementById('master-sources-card');
+  const whitelistSaveButton = document.getElementById('btn-whitelist-save');
+  const whitelistBuildButton = document.getElementById('btn-whitelist-build');
+  buildButton.style.display = feedsMode ? '' : 'none';
+  sourcesCard.style.display = feedsMode ? '' : 'none';
+  whitelistSaveButton.disabled = !feedsMode;
+  whitelistBuildButton.style.display = feedsMode ? '' : 'none';
+}
+
 async function fetchMasterStatus() {
   try {
     const d = await api('/api/master/status');
+    applyMasterSourceMode(d.source_mode);
     const stEl = document.getElementById('m-status');
     const stSub = document.getElementById('m-status-sub');
     const btn = document.getElementById('btn-trigger-build');

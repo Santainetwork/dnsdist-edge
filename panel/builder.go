@@ -24,6 +24,7 @@ import (
 // MasterState tracks master compilation status and history
 type MasterState struct {
 	mu            sync.Mutex
+	SourceMode    string    `json:"source_mode"`
 	IsBuilding    bool      `json:"is_building"`
 	LastBuildTime time.Time `json:"last_build_time"`
 	LastDuration  string    `json:"last_duration"`

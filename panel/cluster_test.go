@@ -37,6 +37,42 @@ func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 	}
 }
 
+func TestRPZSlaveUIHidesFeedControlsOnly(t *testing.T) {
+	html := string(indexHTML)
+	for _, marker := range []string{
+		`id="btn-trigger-build"`,
+		`id="master-sources-card"`,
+		`id="btn-whitelist-save"`,
+		`id="btn-whitelist-build"`,
+		"function applyMasterSourceMode(sourceMode)",
+		"const feedsMode = sourceMode === 'feeds';",
+		"buildButton.style.display = feedsMode ? '' : 'none';",
+		"sourcesCard.style.display = feedsMode ? '' : 'none';",
+		"whitelistBuildButton.style.display = feedsMode ? '' : 'none';",
+		"whitelistSaveButton.disabled = !feedsMode;",
+		"applyMasterSourceMode(d.source_mode);",
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("RPZ-slave UI missing source-mode marker %q", marker)
+		}
+	}
+
+	start := strings.Index(html, "function applyMasterSourceMode(sourceMode)")
+	if start < 0 {
+		t.Fatal("applyMasterSourceMode function is missing")
+	}
+	end := strings.Index(html[start:], "async function fetchMasterStatus()")
+	if end < 0 {
+		t.Fatal("fetchMasterStatus function must follow source-mode UI setup")
+	}
+	function := html[start : start+end]
+	for _, preserved := range []string{"nav-master", "nav-cluster", "page-cluster", "pub-db-url", "pub-man-url", "master-whitelist-input"} {
+		if strings.Contains(function, preserved) {
+			t.Fatalf("source-mode UI must not hide preserved master function %q", preserved)
+		}
+	}
+}
+
 func TestMasterWhitelistUI(t *testing.T) {
 	html := string(indexHTML)
 	for _, source := range []string{

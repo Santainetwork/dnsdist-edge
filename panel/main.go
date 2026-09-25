@@ -21,11 +21,11 @@ import (
 	"log"
 	"math"
 	"math/big"
-	"path/filepath"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -91,21 +91,22 @@ func validWhitelistDomain(value string) bool {
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 var (
-	flagAddr          = flag.String("addr", envOr("PANEL_ADDR", ":8443"), "Primary listen address (HTTPS if TLS enabled, else HTTP)")
-	flagHTTPAddr      = flag.String("http-addr", envOr("PANEL_HTTP_ADDR", ""), "Optional secondary HTTP listen address (enables dual HTTP+HTTPS mode)")
-	flagTLS           = flag.Bool("tls", envBool("PANEL_TLS", true), "Enable TLS on primary address (set false for pure HTTP)")
-	flagConf          = flag.String("config", envOr("DNSDIST_CONF", "/etc/dnsdist/dnsdist.conf"), "dnsdist.conf path")
-	flagUpstreams     = flag.String("upstreams", envOr("DNSDIST_UPSTREAMS", "/etc/dnsdist/upstreams.conf"), "upstreams.conf path")
-	flagCert          = flag.String("cert", envOr("PANEL_CERT", "/var/lib/dnsdist/panel-cert.pem"), "TLS cert path")
-	flagKey           = flag.String("key", envOr("PANEL_KEY", "/var/lib/dnsdist/panel-key.pem"), "TLS key path")
-	flagSecret        = flag.String("secret-file", envOr("PANEL_SECRET_FILE", "/var/lib/dnsdist/panel.secret"), "JWT secret file")
-	flagSetupSh       = flag.String("setup-sh", "/usr/local/bin/setup-edge.sh", "Path to setup-edge.sh")
-	flagMaster        = flag.Bool("master", envBool("PANEL_MASTER", false), "Enable Central Master mode (CDB builder & publisher)")
-	flagFilesDir      = flag.String("files-dir", envOr("PANEL_FILES_DIR", "/var/www/html/files"), "Directory to serve /files/ from (trust.db, manifest.json)")
-	flagSourcesFile   = flag.String("sources-file", envOr("PANEL_SOURCES_FILE", "/etc/dnsdist-master/sources.txt"), "Path to sources.txt for master compilation")
-	flagWhitelistFile = flag.String("whitelist-file", envOr("PANEL_WHITELIST_FILE", "/etc/dnsdist-master/whitelist.txt"), "Path to whitelist.txt")
-	flagCustomBLFile  = flag.String("custom-bl-file", envOr("PANEL_CUSTOM_BL_FILE", "/etc/dnsdist-master/custom-blacklist.txt"), "Path to custom-blacklist.txt")
-	flagBuildInterval = flag.Duration("build-interval", 6*time.Hour, "Automatic build interval (0 to disable auto-build)")
+	flagAddr              = flag.String("addr", envOr("PANEL_ADDR", ":8443"), "Primary listen address (HTTPS if TLS enabled, else HTTP)")
+	flagHTTPAddr          = flag.String("http-addr", envOr("PANEL_HTTP_ADDR", ""), "Optional secondary HTTP listen address (enables dual HTTP+HTTPS mode)")
+	flagTLS               = flag.Bool("tls", envBool("PANEL_TLS", true), "Enable TLS on primary address (set false for pure HTTP)")
+	flagConf              = flag.String("config", envOr("DNSDIST_CONF", "/etc/dnsdist/dnsdist.conf"), "dnsdist.conf path")
+	flagUpstreams         = flag.String("upstreams", envOr("DNSDIST_UPSTREAMS", "/etc/dnsdist/upstreams.conf"), "upstreams.conf path")
+	flagCert              = flag.String("cert", envOr("PANEL_CERT", "/var/lib/dnsdist/panel-cert.pem"), "TLS cert path")
+	flagKey               = flag.String("key", envOr("PANEL_KEY", "/var/lib/dnsdist/panel-key.pem"), "TLS key path")
+	flagSecret            = flag.String("secret-file", envOr("PANEL_SECRET_FILE", "/var/lib/dnsdist/panel.secret"), "JWT secret file")
+	flagSetupSh           = flag.String("setup-sh", "/usr/local/bin/setup-edge.sh", "Path to setup-edge.sh")
+	flagMaster            = flag.Bool("master", envBool("PANEL_MASTER", false), "Enable Central Master mode (CDB builder & publisher)")
+	flagSourceMode        = flag.String("source-mode", envOr("PANEL_SOURCE_MODE", "feeds"), "Master data source mode: feeds or rpz-slave")
+	flagFilesDir          = flag.String("files-dir", envOr("PANEL_FILES_DIR", "/var/www/html/files"), "Directory to serve /files/ from (trust.db, manifest.json)")
+	flagSourcesFile       = flag.String("sources-file", envOr("PANEL_SOURCES_FILE", "/etc/dnsdist-master/sources.txt"), "Path to sources.txt for master compilation")
+	flagWhitelistFile     = flag.String("whitelist-file", envOr("PANEL_WHITELIST_FILE", "/etc/dnsdist-master/whitelist.txt"), "Path to whitelist.txt")
+	flagCustomBLFile      = flag.String("custom-bl-file", envOr("PANEL_CUSTOM_BL_FILE", "/etc/dnsdist-master/custom-blacklist.txt"), "Path to custom-blacklist.txt")
+	flagBuildInterval     = flag.Duration("build-interval", 6*time.Hour, "Automatic build interval (0 to disable auto-build)")
 	flagBuildNow          = flag.Bool("build-now", false, "Compile CDB immediately and exit (CLI builder mode)")
 	flagDnsdistAPI        = flag.String("dnsdist-api", envOr("DNSDIST_API_URL", "http://127.0.0.1:8083"), "dnsdist web API base URL")
 	flagDnsdistKey        = flag.String("dnsdist-key", envOr("DNSDIST_API_KEY", ""), "dnsdist web API key (X-API-Key)")
@@ -131,6 +132,15 @@ func envBool(key string, def bool) bool {
 		return v == "1" || v == "true" || v == "yes" || v == "on"
 	}
 	return def
+}
+
+func validateSourceMode(mode string) error {
+	switch mode {
+	case "feeds", "rpz-slave":
+		return nil
+	default:
+		return errors.New("source-mode must be feeds or rpz-slave")
+	}
 }
 
 // ─── JWT (manual HMAC-SHA256, no external deps) ───────────────────────────────
@@ -839,8 +849,13 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 	memUsed, memTotal := memMB()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"qps":             stats.qps.Load(),
-		"queries_total":   func() int64 { if v := stats.queriesTotal.Load(); v > 0 { return v }; return int64(stats.udpInTotal.Load()) }(),
+		"qps": stats.qps.Load(),
+		"queries_total": func() int64 {
+			if v := stats.queriesTotal.Load(); v > 0 {
+				return v
+			}
+			return int64(stats.udpInTotal.Load())
+		}(),
 		"blocked_total":   stats.blockedTotal.Load(),
 		"cache_hit_pct":   math.Round(float64(stats.cacheHitPct.Load())/100*10) / 10,
 		"cpu_pct":         math.Round(cpuPercent()*10) / 10,
@@ -859,13 +874,15 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 
 func handleRPZ(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		jsonErr(w, http.StatusMethodNotAllowed, "POST only"); return
+		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
+		return
 	}
 	var body struct {
 		IPs []string `json:"ips"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.IPs) == 0 {
-		jsonErr(w, http.StatusBadRequest, "ips required"); return
+		jsonErr(w, http.StatusBadRequest, "ips required")
+		return
 	}
 	var valid []string
 	for _, ip := range body.IPs {
@@ -874,49 +891,58 @@ func handleRPZ(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if !validIP(ip) {
-			jsonErr(w, http.StatusBadRequest, "invalid IP: "+ip); return
+			jsonErr(w, http.StatusBadRequest, "invalid IP: "+ip)
+			return
 		}
 		valid = append(valid, ip)
 	}
 	if len(valid) == 0 {
-		jsonErr(w, http.StatusBadRequest, "no valid IPs"); return
+		jsonErr(w, http.StatusBadRequest, "no valid IPs")
+		return
 	}
 	out, err := runSetupSh("--set-rpz", strings.Join(valid, ","))
 	if err != nil {
 		log.Printf("[panel] --set-rpz error: %v\n%s", err, out)
-		jsonErr(w, http.StatusInternalServerError, "setup-edge.sh error: "+err.Error()); return
+		jsonErr(w, http.StatusInternalServerError, "setup-edge.sh error: "+err.Error())
+		return
 	}
 	jsonOK(w)
 }
 
 func handleUpstream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		jsonErr(w, http.StatusMethodNotAllowed, "POST only"); return
+		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
+		return
 	}
 	var body struct {
 		Servers []string `json:"servers"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Servers) == 0 {
-		jsonErr(w, http.StatusBadRequest, "servers required"); return
+		jsonErr(w, http.StatusBadRequest, "servers required")
+		return
 	}
 	out, err := runSetupSh("--set-upstream", strings.Join(body.Servers, ","))
 	if err != nil {
 		log.Printf("[panel] --set-upstream error: %v\n%s", err, out)
-		jsonErr(w, http.StatusInternalServerError, "setup-edge.sh error: "+err.Error()); return
+		jsonErr(w, http.StatusInternalServerError, "setup-edge.sh error: "+err.Error())
+		return
 	}
 	jsonOK(w)
 }
 
 func handleSafeSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		jsonErr(w, http.StatusMethodNotAllowed, "POST only"); return
+		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
+		return
 	}
 	var body SafeSearch
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "invalid json"); return
+		jsonErr(w, http.StatusBadRequest, "invalid json")
+		return
 	}
 	if err := writeSafeSearch(body.Google, body.Bing, body.YouTube); err != nil {
-		jsonErr(w, http.StatusInternalServerError, err.Error()); return
+		jsonErr(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	if err := restartDnsdist(); err != nil {
 		log.Printf("[panel] restart dnsdist: %v", err)
@@ -926,7 +952,8 @@ func handleSafeSearch(w http.ResponseWriter, r *http.Request) {
 
 func handleDoTDoH(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		jsonErr(w, http.StatusMethodNotAllowed, "POST only"); return
+		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
+		return
 	}
 	var body struct {
 		DoT  bool   `json:"dot"`
@@ -935,7 +962,8 @@ func handleDoTDoH(w http.ResponseWriter, r *http.Request) {
 		Key  string `json:"key"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "invalid json"); return
+		jsonErr(w, http.StatusBadRequest, "invalid json")
+		return
 	}
 	cd := confDir()
 	if body.Cert == "" {
@@ -945,7 +973,8 @@ func handleDoTDoH(w http.ResponseWriter, r *http.Request) {
 		body.Key = filepath.Join(cd, "certs", "server.key")
 	}
 	if err := writeDoTDoH(body.DoT, body.DoH, body.Cert, body.Key); err != nil {
-		jsonErr(w, http.StatusInternalServerError, err.Error()); return
+		jsonErr(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	if err := restartDnsdist(); err != nil {
 		log.Printf("[panel] restart dnsdist: %v", err)
@@ -955,14 +984,16 @@ func handleDoTDoH(w http.ResponseWriter, r *http.Request) {
 
 func handleSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		jsonErr(w, http.StatusMethodNotAllowed, "POST only"); return
+		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
+		return
 	}
 	var body struct {
 		PanelPassword string `json:"panel_password"`
 		BlockMode     string `json:"block_mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, http.StatusBadRequest, "invalid json"); return
+		jsonErr(w, http.StatusBadRequest, "invalid json")
+		return
 	}
 	if body.PanelPassword != "" {
 		passPath := filepath.Join(filepath.Dir(*flagSecret), "panel.password")
@@ -975,11 +1006,13 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		// patch dnsdist.conf block mode
 		b, err := os.ReadFile(*flagConf)
 		if err != nil {
-			jsonErr(w, http.StatusInternalServerError, "cannot read config: "+err.Error()); return
+			jsonErr(w, http.StatusInternalServerError, "cannot read config: "+err.Error())
+			return
 		}
 		content := reBlockMode.ReplaceAllString(string(b), "BLOCK_MODE = '"+body.BlockMode+"'")
 		if err := atomicWriteString(*flagConf, content, 0o644); err != nil {
-			jsonErr(w, http.StatusInternalServerError, err.Error()); return
+			jsonErr(w, http.StatusInternalServerError, err.Error())
+			return
 		}
 		if err := restartDnsdist(); err != nil {
 			log.Printf("[panel] restart dnsdist: %v", err)
@@ -991,6 +1024,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 func handleMasterStatus(w http.ResponseWriter, r *http.Request) {
 	masterState.mu.Lock()
 	defer masterState.mu.Unlock()
+	masterState.SourceMode = *flagSourceMode
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(&masterState)
 }
@@ -998,6 +1032,10 @@ func handleMasterStatus(w http.ResponseWriter, r *http.Request) {
 func handleMasterBuild(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	if *flagSourceMode == "rpz-slave" {
+		jsonErr(w, http.StatusConflict, "panel feed builder is disabled in rpz-slave source mode")
 		return
 	}
 	masterState.mu.Lock()
@@ -1022,6 +1060,10 @@ func handleMasterSources(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
+		if *flagSourceMode == "rpz-slave" {
+			jsonErr(w, http.StatusConflict, "source writes are disabled in rpz-slave source mode")
+			return
+		}
 		var body struct {
 			Sources string `json:"sources"`
 		}
@@ -1052,6 +1094,10 @@ func handleMasterWhitelist(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"whitelist": string(content), "count": count})
 	case http.MethodPost:
+		if *flagSourceMode == "rpz-slave" {
+			jsonErr(w, http.StatusConflict, "whitelist writes are disabled in rpz-slave source mode")
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		var body *struct {
 			Whitelist *string `json:"whitelist"`
@@ -1120,13 +1166,23 @@ func registerMasterRoutes(mux *http.ServeMux, enabled bool) {
 	mux.HandleFunc("/api/master/whitelist", auth(handleMasterWhitelist))
 }
 
+func masterAutoBuildEnabled(master bool, sourceMode string, interval time.Duration) bool {
+	return master && sourceMode == "feeds" && interval > 0
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 func main() {
 	flag.Parse()
 	log.SetPrefix("[panel] ")
+	if err := validateSourceMode(*flagSourceMode); err != nil {
+		log.Fatal(err)
+	}
 
 	if *flagBuildNow {
+		if *flagSourceMode == "rpz-slave" {
+			log.Fatal("CLI feed builder is disabled in rpz-slave source mode")
+		}
 		log.Printf("[master-builder] Memulai kompilasi CDB via CLI...")
 		err := BuildMasterCDB(*flagFilesDir, *flagSourcesFile, *flagWhitelistFile, *flagCustomBLFile, 8, true)
 		if err != nil {
@@ -1202,7 +1258,7 @@ func main() {
 	})
 
 	// Master Auto-Build Cron Ticker
-	if *flagMaster && *flagBuildInterval > 0 {
+	if masterAutoBuildEnabled(*flagMaster, *flagSourceMode, *flagBuildInterval) {
 		log.Printf("[master-builder] Penjadwal kompilasi otomatis aktif (interval: %v)", *flagBuildInterval)
 		go func() {
 			ticker := time.NewTicker(*flagBuildInterval)
