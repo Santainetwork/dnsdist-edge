@@ -92,6 +92,10 @@ sudo ./setup-master.sh --install \
 
 Jangan menaruh secret TSIG langsung pada command line atau repository. Bootstrap HTTP opsional dapat diberikan dengan `--rpz-bootstrap-url`; transfer DNS tetap sumber pembaruan authoritative.
 
+Installer menyalin secret ke `/etc/dnsdist-master/rpz-upstream.secret` mode `0600`; service tidak bergantung pada lokasi file sumber setelah instalasi.
+
+Installer memverifikasi SHA-256 release binary terhadap `SHA256SUMS`. Unduhan keduanya memakai URL release yang sama, jadi checksum melindungi dari kerusakan transfer, bukan kompromi akun/release GitHub atau jalur unduhan. Untuk trust lebih kuat, gunakan source bundle lokal tepercaya atau salurkan binary/checksum melalui kanal rilis terverifikasi.
+
 ---
 
 ## ⚙️ Konfigurasi Mode `feeds`

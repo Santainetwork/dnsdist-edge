@@ -150,3 +150,19 @@ func TestMasterAutoBuildEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestEnvDuration(t *testing.T) {
+	const key = "TEST_PANEL_BUILD_INTERVAL"
+	t.Setenv(key, "0")
+	if got := envDuration(key, 6*time.Hour); got != 0 {
+		t.Fatalf("zero duration = %v", got)
+	}
+	t.Setenv(key, "invalid")
+	if got := envDuration(key, 6*time.Hour); got != 6*time.Hour {
+		t.Fatalf("invalid duration fallback = %v", got)
+	}
+	t.Setenv(key, "10m")
+	if got := envDuration(key, 6*time.Hour); got != 10*time.Minute {
+		t.Fatalf("parsed duration = %v", got)
+	}
+}

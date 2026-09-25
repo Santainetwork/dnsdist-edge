@@ -106,7 +106,7 @@ var (
 	flagSourcesFile       = flag.String("sources-file", envOr("PANEL_SOURCES_FILE", "/etc/dnsdist-master/sources.txt"), "Path to sources.txt for master compilation")
 	flagWhitelistFile     = flag.String("whitelist-file", envOr("PANEL_WHITELIST_FILE", "/etc/dnsdist-master/whitelist.txt"), "Path to whitelist.txt")
 	flagCustomBLFile      = flag.String("custom-bl-file", envOr("PANEL_CUSTOM_BL_FILE", "/etc/dnsdist-master/custom-blacklist.txt"), "Path to custom-blacklist.txt")
-	flagBuildInterval     = flag.Duration("build-interval", 6*time.Hour, "Automatic build interval (0 to disable auto-build)")
+	flagBuildInterval     = flag.Duration("build-interval", envDuration("PANEL_BUILD_INTERVAL", 6*time.Hour), "Automatic build interval (0 to disable auto-build)")
 	flagBuildNow          = flag.Bool("build-now", false, "Compile CDB immediately and exit (CLI builder mode)")
 	flagDnsdistAPI        = flag.String("dnsdist-api", envOr("DNSDIST_API_URL", "http://127.0.0.1:8083"), "dnsdist web API base URL")
 	flagDnsdistKey        = flag.String("dnsdist-key", envOr("DNSDIST_API_KEY", ""), "dnsdist web API key (X-API-Key)")
@@ -130,6 +130,15 @@ func envBool(key string, def bool) bool {
 	if v := os.Getenv(key); v != "" {
 		v = strings.ToLower(strings.TrimSpace(v))
 		return v == "1" || v == "true" || v == "yes" || v == "on"
+	}
+	return def
+}
+
+func envDuration(key string, def time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if duration, err := time.ParseDuration(value); err == nil {
+			return duration
+		}
 	}
 	return def
 }

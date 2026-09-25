@@ -14,6 +14,11 @@ SERVE_DIR="/var/www/html/files"
 PANEL_BIN="/usr/local/bin/dnsdist-panel"
 BUILDER_BIN="/usr/local/bin/trust-builder"
 
+if [ -f "$MASTER_CONF_DIR/source-mode" ] && [ "$(cat "$MASTER_CONF_DIR/source-mode")" = rpz-slave ]; then
+    echo "[!] Feed builder dinonaktifkan: source mode aktif adalah rpz-slave." >&2
+    exit 1
+fi
+
 mkdir -p "$MASTER_CONF_DIR" "$SERVE_DIR"
 
 # Inisialisasi default sources jika belum ada
