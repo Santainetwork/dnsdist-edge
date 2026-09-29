@@ -830,6 +830,17 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
 		return
 	}
+	ip := requestIP(r)
+	now := time.Now()
+	if !loginLimiter.Allow(ip, now) {
+		retry := int(math.Ceil(loginLimiter.lockRemaining(ip, now).Minutes()))
+		if retry < 1 {
+			retry = 1
+		}
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
+		jsonErr(w, http.StatusTooManyRequests, "too many failed attempts, locked")
+		return
+	}
 	var body struct {
 		Password string `json:"password"`
 	}
@@ -837,21 +848,35 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	// Load password from secret file (first 32 bytes = JWT secret, next line = password hash)
-	// Password stored as sibling of secret file
+	const defaultPanelPassword = "trust-ng-admin"
 	passPath := filepath.Join(filepath.Dir(*flagSecret), "panel.password")
-	storedPass, _ := os.ReadFile(passPath)
-	expected := strings.TrimSpace(string(storedPass))
-	if expected == "" {
-		expected = "admin" // default if not set
+	stored, err := os.ReadFile(passPath)
+	if err != nil && !os.IsNotExist(err) {
+		log.Printf("[panel] read password file: %v", err)
+		jsonErr(w, http.StatusInternalServerError, "password file unreadable")
+		return
 	}
-	if body.Password != expected {
+	expected := strings.TrimSpace(string(stored))
+	if expected == "" {
+		expected = defaultPanelPassword
+	}
+	if !verifyPassword(expected, body.Password) {
+		loginLimiter.RecordFailure(ip, now)
 		jsonErr(w, http.StatusUnauthorized, "invalid password")
 		return
 	}
+	loginLimiter.ResetFailures(ip)
+	if !isHashedPassword(expected) {
+		if err := migratePlaintextPassword(passPath, body.Password); err != nil {
+			log.Printf("[panel] password migrate: %v", err)
+		}
+	}
 	token := jwtSign(map[string]any{
-		"sub": "admin",
-		"exp": time.Now().Add(24 * time.Hour).Unix(),
+		"sub":  "admin",
+		"iat":  now.Unix(),
+		"nbf":  now.Add(-30 * time.Second).Unix(),
+		"exp":  now.Add(24 * time.Hour).Unix(),
+		"jti":  randHex(16),
 	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
