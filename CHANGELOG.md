@@ -7,6 +7,8 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ## [Unreleased]
 
+## [2.9.1] — 2026-09-29
+
 ### Central Master Multimode
 - Menambahkan source mode `feeds` (default kompatibel) dan `rpz-slave`, terpisah dari pilihan resolver `--with-dnsdist` / `--no-dnsdist`.
 - Mengintegrasikan daemon `rpz-master` untuk sinkronisasi AXFR/IXFR upstream, kompilasi CDB atomik, endpoint `/files/trust.db`, serta transfer downstream terbatas ACL/TSIG.
@@ -14,6 +16,7 @@ Format: [versi] — tanggal, deskripsi singkat.
 - Menambahkan hardening konfigurasi, serialisasi sync/build, graceful shutdown, dan alias CLI `-version`.
 - Memperbaiki instalasi Edge agar `--url` diteruskan melalui `CENTRAL_DB_URLS` pada sinkronisasi pertama.
 - Menambahkan test Go race/vet/build, test kontrak installer multimode, test URL Edge, dan CI terkait.
+- Menyamakan versi panel/UI/telemetri ke 2.9.0, menyelaraskan dokumentasi port RPZ `:5354` dan path konfigurasi `/etc/dnsdist-master/`, serta membuat build binary panel statik dan reproducible.
 
 ---
 
