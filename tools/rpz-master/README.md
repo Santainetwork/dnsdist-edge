@@ -37,13 +37,13 @@ Mengunduh daftar domain dari URL Trust Positif Komdigi dan langsung mengompilasi
 ### 3. Mode Server (DNS + HTTP)
 Menjalankan daemon open master:
 ```bash
-./rpz-master -action serve -dns-listen 127.0.0.1:5353 -http-listen 127.0.0.1:8088
+./rpz-master -action serve -dns-listen 127.0.0.1:5354 -http-listen 127.0.0.1:8088
 ```
 
 ### 4. Mode Sinkronisasi Upstream (IXFR)
 Menarik pembaruan inkremental dari master upstream:
 ```bash
-./rpz-master -action sync -c /etc/dnsdist/rpz-master.json
+./rpz-master -action sync -c /etc/dnsdist-master/rpz-master.json
 ```
 
 ---
@@ -54,7 +54,7 @@ Tambahkan konfigurasi berikut ke `/etc/dnsdist/dnsdist.conf`:
 
 ```lua
 -- 1. Definisikan backend RPZ Master lokal
-newServer({ address = '127.0.0.1:5353', pool = 'rpz-master', name = 'rpz-master' })
+newServer({ address = '127.0.0.1:5354', pool = 'rpz-master', name = 'rpz-master' })
 
 -- 2. Belokkan kueri transfer zona (AXFR/IXFR/SOA) TCP ke backend RPZ Master
 addAction(
@@ -87,7 +87,7 @@ addAction(
 {
   "source_mode": "rpz-slave",
   "zone": "rpz.trustpositif.",
-  "listen_dns": "127.0.0.1:5353",
+  "listen_dns": "127.0.0.1:5354",
   "listen_http": "0.0.0.0:8088",
   "cname_target": "blockpage.komdigi.go.id.",
   "cdb_path": "/var/lib/dnsdist/trustpositif.cdb",
