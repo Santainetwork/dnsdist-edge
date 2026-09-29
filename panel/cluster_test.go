@@ -10,6 +10,18 @@ import (
 	"time"
 )
 
+func TestPanelVersionMatchesReleaseUI(t *testing.T) {
+	if PanelVersion != "2.9.0" {
+		t.Fatalf("PanelVersion = %q, want 2.9.0", PanelVersion)
+	}
+	html := string(indexHTML)
+	for _, marker := range []string{"DNSDist Edge Panel v" + PanelVersion, "setup-edge.sh (v" + PanelVersion + ")"} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("index HTML missing release version marker %q", marker)
+		}
+	}
+}
+
 func TestWebNodeEnrollmentHandoffUI(t *testing.T) {
 	html := string(indexHTML)
 	for _, marker := range []string{
