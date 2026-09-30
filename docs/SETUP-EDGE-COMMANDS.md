@@ -26,14 +26,16 @@
 | 16 | `--uninstall` | — | **Sistem** | Hapus instalasi lengkap |
 | 17 | `--set-cdb-sources` | `<URL1,URL2,...>` | **Cluster** | Set daftar sumber CDB (central, mirror, peer) |
 | 18 | `--with-panel` | — | **Panel** | Install panel HTTPS :8443 (download binary + systemd) |
-| 19 | `--master-url` | `<URL>` | **Cluster** | URL Central Master untuk telemetri terpusat |
-| 20 | `--enroll-token` | `<TOK>` | **Cluster** | Token pendaftaran node ke master cluster |
-| 21 | `--node-name` | `<NAMA>` | **Cluster** | Nama node edge di dashboard cluster (default: hostname) |
-| 22 | `-V`, `--version` / `-h`, `--help` | — | **Info** | Tampilkan versi / bantuan |
-| 23 | `--transparent-dns` | `<off\|auto\|tproxy>` | **Jaringan** | Rencana/atur transparent DNS; `auto` hanya diagnostik |
-| 24 | `--transparent-interface` | `<IFACE>` | **Jaringan** | Interface LAN untuk TPROXY |
-| 25 | `--transparent-subnet` | `<CIDR>` | **Jaringan** | Subnet klien IPv4 untuk TPROXY |
-| 26 | `--apply-transparent` | — | **Jaringan** | Izinkan perubahan nftables/routing; tanpa ini hanya plan |
+| 19 | `--with-blockpage` | — | **Trust+** | Opsional: install Nginx :80, arahkan RPZ ke IP node, upload HTML dari panel |
+| 20 | `--blockpage-addr` | `<ADDR>` | **Trust+** | Opsional: listener blockpage bawaan panel; jangan pakai :80 bersama Nginx |
+| 21 | `--master-url` | `<URL>` | **Cluster** | URL Central Master untuk telemetri terpusat |
+| 22 | `--enroll-token` | `<TOK>` | **Cluster** | Token pendaftaran node ke master cluster |
+| 23 | `--node-name` | `<NAMA>` | **Cluster** | Nama node edge di dashboard cluster (default: hostname) |
+| 24 | `-V`, `--version` / `-h`, `--help` | — | **Info** | Tampilkan versi / bantuan |
+| 25 | `--transparent-dns` | `<off\|auto\|tproxy>` | **Jaringan** | Rencana/atur transparent DNS; `auto` hanya diagnostik |
+| 26 | `--transparent-interface` | `<IFACE>` | **Jaringan** | Interface LAN untuk TPROXY |
+| 27 | `--transparent-subnet` | `<CIDR>` | **Jaringan** | Subnet klien IPv4 untuk TPROXY |
+| 28 | `--apply-transparent` | — | **Jaringan** | Izinkan perubahan nftables/routing; tanpa ini hanya plan |
 
 ---
 
@@ -120,6 +122,12 @@ sudo ./setup-edge.sh --set-upstream "9.9.9.9, 1.1.1.1"
 ```bash
 # Install saat pertama kali
 sudo ./setup-edge.sh --install --with-panel
+
+# Satu mesin sebagai DNS + halaman pemblokiran Trust+ (Nginx :80)
+sudo ./setup-edge.sh --install --with-panel --with-blockpage
+
+# Alternatif tanpa Nginx: listener bawaan panel pada port non-konflik
+sudo ./setup-edge.sh --install --with-panel --blockpage-addr :8080
 
 # Tambah panel ke node yang sudah ada
 sudo ./setup-edge.sh --with-panel

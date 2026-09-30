@@ -7,6 +7,14 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ## [Unreleased]
 
+### Panel — Auth Hardening & Trust+ Blockpage (Opsional)
+- Password panel kini PBKDF2 (`pbkdf2$...`) dengan migrasi plaintext saat login; `/api/settings` hash password baru dan tolak password <8 karakter.
+- Rate limiter login per-IP (5 gagal → kunci 15 menit, 429 + `Retry-After`); JWT tambah `iat/nbf/jti`.
+- Halaman blokir Trust+ opsional: default `Akses Diblokir` dengan placeholder `{{domain}}` (strip port + HTML-escape); API `GET/POST/DELETE /api/blockpage` dukung JSON `{html}` dan multipart `page`, limit 1 MiB.
+- Listener panel opt-in via `-blockpage-addr` / `PANEL_BLOCKPAGE_ADDR` (default mati agar tidak bentrok :80); tambah `-blockpage-webroot` / `PANEL_BLOCKPAGE_WEBROOT` untuk mirror upload ke nginx; reset tulis default ke mirror.
+- Installer: default `WITH_BLOCKPAGE=false`; flag `--with-blockpage` (nginx :80 + mirror `/var/www/html/index.html`, sinkhole otomatis ke IP node) dan `--blockpage-addr <ADDR>`; nilai tersimpan `SAVED_BLOCKPAGE_*` di `node.conf` dan dihormati kecuali flag eksplisit diberikan; nginx hanya dipasang bila diminta dan mode bukan adguard.
+- UI Settings: kartu Trust+ (badge aktif/off, info target listen/webroot, upload file, reset), tombol login busy state + pesan lockout dari header `Retry-After`, token gaya netral, login grid/glow.
+
 ## [2.9.1] — 2026-09-29
 
 ### Central Master Multimode

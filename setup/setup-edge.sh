@@ -27,6 +27,9 @@ EDGE_DIR=$(pwd)
 CENTRAL_DB_URL="http://central-manager.local/blacklist.db"
 PANEL_RELEASE_URL="${PANEL_RELEASE_URL:-https://github.com/Santainetwork/dnsdist-edge/releases/latest/download/dnsdist-panel}"
 WITH_PANEL=${WITH_PANEL:-true}
+WITH_BLOCKPAGE=${WITH_BLOCKPAGE:-false}
+BLOCKPAGE_ADDR=${BLOCKPAGE_ADDR:-}
+BLOCKPAGE_WEBROOT=${BLOCKPAGE_WEBROOT:-}
 WEBSERVER_PASSWORD="trust-ng-admin"
 WEBSERVER_APIKEY="trust-ng-apikey-changeme"
 TRANSPARENT_MODE="${TRANSPARENT_MODE:-}"
@@ -78,6 +81,8 @@ show_help() {
     echo "      --set-cdb-sources   Ubah daftar sumber CDB (central, mirror, peer) dipisah koma"
     echo "      --with-panel        Pasang/aktifkan DNSDist Panel (default: aktif)"
     echo "      --no-panel          Lewati pemasangan DNSDist Panel"
+    echo "      --with-blockpage    Pasang Nginx Trust+ :80; halaman HTML diatur via panel"
+    echo "      --blockpage-addr <ADDR>  Listener blockpage bawaan panel (contoh :8080, bukan :80 bila Nginx aktif)"
     echo "      --transparent-dns <off|auto|tproxy>  Mode transparent DNS (default: off)"
     echo "      --transparent-interface <IFACE>      Interface LAN untuk mode tproxy"
     echo "      --transparent-subnet <CIDR>          Subnet IPv4 klien untuk mode tproxy"
@@ -169,6 +174,9 @@ SAVED_WEBSERVER_PASSWORD="${WEBSERVER_PASSWORD}"
 SAVED_WEBSERVER_APIKEY="${WEBSERVER_APIKEY}"
 SAVED_MASTER_URL="${MASTER_URL:-}"
 SAVED_ENROLL_TOKEN="${ENROLL_TOKEN:-}"
+SAVED_WITH_BLOCKPAGE="${WITH_BLOCKPAGE:-false}"
+SAVED_BLOCKPAGE_ADDR="${BLOCKPAGE_ADDR:-}"
+SAVED_BLOCKPAGE_WEBROOT="${BLOCKPAGE_WEBROOT:-}"
 SAVED_NODE_NAME="${NODE_NAME:-}"
 SAVED_TRANSPARENT_MODE="${TRANSPARENT_MODE:-off}"
 SAVED_TRANSPARENT_INTERFACE="${TRANSPARENT_INTERFACE:-}"
@@ -203,6 +211,9 @@ load_config() {
             [ -n "$SAVED_WEBSERVER_APIKEY" ] && [ "$APIKEY_EXPLICIT" != true ] && WEBSERVER_APIKEY="$SAVED_WEBSERVER_APIKEY"
             [ -n "$SAVED_MASTER_URL" ] && [ "$MASTER_URL_EXPLICIT" != true ] && MASTER_URL="$SAVED_MASTER_URL"
             [ -n "$SAVED_ENROLL_TOKEN" ] && [ "$ENROLL_TOKEN_EXPLICIT" != true ] && ENROLL_TOKEN="$SAVED_ENROLL_TOKEN"
+            [ -n "$SAVED_WITH_BLOCKPAGE" ] && [ "$BLOCKPAGE_EXPLICIT" != true ] && WITH_BLOCKPAGE="$SAVED_WITH_BLOCKPAGE"
+            [ -n "$SAVED_BLOCKPAGE_ADDR" ] && [ "$BLOCKPAGE_EXPLICIT" != true ] && BLOCKPAGE_ADDR="$SAVED_BLOCKPAGE_ADDR"
+            [ -n "$SAVED_BLOCKPAGE_WEBROOT" ] && [ "$BLOCKPAGE_EXPLICIT" != true ] && BLOCKPAGE_WEBROOT="$SAVED_BLOCKPAGE_WEBROOT"
             [ -n "$SAVED_NODE_NAME" ] && [ "$NODE_NAME_EXPLICIT" != true ] && NODE_NAME="$SAVED_NODE_NAME"
             [ -n "$SAVED_TRANSPARENT_MODE" ] && TRANSPARENT_MODE="$SAVED_TRANSPARENT_MODE"
             [ -n "$SAVED_TRANSPARENT_INTERFACE" ] && TRANSPARENT_INTERFACE="$SAVED_TRANSPARENT_INTERFACE"
@@ -231,6 +242,9 @@ load_config_silent() {
         [ -n "$SAVED_WEBSERVER_APIKEY" ] && WEBSERVER_APIKEY="$SAVED_WEBSERVER_APIKEY"
         [ -n "$SAVED_MASTER_URL" ] && MASTER_URL="$SAVED_MASTER_URL"
         [ -n "$SAVED_ENROLL_TOKEN" ] && ENROLL_TOKEN="$SAVED_ENROLL_TOKEN"
+        [ -n "$SAVED_WITH_BLOCKPAGE" ] && [ "$BLOCKPAGE_EXPLICIT" != true ] && WITH_BLOCKPAGE="$SAVED_WITH_BLOCKPAGE"
+        [ -n "$SAVED_BLOCKPAGE_ADDR" ] && [ "$BLOCKPAGE_EXPLICIT" != true ] && BLOCKPAGE_ADDR="$SAVED_BLOCKPAGE_ADDR"
+        [ -n "$SAVED_BLOCKPAGE_WEBROOT" ] && [ "$BLOCKPAGE_EXPLICIT" != true ] && BLOCKPAGE_WEBROOT="$SAVED_BLOCKPAGE_WEBROOT"
         [ -n "$SAVED_NODE_NAME" ] && NODE_NAME="$SAVED_NODE_NAME"
         [ -n "$SAVED_TRANSPARENT_MODE" ] && TRANSPARENT_MODE="$SAVED_TRANSPARENT_MODE"
         [ -n "$SAVED_TRANSPARENT_INTERFACE" ] && TRANSPARENT_INTERFACE="$SAVED_TRANSPARENT_INTERFACE"
@@ -751,7 +765,6 @@ PYEOF
 do_install_nginx() {
     echo -e "${CYAN}=== Menginstal Nginx Web Server untuk Trust Positif ===${NC}"
     apt-get install -y nginx
-    
     cat > /var/www/html/index.html <<'EOF'
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Akses Ditolak - Trust Positif</title>
@@ -1038,7 +1051,10 @@ Environment=PANEL_SECRET_FILE=/var/lib/dnsdist/panel.secret
 Environment=PANEL_CERT=/var/lib/dnsdist/panel-cert.pem
 Environment=PANEL_KEY=/var/lib/dnsdist/panel-key.pem
 Environment=DNSDIST_CONF=/etc/dnsdist/dnsdist.conf
-Environment=DNSDIST_UPSTREAMS=/etc/dnsdist/upstreams.conf${extra_env}
+Environment=DNSDIST_UPSTREAMS=/etc/dnsdist/upstreams.conf
+Environment=PANEL_BLOCKPAGE_ADDR=${BLOCKPAGE_ADDR}
+Environment=PANEL_BLOCKPAGE_FILE=/var/lib/dnsdist/blockpage.html
+Environment=PANEL_BLOCKPAGE_WEBROOT=${BLOCKPAGE_WEBROOT}${extra_env}
 LimitNOFILE=65536
 
 [Install]
@@ -1087,9 +1103,16 @@ do_install() {
             echo -e "${GREEN}[*] Menggunakan Mode AdGuard (0.0.0.0)${NC}"
         else
             echo ""
-            read -p "Apakah Anda ingin menginstal Nginx lokal di Edge Node ini sebagai halaman Trust Positif? (y/n) [n]: " install_nx
+            local install_nx="n"
+            if [ "$WITH_BLOCKPAGE" = true ] && [ -n "$BLOCKPAGE_WEBROOT" ]; then
+                install_nx="y"
+            else
+                read -p "Apakah Anda ingin menginstal Nginx lokal di Edge Node ini sebagai halaman Trust Positif? (y/n) [n]: " install_nx
+            fi
             if [ "$install_nx" = "y" ] || [ "$install_nx" = "Y" ]; then
-                do_install_nginx
+                WITH_BLOCKPAGE=true
+                BLOCKPAGE_ADDR=""
+                BLOCKPAGE_WEBROOT="/var/www/html/index.html"
                 local_ip=$(hostname -I | awk '{print $1}')
                 echo -e "${GREEN}[*] Memilih IP Node ini ($local_ip) sebagai target Sinkhole RPZ otomatis.${NC}"
                 RPZ_IPS="$local_ip"
@@ -1106,6 +1129,11 @@ do_install() {
             upstreams_in="1.1.1.1, 8.8.8.8"
         fi
         UPSTREAM_DNS="$upstreams_in"
+    fi
+
+    # Non-interactive --with-blockpage: sinkhole to this node automatically.
+    if [ "$WITH_BLOCKPAGE" = true ] && [ "$CHOSEN_MODE" != "adguard" ] && [ -n "$BLOCKPAGE_WEBROOT" ]; then
+        RPZ_IPS=$(hostname -I | awk '{print $1}')
     fi
 
     echo -e "\n${CYAN}=== [2/5] Persiapan Konfigurasi & Sertifikat TLS ===${NC}"
@@ -1277,6 +1305,7 @@ TRANSPARENT_EXPLICIT=false
 
 MASTER_URL_EXPLICIT=false
 ENROLL_TOKEN_EXPLICIT=false
+BLOCKPAGE_EXPLICIT=false
 NODE_NAME_EXPLICIT=false
 MASTER_URL=""
 ENROLL_TOKEN=""
@@ -1375,6 +1404,20 @@ while [ "$#" -gt 0 ]; do
             ;;
         --no-panel)
             WITH_PANEL=false
+            ;;
+        --with-blockpage)
+            WITH_BLOCKPAGE=true
+            BLOCKPAGE_ADDR=""
+            BLOCKPAGE_WEBROOT="/var/www/html/index.html"
+            BLOCKPAGE_EXPLICIT=true
+            ;;
+        --blockpage-addr)
+            [ -n "${2:-}" ] || { echo -e "${RED}[!] --blockpage-addr membutuhkan alamat listener.${NC}"; exit 1; }
+            WITH_BLOCKPAGE=true
+            BLOCKPAGE_ADDR="$2"
+            BLOCKPAGE_WEBROOT=""
+            BLOCKPAGE_EXPLICIT=true
+            shift
             ;;
         --transparent-dns)
             case "${2:-}" in
@@ -1491,6 +1534,9 @@ fi
 
 if [ "$INSTALL" = true ]; then
     do_install
+    if [ "$WITH_BLOCKPAGE" = true ] && [ -n "$BLOCKPAGE_WEBROOT" ] && [ "$CHOSEN_MODE" != "adguard" ]; then
+        do_install_nginx
+    fi
     do_install_panel
     exit 0
 fi

@@ -45,7 +45,7 @@ func (l *loginRateLimiter) Allow(ip string, now time.Time) bool {
 	if now.Before(e.lockedTil) {
 		return false
 	}
-	if !e.lockedTil.IsZero() && now.After(e.lockedTil) {
+	if !e.lockedTil.IsZero() && !now.Before(e.lockedTil) {
 		// Lockout expired: start fresh.
 		delete(l.entries, ip)
 		return true
@@ -61,7 +61,7 @@ func (l *loginRateLimiter) RecordFailure(ip string, now time.Time) {
 		e = &loginAttempt{}
 		l.entries[ip] = e
 	}
-	if !e.lockedTil.IsZero() && now.After(e.lockedTil) {
+	if !e.lockedTil.IsZero() && !now.Before(e.lockedTil) {
 		e.failures = 0
 		e.lockedTil = time.Time{}
 	}
@@ -87,7 +87,7 @@ func (l *loginRateLimiter) lockRemaining(ip string, now time.Time) time.Duration
 	if !ok {
 		return 0
 	}
-	if remaining := time.Until(e.lockedTil); remaining > 0 {
+	if remaining := e.lockedTil.Sub(now); remaining > 0 {
 		return remaining
 	}
 	return 0

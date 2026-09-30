@@ -7,18 +7,18 @@
 <style>
 /* ── Design System & Variables ── */
 :root {
-  --bg: #07090e;
-  --surface: #0d121d;
-  --card: #121826;
-  --card-hover: #172033;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(56, 189, 248, 0.5);
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-sub: #64748b;
+  --bg: #09090b;
+  --surface: #0c0c0f;
+  --card: #111113;
+  --card-hover: #18181b;
+  --border: #27272a;
+  --border-focus: #fafafa;
+  --text-main: #fafafa;
+  --text-muted: #a1a1aa;
+  --text-sub: #71717a;
   
-  --sky: #38bdf8;
-  --sky-glow: rgba(56, 189, 248, 0.15);
+  --sky: #f4f4f5;
+  --sky-glow: rgba(250, 250, 250, 0.08);
   --emerald: #10b981;
   --emerald-glow: rgba(16, 185, 129, 0.2);
   --amber: #f59e0b;
@@ -27,15 +27,15 @@
   
   --sidebar-w: 240px;
   --header-h: 60px;
-  --radius-sm: 6px;
-  --radius: 12px;
-  --radius-lg: 16px;
+  --radius-sm: 7px;
+  --radius: 10px;
+  --radius-lg: 12px;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text-main);
   min-height: 100vh;
@@ -287,7 +287,7 @@ nav a.active svg { opacity: 1; stroke: var(--sky); }
 label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.45rem; text-transform: uppercase; letter-spacing: 0.04em; }
 input[type="text"], input[type="password"], textarea {
   width: 100%;
-  background: #090e18;
+  background: #09090b;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-main);
@@ -299,9 +299,9 @@ input[type="text"], input[type="password"], textarea {
 }
 textarea { min-height: 110px; resize: vertical; line-height: 1.5; font-family: ui-monospace, SFMono-Regular, monospace; }
 input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
-  border-color: var(--sky);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
-  background: #0a111e;
+  border-color: #71717a;
+  box-shadow: 0 0 0 3px rgba(250, 250, 250, 0.08);
+  background: #0c0c0f;
 }
 .hint { font-size: 0.72rem; color: var(--text-sub); margin-top: 0.4rem; }
 .hint code { background: rgba(255, 255, 255, 0.06); padding: 0.1rem 0.35rem; border-radius: 4px; color: var(--sky); }
@@ -320,9 +320,10 @@ input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
   border: 1px solid transparent;
   transition: var(--transition);
 }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 .btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
-.btn-primary { background: var(--sky); color: #07090e; }
-.btn-primary:hover { background: #0284c7; color: #fff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25); }
+.btn-primary { background: #fafafa; color: #09090b; }
+.btn-primary:hover { background: #e4e4e7; color: #09090b; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
 .btn-secondary { background: rgba(255, 255, 255, 0.05); color: var(--text-main); border-color: var(--border); }
 .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
 .btn-danger { background: rgba(244, 63, 94, 0.15); color: var(--rose); border-color: rgba(244, 63, 94, 0.3); }
@@ -425,8 +426,12 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
 #login-page {
   position: fixed;
   inset: 0;
-  background: rgba(7, 9, 14, 0.85);
-  backdrop-filter: blur(12px);
+  background:
+    radial-gradient(circle at 50% 10%, rgba(56, 189, 248, 0.08), transparent 30%),
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+    #09090b;
+  background-size: auto, 36px 36px, 36px 36px, auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -436,22 +441,23 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 2.25rem;
-  width: 360px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+  padding: 2rem;
+  width: min(390px, calc(100vw - 2rem));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
 }
 .login-header { text-align: center; margin-bottom: 1.75rem; }
 .login-header .logo-ring {
   width: 50px;
   height: 50px;
   margin: 0 auto 0.75rem;
-  background: linear-gradient(135deg, #0284c7, #38bdf8);
-  border-radius: 14px;
+  background: #fafafa;
+  border: 1px solid #fff;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.login-header .logo-ring svg { width: 28px; height: 28px; stroke: #fff; fill: none; stroke-width: 2; }
+.login-header .logo-ring svg { width: 27px; height: 27px; stroke: #09090b; fill: none; stroke-width: 2; }
 .login-header h2 { font-size: 1.15rem; font-weight: 700; color: #fff; }
 .login-header p { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
 
@@ -554,7 +560,7 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
       <label>Sandi Panel</label>
       <input type="password" id="login-pass" placeholder="Masukkan password" autofocus>
     </div>
-    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">
+    <button class="btn btn-primary" id="login-submit" style="width:100%" onclick="doLogin()">
       <span>Masuk ke Dashboard</span>
       <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
     </button>
@@ -1198,6 +1204,32 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
     <div class="card-box">
       <div class="card-box-header">
         <div>
+          <h3>Halaman Blokir Trust+ (Opsional)</h3>
+          <p>Host halaman blokir di mesin ini: 1 mesin = DNS + pemblokiran</p>
+        </div>
+        <div id="blockpage-badge"></div>
+      </div>
+      <div id="blockpage-info" style="font-size:0.8rem;color:var(--text-sub);margin-bottom:1rem;"></div>
+      <div class="form-group" style="max-width:520px">
+        <label>Unggah Halaman Trust+ (HTML, maks 1 MiB)</label>
+        <input type="file" id="blockpage-file" accept=".html,.htm,text/html" style="color:var(--text-muted)">
+        <p style="font-size:0.75rem;color:var(--text-sub);margin-top:0.35rem">
+          Placeholder <span class="mono" style="color:var(--sky)">{{domain}}</span> diganti nama domain yang diblokir.
+        </p>
+      </div>
+      <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="uploadBlockpage()">
+          <span>Unggah Halaman</span>
+        </button>
+        <button class="btn btn-danger" onclick="resetBlockpage()">
+          <span>Kembalikan Default</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card-box">
+      <div class="card-box-header">
+        <div>
           <h3>Informasi Versi & Sistem</h3>
           <p>Detail arsitektur instalasi Trust-NG</p>
         </div>
@@ -1361,7 +1393,10 @@ function isLoggedIn() { return !!token; }
 async function doLogin() {
   const pass = document.getElementById('login-pass').value;
   const err = document.getElementById('login-err');
+  const button = document.getElementById('login-submit');
   err.textContent = '';
+  button.disabled = true;
+  button.querySelector('span').textContent = 'Memverifikasi…';
   try {
     const r = await fetch(API + '/api/login', {
       method: 'POST',
@@ -1369,13 +1404,20 @@ async function doLogin() {
       body: JSON.stringify({ password: pass })
     });
     const d = await r.json();
-    if (!r.ok) { err.textContent = d.error || 'Login gagal'; return; }
+    if (!r.ok) {
+      const retry = r.headers.get('Retry-After');
+      err.textContent = retry ? `Terlalu banyak percobaan. Coba lagi dalam ${retry} menit.` : (d.error || 'Login gagal');
+      return;
+    }
     token = d.token;
     localStorage.setItem('panel_token', token);
     document.getElementById('login-page').style.display = 'none';
     onLogin();
   } catch (e) {
     err.textContent = 'Koneksi error: ' + e.message;
+  } finally {
+    button.disabled = false;
+    button.querySelector('span').textContent = 'Masuk ke Dashboard';
   }
 }
 
@@ -1410,6 +1452,7 @@ function nav(page, el) {
   } else {
     if (clusterPoller) { clearInterval(clusterPoller); clusterPoller = null; }
   }
+  if (page === 'settings') loadBlockpageInfo();
   if (page === 'rpz' || page === 'upstream' || page === 'safesearch' || page === 'dotdoh' || page === 'settings') {
     fetchConfig();
   }
@@ -1702,6 +1745,58 @@ async function savePassword() {
     document.getElementById('set-pass').value = '';
   } catch (e) {
     toast('Gagal mengganti sandi: ' + e.message, 'error');
+  }
+}
+
+// ── Trust+ Block Page ──
+async function loadBlockpageInfo() {
+  try {
+    const info = await api('/api/blockpage');
+    const badge = document.getElementById('blockpage-badge');
+    const desc = document.getElementById('blockpage-info');
+    if (!badge || !desc) return;
+    badge.innerHTML = info.enabled
+      ? '<span class="badge" style="background:rgba(34,197,94,0.12);color:#4ade80">Listener aktif</span>'
+      : '<span class="badge" style="background:rgba(148,163,184,0.12);color:#94a3b8">Listener off</span>';
+    desc.textContent = info.custom
+      ? 'Halaman kustom aktif (' + info.path + '). '
+      : 'Halaman default Trust+ aktif (' + info.path + '). ';
+    const target = info.listen || info.webroot || 'host lokal';
+    desc.textContent += info.enabled
+      ? 'Dilayani melalui ' + target + ' — pastikan SINKHOLE_IPS di dnsdist.conf mengarah ke mesin ini.'
+      : 'Aktifkan dengan flag -blockpage-addr (mis. :80) atau env PANEL_BLOCKPAGE_ADDR, lalu arahkan SINKHOLE_IPS ke mesin ini.';
+  } catch (e) { /* panel versi lama tanpa endpoint blockpage */ }
+}
+
+async function uploadBlockpage() {
+  const f = document.getElementById('blockpage-file').files[0];
+  if (!f) { toast('Pilih file HTML dulu', 'error'); return; }
+  if (f.size > 1048576) { toast('Ukuran maksimum 1 MiB', 'error'); return; }
+  const fd = new FormData();
+  fd.append('page', f);
+  try {
+    const r = await fetch(API + '/api/blockpage', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'upload gagal');
+    toast('Halaman Trust+ berhasil diunggah');
+    loadBlockpageInfo();
+  } catch (e) {
+    toast('Gagal mengunggah halaman: ' + e.message, 'error');
+  }
+}
+
+async function resetBlockpage() {
+  if (!confirm('Kembalikan halaman blokir ke default Trust+?')) return;
+  try {
+    await api('/api/blockpage', 'DELETE');
+    toast('Halaman blokir dikembalikan ke default');
+    loadBlockpageInfo();
+  } catch (e) {
+    toast('Gagal reset halaman: ' + e.message, 'error');
   }
 }
 

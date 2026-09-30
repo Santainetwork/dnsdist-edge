@@ -18,6 +18,26 @@ func TestSettingsBlockModeCardMarkup(t *testing.T) {
 	}
 }
 
+func TestBlockpageSettingsMarkup(t *testing.T) {
+	page := string(indexHTML)
+	for _, marker := range []string{
+		"Halaman Blokir Trust+ (Opsional)",
+		`id="blockpage-file"`,
+		"uploadBlockpage()",
+		"resetBlockpage()",
+		"{{domain}}",
+		`id="login-submit"`,
+		"Memverifikasi…",
+	} {
+		if !strings.Contains(page, marker) {
+			t.Fatalf("panel HTML missing marker %q", marker)
+		}
+	}
+	if strings.Contains(page, "blockpage-preview") {
+		t.Fatal("panel must not expose stale or unsafe blockpage preview URL")
+	}
+}
+
 func TestRuleMatchingLogic(t *testing.T) {
 	sampleJSON := `{
 		"rules": [

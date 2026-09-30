@@ -103,6 +103,9 @@ var (
 	flagKey               = flag.String("key", envOr("PANEL_KEY", "/var/lib/dnsdist/panel-key.pem"), "TLS key path")
 	flagSecret            = flag.String("secret-file", envOr("PANEL_SECRET_FILE", "/var/lib/dnsdist/panel.secret"), "JWT secret file")
 	flagSetupSh           = flag.String("setup-sh", "/usr/local/bin/setup-edge.sh", "Path to setup-edge.sh")
+	flagBlockpageListen   = flag.String("blockpage-addr", envOr("PANEL_BLOCKPAGE_ADDR", ""), "Optional public listener for Trust+ block page (e.g. :80). Empty = off")
+	flagBlockpageFile     = flag.String("blockpage-file", envOr("PANEL_BLOCKPAGE_FILE", "/var/lib/dnsdist/blockpage.html"), "Custom Trust+ block page HTML path")
+	flagBlockpageWebroot  = flag.String("blockpage-webroot", envOr("PANEL_BLOCKPAGE_WEBROOT", ""), "Optional mirror path for nginx-served Trust+ HTML")
 	flagMaster            = flag.Bool("master", envBool("PANEL_MASTER", false), "Enable Central Master mode (CDB builder & publisher)")
 	flagSourceMode        = flag.String("source-mode", envOr("PANEL_SOURCE_MODE", "feeds"), "Master data source mode: feeds or rpz-slave")
 	flagFilesDir          = flag.String("files-dir", envOr("PANEL_FILES_DIR", "/var/www/html/files"), "Directory to serve /files/ from (trust.db, manifest.json)")
@@ -872,11 +875,11 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	token := jwtSign(map[string]any{
-		"sub":  "admin",
-		"iat":  now.Unix(),
-		"nbf":  now.Add(-30 * time.Second).Unix(),
-		"exp":  now.Add(24 * time.Hour).Unix(),
-		"jti":  randHex(16),
+		"sub": "admin",
+		"iat": now.Unix(),
+		"nbf": now.Add(-30 * time.Second).Unix(),
+		"exp": now.Add(24 * time.Hour).Unix(),
+		"jti": randHex(16),
 	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
@@ -1033,8 +1036,12 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.PanelPassword != "" {
+		if len(body.PanelPassword) < 8 {
+			jsonErr(w, http.StatusBadRequest, "password must be at least 8 characters")
+			return
+		}
 		passPath := filepath.Join(filepath.Dir(*flagSecret), "panel.password")
-		if err := atomicWriteString(passPath, body.PanelPassword, 0o600); err != nil {
+		if err := atomicWriteString(passPath, hashPassword(body.PanelPassword)+"\n", 0o600); err != nil {
 			jsonErr(w, http.StatusInternalServerError, "cannot save password: "+err.Error())
 			return
 		}
@@ -1268,6 +1275,23 @@ func main() {
 	mux.HandleFunc("/api/safesearch", auth(handleSafeSearch))
 	mux.HandleFunc("/api/dotdoh", auth(handleDoTDoH))
 	mux.HandleFunc("/api/settings", auth(handleSettings))
+	mux.HandleFunc("/api/blockpage", auth(handleBlockpage))
+
+	// Optional public Trust+ block-page listener (one machine = DNS + blockpage).
+	if *flagBlockpageListen != "" {
+		bpSrv := &http.Server{
+			Addr:         *flagBlockpageListen,
+			Handler:      http.HandlerFunc(serveBlockpage),
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
+		go func() {
+			io.WriteString(os.Stderr, fmt.Sprintf("[panel] Trust+ block page listener on %s\n", *flagBlockpageListen))
+			if err := bpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Printf("[panel] blockpage listener error: %v", err)
+			}
+		}()
+	}
 
 	// Master API Endpoints
 	registerMasterRoutes(mux, *flagMaster)
