@@ -123,6 +123,9 @@ var (
 	flagAgentStateFile    = flag.String("agent-state-file", envOr("PANEL_AGENT_STATE_FILE", "/var/lib/dnsdist/cluster-agent.json"), "Path to edge agent state JSON")
 	flagHeartbeatInterval = flag.Duration("heartbeat-interval", 60*time.Second, "Edge telemetry heartbeat interval to master")
 	flagGenEnrollToken    = flag.Bool("enrollment-token", false, "Generate an enrollment token and exit (CLI mode)")
+	flagDnstapAddr        = flag.String("dnstap-addr", envOr("PANEL_DNSTAP_ADDR", ""), "Optional dnstap framestream TCP listener address (e.g. 127.0.0.1:6000)")
+	dnstapAgg             = NewDnstapAggregator(50000)
+	dnstapServer          *DnstapServer
 )
 
 func envOr(key, def string) string {
@@ -1309,6 +1312,19 @@ func main() {
 	// Edge Cluster Agent & Config (available on all nodes)
 	initEdgeAgent(*flagAgentStateFile, *flagMasterURL, *flagEnrollToken, *flagNodeName, *flagHeartbeatInterval)
 	mux.HandleFunc("/api/cluster/config", auth(handleEdgeClusterConfig))
+
+	// dnstap Analytics Listener & Endpoint
+	if *flagDnstapAddr != "" {
+		srv, err := NewDnstapServer("tcp", *flagDnstapAddr, dnstapAgg)
+		if err != nil {
+			log.Printf("[dnstap] warning: could not bind dnstap listener on %s: %v", *flagDnstapAddr, err)
+		} else {
+			dnstapServer = srv
+			srv.Start()
+			log.Printf("[dnstap] listener active on %s (framestream zero-client-ip)", *flagDnstapAddr)
+		}
+	}
+	mux.HandleFunc("/api/dnstap/top", auth(handleDnstapTop))
 
 	// File Publisher (for Master Mode: serves trust.db, manifest.json)
 	fs := http.FileServer(http.Dir(*flagFilesDir))
