@@ -379,12 +379,39 @@ func (cs *ClusterStore) DeleteNode(id string) error {
 	return cs.save()
 }
 
+func (cs *ClusterStore) Close() error {
+	return nil
+}
+
 // ─── Master HTTP Handlers ───────────────────────────────────────────────────
 
-var clusterStore *ClusterStore
+var (
+	clusterStore   *ClusterStore
+	clusterStorage ClusterStorage
+)
+
+func getClusterStorage() ClusterStorage {
+	if clusterStorage != nil {
+		return clusterStorage
+	}
+	return clusterStore
+}
+
+func setClusterStorage(s ClusterStorage) {
+	clusterStorage = s
+}
 
 func initClusterStore(filePath string) {
+	if strings.HasSuffix(filePath, ".db") || strings.HasSuffix(filePath, ".sqlite") {
+		store, err := NewSQLiteClusterStore(filePath)
+		if err != nil {
+			log.Fatalf("gagal inisialisasi SQLite cluster store: %v", err)
+		}
+		clusterStorage = store
+		return
+	}
 	clusterStore = newClusterStore(filePath)
+	clusterStorage = clusterStore
 	// Background ticker to keep node statuses fresh
 	go func() {
 		t := time.NewTicker(30 * time.Second)
@@ -419,7 +446,7 @@ func handleClusterToken(w http.ResponseWriter, r *http.Request) {
 	default:
 		duration = 24 * time.Hour
 	}
-	tok := clusterStore.GenerateEnrollmentToken(duration)
+	tok := getClusterStorage().GenerateEnrollmentToken(duration)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"token":      tok,
@@ -438,7 +465,7 @@ func handleClusterRegister(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
-	rec, err := clusterStore.RegisterNode(req, clientIP(r))
+	rec, err := getClusterStorage().RegisterNode(req, clientIP(r))
 	if err != nil {
 		jsonErr(w, http.StatusUnauthorized, err.Error())
 		return
@@ -462,7 +489,7 @@ func handleClusterHeartbeat(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
-	if err := clusterStore.ProcessHeartbeat(req, clientIP(r)); err != nil {
+	if err := getClusterStorage().ProcessHeartbeat(req, clientIP(r)); err != nil {
 		jsonErr(w, http.StatusUnauthorized, err.Error())
 		return
 	}
@@ -493,7 +520,7 @@ func handleClusterHeartbeat(w http.ResponseWriter, r *http.Request) {
 func handleClusterNodes(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		nodes, agg := clusterStore.ListNodes()
+		nodes, agg := getClusterStorage().ListNodes()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"nodes":     nodes,
@@ -505,7 +532,7 @@ func handleClusterNodes(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, http.StatusBadRequest, "id parameter required")
 			return
 		}
-		if err := clusterStore.DeleteNode(id); err != nil {
+		if err := getClusterStorage().DeleteNode(id); err != nil {
 			jsonErr(w, http.StatusNotFound, err.Error())
 			return
 		}
