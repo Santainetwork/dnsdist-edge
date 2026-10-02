@@ -173,3 +173,30 @@ Jika opsi `--with-panel` diaktifkan:
 - **HTTPS**: `https://IP_MASTER:8443` (SSL self-signed)
 - **HTTP**: `http://IP_MASTER:8084` (Plain HTTP)
 - Login default: `admin` / `trust-ng-admin`
+
+### Penyimpanan Cluster (JSON / SQLite)
+
+Panel master menyimpan registry node dan token enroll lewat interface `ClusterStorage`:
+
+- **JSON file** (default): `--cluster-nodes-file /var/lib/dnsdist/cluster-nodes.json`.
+- **SQLite pure-Go** (tanpa CGO, mode WAL): cukup akhiri path dengan `.db` atau `.sqlite`, misalnya `--cluster-nodes-file /var/lib/dnsdist/cluster.db`.
+
+Kedua engine kompatibel penuh; migrasi cukup mengganti path file.
+
+### Analitik dnstap (tanpa client IP)
+
+Panel bisa menerima streaming dnstap dari dnsdist dan menampilkan domain terblokir teratas:
+
+```bash
+dnsdist-panel --master --dnstap-addr 127.0.0.1:6000
+```
+
+Di `dnsdist.conf` tambahkan logger framestream ke alamat yang sama:
+
+```lua
+local fstrm = newFrameStreamTcpLogger("127.0.0.1:6000")
+addAction(kvsRule, DnstapLogAction("master-01", fstrm))
+```
+
+- Endpoint terautentikasi: `GET /api/dnstap/top?limit=10`.
+- Client IP dibuang seketika setelah parsing (kepatuhan UU PDP); entri unik berlebih dialihkan ke bucket `_other_` agar memori tetap terbatas.

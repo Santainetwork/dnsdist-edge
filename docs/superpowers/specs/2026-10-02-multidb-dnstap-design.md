@@ -91,7 +91,7 @@ type ClusterStorage interface {
 -- dnstap streaming logger ke collector lokal
 local fstrm = newFrameStreamTcpLogger("127.0.0.1:6000")
 -- Log query terblokir saja
-addAction(AndRule({OrRule({kvd_trust, kvd_custom})}), DnstapLogAction("edge-node-01", fstrm))
+addAction(kvsRule, DnstapLogAction("edge-node-01", fstrm))
 ```
 
 Panel dijalankan dengan `--dnstap-addr 127.0.0.1:6000`.

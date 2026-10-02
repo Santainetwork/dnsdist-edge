@@ -129,6 +129,15 @@ Kedua mode menerbitkan kontrak Edge yang sama: `http://MASTER:8080/files/trust.d
 - **Refused ANY queries** (anti-amplification)
 - **Private IP blocking** untuk RFC1918 ranges
 - **Secure credentials** untuk web console & API
+- **PBKDF2 password hashing** dengan migrasi plaintext otomatis
+- **Login lockout per-IP** (5 gagal → kunci 15 menit, 429 + `Retry-After`)
+
+### 🖥️ Management Panel (Go, single binary)
+- **Cluster registry** — pendaftaran edge node via enrollment token single-use dengan TTL
+- **Pluggable storage** — JSON file (default, `--cluster-nodes-file *.json`) atau SQLite pure-Go (zero CGO, mode WAL, cukup akhiri path dengan `.db`/`.sqlite`)
+- **Edge telemetry** — heartbeat QPS, cache-hit, CPU/mem, status online/offline
+- **dnstap analytics** — streaming framestream TCP (`--dnstap-addr 127.0.0.1:6000`), `GET /api/dnstap/top?limit=N`, tanpa menyimpan client IP (UU PDP)
+- **Trust+ blockpage** opsional dengan listener dan mirror nginx terpisah
 
 ### 📊 Advanced Monitoring
 - **Top queries** - Domain paling banyak diminta
@@ -187,7 +196,16 @@ dnsdist-edge/
 ├── docs/                        # Documentation
 │   ├── SETUP.md                # Full setup guide
 │   ├── SETUP-EDGE-COMMANDS.md  # CLI command guide for setup-edge.sh
+│   ├── CLUSTER-PLAN.md         # Cluster & storage architecture
 │   └── QUICK_REFERENCE.md      # Command cheatsheet
+├── panel/                      # Go management panel (dnsdist-panel)
+│   ├── main.go                 # HTTP API, CLI modes, cluster + dnstap wiring
+│   ├── cluster.go              # Node registry & telemetry (JSON store)
+│   ├── storage.go              # ClusterStorage interface + pure-Go SQLite store
+│   ├── dnstap.go               # dnstap framestream server + bounded aggregator
+│   ├── builder.go              # CDB compiler (master mode)
+│   ├── password.go             # PBKDF2 hashing + legacy migration
+│   └── static/index.html       # Single-file web UI
 ├── EDGE-README.md               # Edge architecture docs
 ├── TOPSTATS-README.md           # Top stats module docs
 ├── .github/workflows/ci.yml     # GitHub Actions CI

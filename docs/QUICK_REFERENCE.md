@@ -193,6 +193,33 @@ chown -R dnsdist:dnsdist /etc/dnsdist /var/lib/dnsdist
 chmod 600 /etc/dnsdist/certs/server.key
 ```
 
+## 🧭 Panel Quick Reference
+
+```bash
+# Panel CLI: generate enrollment token
+dnsdist-panel -enrollment-token
+
+# Panel CLI: compile CDB lalu keluar (master mode)
+dnsdist-panel -master -build-now
+
+# Panel dengan storage SQLite (path berakhiran .db / .sqlite)
+dnsdist-panel -master -cluster-nodes-file /var/lib/dnsdist/cluster.db
+
+# Panel dengan listener dnstap (framestream TCP)
+dnsdist-panel -master -dnstap-addr 127.0.0.1:6000
+
+# Panel tanpa TLS untuk testing lokal
+dnsdist-panel -addr :8443 -tls=false
+```
+
+```bash
+# API terproteksi (butuh JWT dari /api/login)
+curl -H "Authorization: Bearer $TOKEN" 'http://127.0.0.1:8443/api/dnstap/top?limit=10'
+curl -H "Authorization: Bearer $TOKEN" 'http://127.0.0.1:8443/api/cluster/nodes'
+```
+
+---
+
 ## 🛡️ Security Checklist
 
 - [ ] Ganti default password web console (port 8083)
