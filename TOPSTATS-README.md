@@ -15,9 +15,29 @@ Module untuk tracking query statistics, top blocked domains, dan top ASN di dnsd
 ### File Yang Dibutuhkan
 1. `/etc/dnsdist/top-stats.lua` - Module utama (sudah ada)
 2. `/etc/dnsdist/dnsdist.conf` - Konfigurasi dnsdist (sudah include top-stats.lua)
-3. `/etc/dnsdist/asn-db.csv` - Database ASN (opsional, format CSV)
+3. `/etc/dnsdist/asn-db.bin` - Database ASN compact, **format biner** (Recommended, di-generate via `addons/build-asn-db.sh`)
 
-### Format ASN Database (`asn-db.csv`)
+### Database ASN
+
+Modul ini mendukung dua format database ASN:
+- **`.bin`** (Recommended) — file biner compact hasil kompilasi `addons/build-asn-db.sh` dari `ipinfo_lite.csv` (https://ipinfo.io/products/free-ip-database). Lookup O(log N) via binary search, penggunaan memori minimal (hanya ukuran file), mampu menangani 1+ juta prefix tanpa menurunkan QPS dnsdist.
+- **`.csv`** — format text (subnet,asn_number,asn_name). Cocok untuk skala kecil (di bawah 10k prefix) atau unit test, tapi linear scan O(N) per query.
+
+#### Cara Generate `.bin` dari `ipinfo_lite.csv`
+
+Unduh dataset `ipinfo_lite.csv` dari https://ipinfo.io/products/free-ip-database, lalu kompilasi:
+
+```bash
+# Baca ipinfo_lite.csv dari direktori aktif, tulis langsung ke /etc/dnsdist/asn-db.bin
+sudo bash addons/build-asn-db.sh
+
+# Script juga me-restart dnsdist jika sedang aktif
+```
+
+Untuk dataset global penuh, file `asn-db.bin` biasanya berukuran 15-25 MB dan berisi ~1 juta entry.
+
+#### Format CSV Manual (`asn-db.csv`, opsional, skala kecil)
+
 ```csv
 subnet,asn_number,asn_name
 127.0.0.0/8,127,Localhost Loopback
