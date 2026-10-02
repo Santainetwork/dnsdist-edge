@@ -8,7 +8,7 @@
 set -e
 
 # --- Versi Script ---
-SCRIPT_VERSION="2.9.0"
+SCRIPT_VERSION="3.0.0"
 SELF_UPDATE_URL="${SELF_UPDATE_URL:-https://github.com/Santainetwork/dnsdist-edge/releases/latest/download/setup-edge.sh}"
 
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---

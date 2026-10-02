@@ -39,7 +39,7 @@ func TestSQLiteClusterStore(t *testing.T) {
 	node1, err := store.RegisterNode(RegisterRequest{
 		EnrollToken: tok,
 		Name:        "edge-sqlite-01",
-		Version:     "2.9.0",
+		Version:     "3.0.0",
 		ReportedIP:  "10.0.0.2",
 	}, "10.0.0.2")
 	if err != nil {
@@ -69,7 +69,7 @@ func TestSQLiteClusterStore(t *testing.T) {
 		NodeKey:        node1.Key,
 		Name:           "edge-sqlite-01",
 		ReportedIP:     "10.0.0.2",
-		Version:        "2.9.0",
+		Version:        "3.0.0",
 		QPS:            250,
 		QueriesTotal:   15000,
 		BlockedTotal:   1200,
@@ -200,7 +200,7 @@ func TestClusterHTTPWithSQLite(t *testing.T) {
 	regBody, _ := json.Marshal(RegisterRequest{
 		EnrollToken: tokenResp.Token,
 		Name:        "sqlite-edge-http",
-		Version:     "2.9.0",
+		Version:     "3.0.0",
 	})
 	regReq := httptest.NewRequest(http.MethodPost, "/api/cluster/register", bytes.NewReader(regBody))
 	regReq.RemoteAddr = "10.10.10.5:1234"

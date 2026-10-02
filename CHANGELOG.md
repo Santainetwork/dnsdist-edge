@@ -7,6 +7,16 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-10-02
+
+### Panel — Multi-Database Cluster Storage
+- Abstraksi `ClusterStorage` dengan backend SQLite pure-Go (`modernc.org/sqlite`, zero CGO, mode WAL); `ClusterStore` JSON lama tetap 100% kompatibel.
+- Token enroll single-use dengan TTL, status node dinamis, migrasi skema otomatis.
+
+### Panel — Streaming Analitik dnstap (zero-client-IP)
+- Decoder framestream TCP/UNIX socket pure-Go, agregator bounded-memory dengan bucket overflow `_other_`.
+- Client IP dibuang seketika saat parsing (kepatuhan UU PDP); endpoint `GET /api/dnstap/top`; flag `--dnstap-addr`.
+
 ### Panel — Auth Hardening & Trust+ Blockpage (Opsional)
 - Password panel kini PBKDF2 (`pbkdf2$...`) dengan migrasi plaintext saat login; `/api/settings` hash password baru dan tolak password <8 karakter.
 - Rate limiter login per-IP (5 gagal → kunci 15 menit, 429 + `Retry-After`); JWT tambah `iat/nbf/jti`.
