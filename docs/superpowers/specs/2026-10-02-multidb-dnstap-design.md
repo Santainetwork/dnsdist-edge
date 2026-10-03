@@ -113,7 +113,7 @@ Endpoint memakai autentikasi yang sama dengan API panel lain.
 
 ---
 
-## 5. Status Implementasi (v3.0.0)
+## 5. Status Implementasi (v3.1.0)
 
 - [x] Abstraksi `ClusterStorage` di `panel/storage.go`
 - [x] Adapter backward-compatible pada `panel/cluster.go`
@@ -123,4 +123,6 @@ Endpoint memakai autentikasi yang sama dengan API panel lain.
 - [x] Pengabaian Client IP seketika (UU PDP)
 - [x] Flag `--dnstap-addr` dan route `/api/dnstap/top`
 - [x] Test suite: `panel/storage_test.go`, `panel/dnstap_test.go`
-- [ ] Adapter `PostgresClusterStore` untuk master cluster
+- [x] Adapter `PostgresClusterStore` pure-Go via pgx/v5 stdlib (`panel/pgstore.go`): skema otomatis, DSN via `--database-url` / `PANEL_DATABASE_URL` / `PANEL_DB_*` / `postgres://` di `--cluster-nodes-file`
+- [x] Test `panel/pgstore_test.go`: lifecycle live (skip bila `PANEL_TEST_DATABASE_URL` kosong) + `TestPostgresDSNFromEnv` (env/escaping, selalu jalan)
+- [ ] Benchmark telemetri ratusan node & migrasi JSON/SQLite → Postgres

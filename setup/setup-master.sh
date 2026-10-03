@@ -7,7 +7,7 @@
 
 set -e
 
-SCRIPT_VERSION="3.0.0"
+SCRIPT_VERSION="3.1.0"
 SELF_UPDATE_URL="${SELF_UPDATE_URL:-https://github.com/Santainetwork/dnsdist-edge/releases/latest/download/setup-master.sh}"
 MASTER_DIR="${MASTER_DIR:-$(pwd)}"
 CONF_DIR="/etc/dnsdist-master"

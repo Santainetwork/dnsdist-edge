@@ -402,6 +402,21 @@ func setClusterStorage(s ClusterStorage) {
 }
 
 func initClusterStore(filePath string) {
+	dsn := postgresDSNFromEnv("")
+	if flagDatabaseURL != nil && *flagDatabaseURL != "" {
+		dsn = *flagDatabaseURL
+	}
+	if dsn == "" && strings.HasPrefix(filePath, "postgres://") {
+		dsn = filePath
+	}
+	if dsn != "" {
+		store, err := NewPostgresClusterStore(dsn)
+		if err != nil {
+			log.Fatalf("gagal inisialisasi Postgres cluster store: %v", err)
+		}
+		clusterStorage = store
+		return
+	}
 	if strings.HasSuffix(filePath, ".db") || strings.HasSuffix(filePath, ".sqlite") {
 		store, err := NewSQLiteClusterStore(filePath)
 		if err != nil {

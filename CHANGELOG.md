@@ -7,6 +7,11 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ## [Unreleased]
 
+### Panel — PostgreSQL Cluster Storage (Central Master)
+- Adapter `PostgresClusterStore` pure-Go via `pgx/v5` stdlib (tanpa CGO): skema `cluster_tokens` + `cluster_nodes` dibuat otomatis, kontrak method 1:1 dengan engine JSON/SQLite (token single-use, status dinamis, `Key` tidak bocor di `ListNodes`).
+- Seleksi backend: `--database-url` / `PANEL_DATABASE_URL` (atau komponen `PANEL_DB_HOST/PORT/USER/PASSWORD/NAME`), atau `postgres://` di `--cluster-nodes-file`.
+- Versi panel/UI/installer naik ke 3.1.0; test `pgstore_test.go` (lifecycle live bila `PANEL_TEST_DATABASE_URL` diset, `TestPostgresDSNFromEnv` selalu jalan).
+
 ## [3.0.0] — 2026-10-02
 
 ### Panel — Multi-Database Cluster Storage

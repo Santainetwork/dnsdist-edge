@@ -91,7 +91,7 @@ func validWhitelistDomain(value string) bool {
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 // PanelVersion is the edge panel release version used in cluster telemetry.
-const PanelVersion = "3.0.0"
+const PanelVersion = "3.1.0"
 
 var (
 	flagAddr              = flag.String("addr", envOr("PANEL_ADDR", ":8443"), "Primary listen address (HTTPS if TLS enabled, else HTTP)")
@@ -116,13 +116,14 @@ var (
 	flagBuildNow          = flag.Bool("build-now", false, "Compile CDB immediately and exit (CLI builder mode)")
 	flagDnsdistAPI        = flag.String("dnsdist-api", envOr("DNSDIST_API_URL", "http://127.0.0.1:8083"), "dnsdist web API base URL")
 	flagDnsdistKey        = flag.String("dnsdist-key", envOr("DNSDIST_API_KEY", ""), "dnsdist web API key (X-API-Key)")
-	flagClusterNodesFile  = flag.String("cluster-nodes-file", envOr("PANEL_CLUSTER_NODES_FILE", "/var/lib/dnsdist/cluster-nodes.json"), "Path to cluster nodes persistence JSON")
+	flagClusterNodesFile  = flag.String("cluster-nodes-file", envOr("PANEL_CLUSTER_NODES_FILE", "/var/lib/dnsdist/cluster-nodes.json"), "Path to cluster nodes persistence (JSON file, .db/.sqlite for embedded SQLite, or postgres:// URL)")
 	flagMasterURL         = flag.String("master-url", envOr("PANEL_MASTER_URL", ""), "Master URL for edge telemetry and enrollment (e.g. http://10.10.10.1:8084)")
 	flagEnrollToken       = flag.String("enroll-token", envOr("PANEL_ENROLL_TOKEN", ""), "Enrollment token for connecting edge node to central master")
 	flagNodeName          = flag.String("node-name", envOr("PANEL_NODE_NAME", ""), "Human-readable name of this edge node (defaults to hostname)")
 	flagAgentStateFile    = flag.String("agent-state-file", envOr("PANEL_AGENT_STATE_FILE", "/var/lib/dnsdist/cluster-agent.json"), "Path to edge agent state JSON")
 	flagHeartbeatInterval = flag.Duration("heartbeat-interval", 60*time.Second, "Edge telemetry heartbeat interval to master")
 	flagGenEnrollToken    = flag.Bool("enrollment-token", false, "Generate an enrollment token and exit (CLI mode)")
+	flagDatabaseURL       = flag.String("database-url", envOr("PANEL_DATABASE_URL", ""), "PostgreSQL DSN for central master cluster storage (overrides cluster-nodes-file when set)")
 	flagDnstapAddr        = flag.String("dnstap-addr", envOr("PANEL_DNSTAP_ADDR", ""), "Optional dnstap framestream TCP listener address (e.g. 127.0.0.1:6000)")
 	dnstapAgg             = NewDnstapAggregator(50000)
 	dnstapServer          *DnstapServer
