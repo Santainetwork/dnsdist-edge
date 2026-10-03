@@ -474,6 +474,14 @@ function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
         return
     end
 
+    -- Setiap entri harus string IP; angka/nil/tabel akan crash :find di bawah.
+    for i, tip in ipairs(target_ips) do
+        if type(tip) ~= "string" or #tip == 0 then
+            errlog("smartdns: Error - ip-rules alias target ke-" .. i .. " bukan string IP valid; rule dilewati.")
+            return
+        end
+    end
+
     -- Deteksi famili dari target pertama (untuk memilih qtype hook)
     local is_ipv6 = target_ips[1]:find(":") ~= nil
     local dns_qtype = is_ipv6 and DNSQType.AAAA or DNSQType.A
