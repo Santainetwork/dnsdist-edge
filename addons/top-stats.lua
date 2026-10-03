@@ -42,7 +42,7 @@ local CONFIG = {
   apiKey           = 'trust-ng-apikey-changeme',
 
   -- Path database ASN. Format:
-  --   .bin  : binary compact hasil kompilasi csv2bin.py (Recommended, cepat)
+  --   .bin  : binary compact hasil kompilasi addons/build-asn-db.sh (Recommended, cepat)
   --   .csv  : text CSV (subnet,asn_number,asn_name) - format lama
   asnDBPath        = '/etc/dnsdist/asn-db.bin',
 
