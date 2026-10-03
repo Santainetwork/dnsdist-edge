@@ -10,6 +10,7 @@ grep -Fq 'function smartdns_ip_set(' "$PLUGIN"
 grep -Fq 'function smartdns_domain_set(' "$PLUGIN"
 grep -Fq 'function smartdns_cname(' "$PLUGIN"
 grep -Fq 'function smartdns_ip_rules_alias(' "$PLUGIN"
+grep -Fq 'type(target_ips) ~= "table" or #target_ips == 0' "$PLUGIN"  # invalid config must be skipped safely
 grep -Fq 'function smartdns_enable_speedcheck()' "$PLUGIN"
 
 # Current SmartDNS response-mode values must be present.

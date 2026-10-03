@@ -467,6 +467,13 @@ function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
         target_ips = {target_ips}
     end
 
+    -- Validasi trust boundary: config pemanggil. target_ips kosong/nil/tipe
+    -- salah jangan hentikan pemuatan config dnsdist.
+    if type(target_ips) ~= "table" or #target_ips == 0 then
+        errlog("smartdns: Error - ip-rules alias butuh target_ips (string atau array tidak kosong); rule dilewati.")
+        return
+    end
+
     -- Deteksi famili dari target pertama (untuk memilih qtype hook)
     local is_ipv6 = target_ips[1]:find(":") ~= nil
     local dns_qtype = is_ipv6 and DNSQType.AAAA or DNSQType.A
