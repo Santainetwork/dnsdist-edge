@@ -270,6 +270,29 @@ systemctl restart dnsdist
 - **OS**: Debian bookworm (minimal requirement)
 - **Port**: TCP 8083 (web API), 53/udp & 53/tcp (DNS)
 
+## SmartDNS Compatibility Plugin (`addons/smartdns-plugin.lua`)
+
+Plugin opsional yang di-vendor dari repo SmartDist (fitur ala SmartDNS), dimuat otomatis dari `setup/dnsdist.conf` [5.6] — aman bila file tidak ada. Tanpa `lua-socket`, speed check nonaktif otomatis; fitur berikut tetap jalan:
+
+- `smartdns_ip_set(name, filepath)` — netmask group dari file (satu CIDR per baris, `#` = komentar).
+- `smartdns_domain_set(name, filepath)` — suffix match node dari file domain.
+- `smartdns_cname(domain_pattern, target_cname)` — alias CNAME (menerima prefix `-.` / `.`).
+- `smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)` — rewrite A/AAAA yang cocok ip-set ke IP target (round-robin), dukungan IPv4 & IPv6.
+- `smartdns_enable_speedcheck()` — hook global (fastest-ip / fastest-response). Butuh `apt install lua-socket`.
+
+### Contoh Pemakaian (di `dnsdist.conf`)
+
+```lua
+smartdns_ip_set("cloudflare-ipv4", "/etc/smartdns/cdn-ips/cloudflare/ipv4.txt")
+smartdns_domain_set("cf-exclude", "/etc/smartdns/cdn-ips/cloudflare/exclude.txt")
+smartdns_cname("-.api.example.com", "api.example.com.cdn.cloudflare.net.")
+smartdns_ip_rules_alias("cloudflare-ipv4", {"172.64.52.159", "172.64.87.224"}, "cf-exclude")
+-- SPEEDCHECK_ENABLED = true
+-- smartdns_enable_speedcheck()
+```
+
+Catatan: data ip-set/dataset CDN bukan bagian repo ini — unduh dari sumber publik (mis. Cloudflare IP ranges) sesuai kebutuhan.
+
 ## License
 
 MIT License - Sama seperti proyek Trust-NG

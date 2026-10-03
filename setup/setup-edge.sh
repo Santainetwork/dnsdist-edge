@@ -1179,6 +1179,10 @@ PYEOF
     local top_stats_src="$EDGE_DIR/../addons/top-stats.lua"
     [ ! -f "$top_stats_src" ] && top_stats_src="$EDGE_DIR/top-stats.lua"
 
+    # SmartDNS compatibility plugin (opsional, dari repo SmartDist sendiri)
+    local smartdns_src="$EDGE_DIR/../addons/smartdns-plugin.lua"
+    [ ! -f "$smartdns_src" ] && smartdns_src="$EDGE_DIR/smartdns-plugin.lua"
+
     local build_asn_src="$EDGE_DIR/../addons/build-asn-db.sh"
     [ ! -f "$build_asn_src" ] && build_asn_src="$EDGE_DIR/build-asn-db.sh"
 
@@ -1192,6 +1196,16 @@ PYEOF
         echo -e "  ${GREEN}[✓] top-stats.lua terinstall di $CONF_DIR/${NC}"
     else
         echo -e "  ${YELLOW}[!] top-stats.lua tidak ditemukan, modul top-stats dilewati.${NC}"
+    fi
+    echo -e "\n${CYAN}=== [2.6/5] SmartDNS Plugin (ip-set/domain-set/CNAME/alias + speed check, opsional) ===${NC}"
+    if [ -f "$smartdns_src" ]; then
+        cp "$smartdns_src" "$CONF_DIR/smartdns-plugin.lua"
+        chmod 644 "$CONF_DIR/smartdns-plugin.lua"
+        echo -e "  ${GREEN}[✓] smartdns-plugin.lua terinstall di $CONF_DIR/${NC}"
+        echo -e "  ${CYAN}[i] Contoh: smartdns_ip_set / smartdns_cname / smartdns_ip_rules_alias di dnsdist.conf [5.6]${NC}"
+        echo -e "  ${CYAN}[i] Speed check butuh lua-socket (apt install lua-socket); tanpa itu otomatis nonaktif${NC}"
+    else
+        echo -e "  ${YELLOW}[!] smartdns-plugin.lua tidak ditemukan, plugin dilewati.${NC}"
     fi
     if [ -f "$build_asn_src" ]; then
         cp "$build_asn_src" /usr/local/bin/build-asn-db.sh

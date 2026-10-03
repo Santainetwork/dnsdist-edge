@@ -180,6 +180,7 @@ dnsdist-edge/
 │       └── node.conf.j2        # Ansible pre-seed template
 ├── addons/                      # ⭐ OPSIONAL — modul tambahan
 │   ├── top-stats.lua           # Statistics tracking module
+│   ├── smartdns-plugin.lua     # SmartDNS compatibility (ip-set/CNAME/alias + speed check)
 │   ├── build-asn-db.sh         # ASN compiler
 │   ├── dnsdist-tproxy.sh       # Helper E2 nftables/policy routing (opsional)
 │   └── asn-toolkit/            # ASN database data (ipinfo, dnsdist.conf)
