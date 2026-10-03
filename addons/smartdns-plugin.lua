@@ -31,7 +31,10 @@ local _active_sockets = {}
 
 -- Konfigurasi Speed Check (dapat di-override di dnsdist.conf sebelum dofile())
 SPEEDCHECK_ENABLED     = true       -- Aktifkan/nonaktifkan fitur ini
-SPEEDCHECK_MODE        = "fastest-ip" -- "fastest-ip" (reorder) atau "fastest-response" (overwrite)
+SPEEDCHECK_MODE        = "fastest-ip" -- Kompat dgn response-mode SmartDNS:
+                                      --   "first-ping"      = pasang ping pertama yg berhasil (overwrite semua)
+                                      --   "fastest-ip"      = reorder, IP tercepat di urutan #1 (default)
+                                      --   "fastest-response" = overwrite semua record dgn IP tercepat (round-robin)
 SPEEDCHECK_TIMEOUT_MS  = 3000       -- Timeout TCP connect (ms); harus > interval
                                      -- maintenance() dnsdist (~1 detik), kalau tidak socket
                                      -- dibuang sebelum sempat menang.
@@ -41,6 +44,12 @@ SPEEDCHECK_MAX_RESPONSE= 2          -- Maksimal jumlah IP Juara yang dikembalika
 SPEEDCHECK_CACHE_TTL   = 300        -- Detik menyimpan hasil di memori
 SPEEDCHECK_QUEUE_LIMIT = 200        -- Maks antrian domain sekaligus
 SPEEDCHECK_MAX_SOCKETS = 120        -- BUG FIX #3: Batas maksimal socket TCP aktif (6 IP x 2 port x 10 domain)
+
+-- Pengecualian speed-check per domain (ala domain-rules -speed-check-mode none/tcp:port)
+--   SPEEDCHECK_SKIP  = {"local.example.com", ".internal"}
+--   SPEEDCHECK_PORTS_OVERRIDE = { ["api.example.com"] = {443} }
+SPEEDCHECK_SKIP        = {}         -- Prefix akhiran ".x" = subdomain; tanpa titik = exact/domain itu sendiri
+SPEEDCHECK_PORTS_OVERRIDE = {}      -- Kunci = domain (exact), nilai = daftar port pengganti
 
 -- Konfigurasi Parallel Upstream Aggregation
 -- Secara default SmartDist menggunakan newServer() yang sudah dikonfigurasi,
@@ -58,6 +67,28 @@ local _parallel_queue_set  = {}        -- Hash map O(1) untuk duplikat
 local _parallel_sockets    = {}        -- Socket UDP aktif untuk query DNS
 local _active_upstreams    = {}        -- List upstream aktif setelah filter latency
 local _last_upstream_refresh = 0       -- Timestamp refresh terakhir
+
+-- Cek apakah domain masuk daftar skip speed-check (prefix "." = subdomain, exact jika tanpa titik)
+local function _speedcheck_skipped(domain)
+    if not SPEEDCHECK_SKIP or #SPEEDCHECK_SKIP == 0 then return false end
+    for _, pat in ipairs(SPEEDCHECK_SKIP) do
+        if pat:sub(1, 1) == "." then
+            local sub = pat:sub(2)
+            if domain == sub or domain:sub(-#sub - 1) == "." .. sub then return true end
+        elseif domain == pat then
+            return true
+        end
+    end
+    return false
+end
+
+-- Ambil daftar port untuk sebuah domain (override per-domain, else global)
+local function _speedcheck_ports(domain)
+    if SPEEDCHECK_PORTS_OVERRIDE and SPEEDCHECK_PORTS_OVERRIDE[domain] then
+        return SPEEDCHECK_PORTS_OVERRIDE[domain]
+    end
+    return SPEEDCHECK_PORTS
+end
 
 if not _has_socket then
     warnlog("[SmartDist] lua-socket tidak ditemukan! Speed Check DINONAKTIFKAN.")
@@ -98,6 +129,7 @@ end
 -- Tambahkan domain ke antrian probing jika belum ada
 local function _enqueue(domain, ips)
     if not SPEEDCHECK_ENABLED then return end
+    if _speedcheck_skipped(domain) then return end
     if #_probe_queue >= SPEEDCHECK_QUEUE_LIMIT then return end
     
     -- Cek duplikat O(1)
@@ -212,8 +244,9 @@ function maintenance()
         for i = 1, drain_count do
             local item = table.remove(_probe_queue, 1)
             if item then
+                local ports = _speedcheck_ports(item.domain)
                 for _, ip in ipairs(item.ips) do
-                    for _, port in ipairs(SPEEDCHECK_PORTS) do
+                    for _, port in ipairs(ports) do
                         local ok, sock = pcall(function()
                             local s = _socket.tcp()
                             s:settimeout(0)
@@ -411,7 +444,14 @@ end
 --   - String tunggal:  "172.64.87.224"
 --   - Tabel/array:     {"172.64.52.159", "172.64.87.224"}
 --
+-- Semantics SmartDNS (src/dns_server/answer.c + ip_rule.c): ip-alias dicek PER
+-- RECORD; record yang cocok ip-set diganti dari daftar alias, record lain utuh.
+-- (SmartDNS menaruh SEMUA alias di setiap record yang cocok, lalu dedup lewat
+-- ip_map. Lihat ponytail di hook untuk model yang dipakai di sini.)
+--
 -- Otomatis mendeteksi IPv4 (A record) atau IPv6 (AAAA record) dari format IP.
+-- Hanya alias dengan famili yang sama dengan record yang dipakai (cek
+-- addr_len di _dns_server_process_ip_alias) — alias beda famili dilewati.
 -- ============================================================================
 function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
     -- Pastikan ip-set sudah dideklarasikan
@@ -425,43 +465,58 @@ function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
         target_ips = {target_ips}
     end
 
-    -- Siapkan fungsi helper untuk membangun targets_bytes
-    local function build_targets_bytes(ips)
-        local is_ipv6 = ips[1]:find(":") ~= nil
-        local bytes_list = {}
-        for _, ip in ipairs(ips) do
-            if is_ipv6 then
-                bytes_list[#bytes_list + 1] = _ipv6_to_bytes(ip)
-            else
-                local bytes = {}
-                for octet in ip:gmatch("%d+") do
-                    bytes[#bytes + 1] = tonumber(octet)
-                end
-                bytes_list[#bytes_list + 1] = bytes
-            end
-        end
-        return bytes_list
-    end
-
-    -- Deteksi IPv4 vs IPv6 berdasarkan format target IP pertama
+    -- Deteksi famili dari target pertama (untuk memilih qtype hook)
     local is_ipv6 = target_ips[1]:find(":") ~= nil
     local dns_qtype = is_ipv6 and DNSQType.AAAA or DNSQType.A
     local record_len = is_ipv6 and 16 or 4
 
-    -- Pre-parse semua target IP default ke bentuk byte
-    local default_targets_bytes = build_targets_bytes(target_ips)
+    -- Pre-parse SEMUA alias ke byte array. Alias beda famili dibuang
+    -- (SmartDNS: addr_len harus sama, kalau tidak -> continue/skip).
+    local alias_list = {}
+    for _, tip in ipairs(target_ips) do
+        local tip_v6 = tip:find(":") ~= nil
+        if tip_v6 == is_ipv6 then
+            local bytes
+            if tip_v6 then
+                bytes = _ipv6_to_bytes(tip)
+            else
+                bytes = {}
+                for octet in tip:gmatch("%d+") do
+                    bytes[#bytes + 1] = tonumber(octet)
+                end
+            end
+            if #bytes == record_len then
+                alias_list[#alias_list + 1] = bytes
+            end
+        end
+    end
+
+    if #alias_list == 0 then
+        errlog("smartdns: ip-rules alias -ip-set " .. ip_set_name .. ": tidak ada alias yang cocok famili.")
+        return
+    end
 
     local ip_type_str = is_ipv6 and "IPv6/AAAA" or "IPv4/A"
     infolog("smartdns: ip-rules alias [" .. ip_type_str .. "] ip-set:" .. ip_set_name 
             .. " -> " .. table.concat(target_ips, ", "))
 
-    -- Rule Response: Inspeksi response dari upstream, rewrite jika cocok
+    -- Semantics SmartDNS asli (src/dns_server/answer.c + src/dns_server/ip_rule.c):
+    -- ip-alias dicek per RECORD. Record yang cocok ip-set diisi dari daftar
+    -- alias; record yang tidak cocok dibiarkan utuh. Alias beda famili di-skip.
+    --
+    -- ponytail: dnsdist tidak bisa menumbuhkan/menyusutkan jumlah RR tanpa
+    -- membangun ulang paket + ANCOUNT. Jadi record yang cocok diisi alias
+    -- secara round-robin (bukan menaruh seluruh daftar di tiap record).
+    -- Hasil sama dengan SmartDNS saat jumlah record cocok == jumlah alias;
+    -- beda hanya saat jumlahnya tidak sama (bisa ada alias berulang).
+    -- Butuh persis ala ip_map (dedup + jumlah RR dinamis)? Bangun ulang paket
+    -- dan sesuaikan test ALIAS_RR/ALIAS_PARTIAL.
     addResponseAction(AllRule(), LuaResponseAction(function(dr)
         -- Filter berdasarkan tipe query (A untuk IPv4, AAAA untuk IPv6)
-        if dr.qtype ~= dns_qtype then 
-            return DNSResponseAction.None, "" 
+        if dr.qtype ~= dns_qtype then
+            return DNSResponseAction.None, ""
         end
-        
+
         -- EXCLUDE LOGIC: domain di daftar exclude tidak di-alias
         if exclude_domain_set and smartdns_smn[exclude_domain_set] then
             if smartdns_smn[exclude_domain_set]:check(dr.qname) then
@@ -474,8 +529,8 @@ function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
         local overlay = newDNSPacketOverlay(pkt)
         local record_count = overlay:getRecordsCountInSection(DNSSection.Answer)
 
-        -- Fase 1: Cek apakah ada record yang cocok dengan ip-set
-        local needs_rewrite = false
+        -- Kumpulkan offset record target yang cocok ip-set (urutan paket)
+        local matched_offsets = {}
         for i = 0, record_count - 1 do
             local rec = overlay:getRecord(i)
             if rec.type == dns_qtype and rec.contentLength == record_len then
@@ -483,55 +538,52 @@ function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
                 if is_ipv6 then
                     ip_str = _bytes_to_ipv6(pkt, rec.contentOffset)
                 else
-                    ip_str = string.format("%d.%d.%d.%d", 
-                        pkt:byte(rec.contentOffset + 1), 
-                        pkt:byte(rec.contentOffset + 2), 
-                        pkt:byte(rec.contentOffset + 3), 
+                    ip_str = string.format("%d.%d.%d.%d",
+                        pkt:byte(rec.contentOffset + 1),
+                        pkt:byte(rec.contentOffset + 2),
+                        pkt:byte(rec.contentOffset + 3),
                         pkt:byte(rec.contentOffset + 4))
                 end
-                
+
                 local addr = newCA(ip_str)
                 if addr and smartdns_nmg[ip_set_name]:match(addr) then
-                    needs_rewrite = true
-                    break
+                    matched_offsets[#matched_offsets + 1] = rec.contentOffset
                 end
             end
         end
 
-        -- Fase 2: Jika ada yang cocok, rewrite semua record yang matching
-        if needs_rewrite then
-            -- Konversi paket ke tabel byte untuk diedit
-            local pkt_bytes = {pkt:byte(1, #pkt)}
-            local target_idx = 1  -- Round-robin index untuk multiple targets
-            local active_targets_bytes = default_targets_bytes
+        if #matched_offsets == 0 then
+            return DNSResponseAction.None, ""
+        end
 
-            for i = 0, record_count - 1 do
-                local rec = overlay:getRecord(i)
-                if rec.type == dns_qtype and rec.contentLength == record_len then
-                    -- Pilih target IP (round-robin jika lebih dari 1)
-                    local tb = active_targets_bytes[target_idx]
-                    
-                    -- Tulis ulang byte-byte IP di paket
+        -- Bangun daftar IP hasil: record tak cocok tetap; record cocok diganti
+        -- alias bergilir (round-robin), supaya multi-record tidak semua jadi
+        -- alias yang sama. Set IP asli tidak pernah bocor ke respons.
+        -- (SmartDNS men-dedup lewat ip_map; di sini jumlah RR tetap, lihat
+        -- ponytail di atas.)
+        local pkt_bytes = {pkt:byte(1, #pkt)}
+        local matched_n = 0
+
+        for i = 0, record_count - 1 do
+            local rec = overlay:getRecord(i)
+            if rec.type == dns_qtype and rec.contentLength == record_len then
+                if matched_offsets[matched_n + 1] == rec.contentOffset then
+                    matched_n = matched_n + 1
+                    local target_bytes = alias_list[((matched_n - 1) % #alias_list) + 1]
                     for b = 1, record_len do
-                        pkt_bytes[rec.contentOffset + b] = tb[b]
-                    end
-                    
-                    -- Maju ke target berikutnya (round-robin)
-                    target_idx = target_idx + 1
-                    if target_idx > #active_targets_bytes then
-                        target_idx = 1
+                        pkt_bytes[rec.contentOffset + b] = target_bytes[b]
                     end
                 end
             end
-            
-            -- Rebuild paket dari byte array
-            local parts = {}
-            for _, b in ipairs(pkt_bytes) do
-                parts[#parts + 1] = string.char(b)
-            end
-            dr:setContent(table.concat(parts))
         end
-        
+
+        -- Rebuild paket dari byte array
+        local parts = {}
+        for _, b in ipairs(pkt_bytes) do
+            parts[#parts + 1] = string.char(b)
+        end
+        dr:setContent(table.concat(parts))
+
         return DNSResponseAction.None, ""
     end), {name="IP Alias: " .. ip_set_name .. " (" .. (is_ipv6 and "IPv6" or "IPv4") .. ")"})
 end
