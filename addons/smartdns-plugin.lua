@@ -223,7 +223,9 @@ function maintenance()
                     if existing_ip == sess.ip then is_dup = true break end
                 end
                 
-                if not is_dup and #entry.ips < (SPEEDCHECK_MAX_RESPONSE or 2) then
+                local max_response = (SPEEDCHECK_MODE == "first-ping") and 1
+                    or (SPEEDCHECK_MAX_RESPONSE or 2)
+                if not is_dup and #entry.ips < max_response then
                     table.insert(entry.ips, sess.ip)
                     infolog(string.format("[SmartDist] Fastest Rank #%d for %s -> %s (%dms)",
                         #entry.ips, sess.domain, sess.ip, latency_ms))
@@ -615,6 +617,12 @@ function smartdns_enable_speedcheck()
 
         local domain = dr.qname:toString():gsub("%.$", "")
 
+        -- SmartDNS domain-rules -speed-check-mode none: preserve upstream
+        -- response and avoid both TCP probing and cached speed rewrite.
+        if _speedcheck_skipped(domain) then
+            return DNSResponseAction.None, ""
+        end
+
         -- BUG FIX #1: FAST PATH — cek hal-hal murah SEBELUM parsing paket yang mahal.
         -- Jika domain sudah ada di antrian probe, tidak ada yang perlu dilakukan.
         if _probe_queue_set[domain] then
@@ -689,7 +697,20 @@ function smartdns_enable_speedcheck()
             table.insert(target_bytes_list, tbytes)
         end
 
-        if SPEEDCHECK_MODE == "fastest-ip" then
+        if SPEEDCHECK_MODE == "first-ping" then
+            -- SmartDNS first-ping: first successful probe wins, no reorder
+            -- against a multi-IP result because only one winner is cached.
+            local winner = target_bytes_list[1]
+            for i = 0, record_count - 1 do
+                local rec = overlay:getRecord(i)
+                if rec.type == dr.qtype and rec.contentLength == record_len then
+                    for b = 1, record_len do
+                        pkt_bytes[rec.contentOffset + b] = winner[b]
+                    end
+                    break
+                end
+            end
+        elseif SPEEDCHECK_MODE == "fastest-ip" then
             -- Mode fastest-ip: Tukar IP tercepat #1 ke urutan paling atas
             local first_rec_offset = nil
             local fastest_rec_offset = nil
