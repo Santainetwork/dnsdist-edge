@@ -20,6 +20,7 @@ grep -Fq 'fastest-response' "$PLUGIN"
 # Per-domain skip/ports override must exist (domain-rules -speed-check-mode none analog).
 grep -Fq 'SPEEDCHECK_SKIP' "$PLUGIN"
 grep -Fq 'SPEEDCHECK_PORTS_OVERRIDE' "$PLUGIN"
+grep -Fq '_speedcheck_ports' "$PLUGIN"  # helper function must exist
 
 # Graceful no-socket path must be explicit.
 grep -Fq 'SPEEDCHECK_ENABLED = false' "$PLUGIN"
