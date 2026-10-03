@@ -12,6 +12,9 @@ grep -Fq 'function smartdns_cname(' "$PLUGIN"
 grep -Fq 'function smartdns_ip_rules_alias(' "$PLUGIN"
 grep -Fq 'type(target_ips) ~= "table" or #target_ips == 0' "$PLUGIN"  # invalid config must be skipped safely
 grep -Fq 'type(tip) ~= "string" or #tip == 0' "$PLUGIN"  # invalid entries must be skipped safely
+grep -Fq 'ip-set butuh name dan filepath string tidak kosong' "$PLUGIN"
+grep -Fq 'domain-set butuh name dan filepath string tidak kosong' "$PLUGIN"
+grep -Fq 'cname butuh domain_pattern dan target_cname string tidak kosong' "$PLUGIN"
 grep -Fq 'function smartdns_enable_speedcheck()' "$PLUGIN"
 
 # Current SmartDNS response-mode values must be present.

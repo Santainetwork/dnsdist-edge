@@ -384,6 +384,10 @@ end
 -- Meniru fungsi: ip-set -name [nama] -file [file]
 -- ============================================================================
 function smartdns_ip_set(name, filepath)
+    if type(name) ~= "string" or #name == 0 or type(filepath) ~= "string" or #filepath == 0 then
+        errlog("smartdns: Error - ip-set butuh name dan filepath string tidak kosong; rule dilewati.")
+        return
+    end
     smartdns_nmg[name] = newNMG()
     local file = io.open(filepath, "r")
     if file then
@@ -404,6 +408,10 @@ end
 -- Meniru fungsi: domain-set -name [nama] -file [file]
 -- ============================================================================
 function smartdns_domain_set(name, filepath)
+    if type(name) ~= "string" or #name == 0 or type(filepath) ~= "string" or #filepath == 0 then
+        errlog("smartdns: Error - domain-set butuh name dan filepath string tidak kosong; rule dilewati.")
+        return
+    end
     smartdns_smn[name] = newSuffixMatchNode()
     local file = io.open(filepath, "r")
     if file then
@@ -426,6 +434,10 @@ end
 -- Meniru fungsi: cname /domain/target
 -- ============================================================================
 function smartdns_cname(domain_pattern, target_cname)
+    if type(domain_pattern) ~= "string" or #domain_pattern == 0 or type(target_cname) ~= "string" or #target_cname == 0 then
+        errlog("smartdns: Error - cname butuh domain_pattern dan target_cname string tidak kosong; rule dilewati.")
+        return
+    end
     -- Menghapus prefix wildcard "-." atau "." khas SmartDNS jika disertakan oleh user
     local clean_domain = domain_pattern
     if clean_domain:sub(1, 2) == "-." then
