@@ -272,13 +272,13 @@ systemctl restart dnsdist
 
 ## SmartDNS Compatibility Plugin (`addons/smartdns-plugin.lua`)
 
-Plugin opsional yang di-vendor dari repo SmartDist (fitur ala SmartDNS), dimuat otomatis dari `setup/dnsdist.conf` [5.6] — aman bila file tidak ada. Tanpa `lua-socket`, speed check nonaktif otomatis; fitur berikut tetap jalan:
+Plugin opsional yang di-vendor dari repo SmartDist (fitur ala SmartDNS), dimuat otomatis dari `setup/dnsdist.conf` [5.6] — aman bila file tidak ada. Tanpa `lua-socket`, speed check nonaktif otomatis; fitur berikut tetap jalan. **Butuh dnsdist >= 1.9** (`newDNSPacketOverlay` tidak ada di 1.7).
 
 - `smartdns_ip_set(name, filepath)` — netmask group dari file (satu CIDR per baris, `#` = komentar).
-- `smartdns_domain_set(name, filepath)` — suffix match node dari file domain.
+- `smartdns_domain_set(name, filepath)` — suffix match node dari file domain (berlaku juga untuk subdomain).
 - `smartdns_cname(domain_pattern, target_cname)` — alias CNAME (menerima prefix `-.` / `.`).
-- `smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)` — rewrite A/AAAA yang cocok ip-set ke IP target (round-robin), dukungan IPv4 & IPv6.
-- `smartdns_enable_speedcheck()` — hook global (fastest-ip / fastest-response). Butuh `apt install lua-socket`.
+- `smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)` — bila SATU record cocok ip-set, SEMUA A/AAAA record di response di-rewrite ke IP target (round-robin); domain di exclude set dilewati. Dukungan IPv4 & IPv6.
+- `smartdns_enable_speedcheck()` — hook global (fastest-ip = reorder tercepat ke #1 / fastest-response = overwrite top-N). Default probe TCP port 80/443, timeout 3 detik. Butuh `apt install lua-socket`.
 
 ### Contoh Pemakaian (di `dnsdist.conf`)
 

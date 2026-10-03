@@ -32,7 +32,9 @@ local _active_sockets = {}
 -- Konfigurasi Speed Check (dapat di-override di dnsdist.conf sebelum dofile())
 SPEEDCHECK_ENABLED     = true       -- Aktifkan/nonaktifkan fitur ini
 SPEEDCHECK_MODE        = "fastest-ip" -- "fastest-ip" (reorder) atau "fastest-response" (overwrite)
-SPEEDCHECK_TIMEOUT_MS  = 200        -- Timeout TCP connect (milidetik)
+SPEEDCHECK_TIMEOUT_MS  = 3000       -- Timeout TCP connect (ms); harus > interval
+                                     -- maintenance() dnsdist (~1 detik), kalau tidak socket
+                                     -- dibuang sebelum sempat menang.
 SPEEDCHECK_PORTS       = {80, 443}  -- Port yang diuji
 SPEEDCHECK_MAX_IPS     = 6          -- Maks IP yang dites per domain
 SPEEDCHECK_MAX_RESPONSE= 2          -- Maksimal jumlah IP Juara yang dikembalikan (digunakan oleh fastest-response)
@@ -115,6 +117,9 @@ end
 -- Ini adalah "background worker" kita
 function maintenance()
     if not SPEEDCHECK_ENABLED then return end
+    -- maintenance() juga bisa dipanggil di luar dnsdist (test harness):
+    -- keluar aman bila API dnsdist tidak tersedia.
+    if type(getServers) ~= "function" then return end
 
     local timeout_sec = SPEEDCHECK_TIMEOUT_MS / 1000
     local now = _now()
@@ -170,8 +175,9 @@ function maintenance()
             pcall(function() sess.sock:close() end)
         else
             local res, err = sess.sock:connect(sess.ip, sess.port)
-            -- luasocket mengembalikan 1 saat koneksi non-blocking berhasil
-            if res == 1 or (not err) or err == "already connected" then
+            -- luasocket non-blocking: 1 = langsung konek, 0/nil+"already connected" = selesai,
+            -- nil+"timeout"/"Operation already in progress" = masih menunggu
+            if res == 1 or res == 0 or (not err) or err == "already connected" then
                 -- MENANG! IP ini cepat! Masukkan ke array IP pemenang.
                 local latency_ms = math.floor((now - sess.start_time) * 1000)
                 local entry = _speed_cache[sess.domain]
@@ -392,7 +398,9 @@ function smartdns_cname(domain_pattern, target_cname)
     elseif clean_domain:sub(1, 1) == "." then
         clean_domain = clean_domain:sub(2)
     end
-    addAction(SuffixMatchNodeRule(clean_domain), SpoofCNAMEAction(target_cname), {name="CNAME: " .. target_cname})
+    local smn = newSuffixMatchNode()
+    smn:add(newDNSName(clean_domain))
+    addAction(SuffixMatchNodeRule(smn), SpoofCNAMEAction(target_cname), {name="CNAME: " .. target_cname})
     infolog("smartdns: CNAME rule added: *." .. clean_domain .. " -> " .. target_cname)
 end
 
