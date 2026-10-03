@@ -277,8 +277,8 @@ Plugin opsional yang di-vendor dari repo SmartDist (fitur ala SmartDNS), dimuat 
 - `smartdns_ip_set(name, filepath)` — netmask group dari file (satu CIDR per baris, `#` = komentar).
 - `smartdns_domain_set(name, filepath)` — suffix match node dari file domain (berlaku juga untuk subdomain).
 - `smartdns_cname(domain_pattern, target_cname)` — alias CNAME (menerima prefix `-.` / `.`).
-- `smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)` — bila SATU record cocok ip-set, SEMUA A/AAAA record di response di-rewrite ke IP target (round-robin); domain di exclude set dilewati. Dukungan IPv4 & IPv6.
-- `smartdns_enable_speedcheck()` — hook global (fastest-ip = reorder tercepat ke #1 / fastest-response = overwrite top-N). Default probe TCP port 80/443, timeout 3 detik. Butuh `apt install lua-socket`.
+- `smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)` — setiap record yang cocok ip-set diisi dari daftar target secara round-robin; record lain utuh; domain di exclude set dilewati. Dukungan IPv4 & IPv6. Alias beda famili di-skip.
+- `smartdns_enable_speedcheck()` — hook global. `SPEEDCHECK_MODE` mengikuti `response-mode` SmartDNS: `"first-ping"` (pemenang probe pertama), `"fastest-ip"` (reorder tercepat ke #1, default), `"fastest-response"` (overwrite top-N). Skip per-domain: `SPEEDCHECK_SKIP = {"local.example.com", ".internal"}` (prefix `.` = domain + subdomain); port override: `SPEEDCHECK_PORTS_OVERRIDE = {["api.example.com"] = {443}}`. Default probe TCP port 80/443, timeout 3 detik. Butuh `apt install lua-socket`; tanpa itu speed check nonaktif otomatis.
 
 ### Contoh Pemakaian (di `dnsdist.conf`)
 
