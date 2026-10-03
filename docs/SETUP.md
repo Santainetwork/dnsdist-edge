@@ -314,5 +314,5 @@ systemctl restart dnsdist-panel  # auto-generate baru
 
 ---
 
-**Version:** v3.0.0
+**Version:** v3.1.0
 **Last Updated:** October 2026

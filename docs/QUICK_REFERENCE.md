@@ -205,6 +205,9 @@ dnsdist-panel -master -build-now
 # Panel dengan storage SQLite (path berakhiran .db / .sqlite)
 dnsdist-panel -master -cluster-nodes-file /var/lib/dnsdist/cluster.db
 
+# Panel dengan storage PostgreSQL (central master, v3.1.0+)
+dnsdist-panel -master -database-url 'postgres://panel:SECRET@db.internal:5432/trust'
+
 # Panel dengan listener dnstap (framestream TCP)
 dnsdist-panel -master -dnstap-addr 127.0.0.1:6000
 

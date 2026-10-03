@@ -174,14 +174,15 @@ Jika opsi `--with-panel` diaktifkan:
 - **HTTP**: `http://IP_MASTER:8084` (Plain HTTP)
 - Login default: `admin` / `trust-ng-admin`
 
-### Penyimpanan Cluster (JSON / SQLite)
+### Penyimpanan Cluster (JSON / SQLite / PostgreSQL)
 
 Panel master menyimpan registry node dan token enroll lewat interface `ClusterStorage`:
 
 - **JSON file** (default): `--cluster-nodes-file /var/lib/dnsdist/cluster-nodes.json`.
 - **SQLite pure-Go** (tanpa CGO, mode WAL): cukup akhiri path dengan `.db` atau `.sqlite`, misalnya `--cluster-nodes-file /var/lib/dnsdist/cluster.db`.
+- **PostgreSQL** (central master, v3.1.0+): set `--database-url postgres://panel:SECRET@db.internal:5432/trust` (atau env `PANEL_DATABASE_URL`, atau komponen `PANEL_DB_HOST/PORT/USER/PASSWORD/NAME`); skema `cluster_tokens` + `cluster_nodes` dibuat otomatis. Bisa juga via `--cluster-nodes-file postgres://...`.
 
-Kedua engine kompatibel penuh; migrasi cukup mengganti path file.
+Ketiga engine memakai kontrak yang sama (token enroll single-use, status node dinamis, `Key` tidak bocor di `ListNodes`); migrasi JSON/SQLite cukup mengganti path/DSN.
 
 ### Analitik dnstap (tanpa client IP)
 

@@ -258,6 +258,7 @@ sudo ./setup-edge.sh --uninstall
 
 | Versi | Perubahan Utama |
 |---|---|
+| v3.1.0 | Backend PostgreSQL central master (`--database-url` / `PANEL_DATABASE_URL`), pgx/v5 pure-Go tanpa CGO |
 | v3.0.0 | Multi-database cluster storage (SQLite), analitik streaming dnstap zero-client-IP, auth hardening + Trust+ blockpage |
 | v2.9.0 | Web Whitelist Master dan self-update installer dengan verifikasi SHA-256 |
 | v2.8.0 | Transparent DNS E2 (`off|auto|tproxy`), proxy IPv4 UDP/TCP, dan sinkronisasi password panel |

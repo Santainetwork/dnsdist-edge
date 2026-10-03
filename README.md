@@ -134,7 +134,7 @@ Kedua mode menerbitkan kontrak Edge yang sama: `http://MASTER:8080/files/trust.d
 
 ### 🖥️ Management Panel (Go, single binary)
 - **Cluster registry** — pendaftaran edge node via enrollment token single-use dengan TTL
-- **Pluggable storage** — JSON file (default, `--cluster-nodes-file *.json`) atau SQLite pure-Go (zero CGO, mode WAL, cukup akhiri path dengan `.db`/`.sqlite`)
+- **Pluggable storage** — JSON file (default, `--cluster-nodes-file *.json`), SQLite pure-Go (zero CGO, mode WAL, path `.db`/`.sqlite`), atau PostgreSQL central master v3.1.0+ (`--database-url` / `PANEL_DATABASE_URL`, pgx/v5 tanpa CGO)
 - **Edge telemetry** — heartbeat QPS, cache-hit, CPU/mem, status online/offline
 - **dnstap analytics** — streaming framestream TCP (`--dnstap-addr 127.0.0.1:6000`), `GET /api/dnstap/top?limit=N`, tanpa menyimpan client IP (UU PDP)
 - **Trust+ blockpage** opsional dengan listener dan mirror nginx terpisah
