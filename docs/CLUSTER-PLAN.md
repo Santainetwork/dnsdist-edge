@@ -210,8 +210,8 @@ Catatan penting untuk fase 3 (jangan diubah tanpa alasan):
   (burst 3, lalu 1 permintaan / 30 detik) dan membalas `429` + `Retry-After`.
   Token yang valid melewati limit sepenuhnya. Lihat `panel/cdb_ratelimit.go`.
 - **Format key CDB wajib DNS wire format.** dnsdist memakai
-  `KeyValueLookupKeyQName(true)`. `tools/gen-cdb.py` menulis key plain-text
-  sehingga CDB-nya tidak pernah cocok; pakai `tools/gen-cdb-go`.
+  `KeyValueLookupKeyQName(true)`. Kedua generator (`tools/gen-cdb.py` dan
+  `tools/gen-cdb-go`) kini menulis wire format dan kompatibel dengan dnsdist.
 - **Edge mengirim token** lewat `SAVED_CDB_TOKEN` di `node.conf`; tanpa ini edge
   tidak bisa menarik dari master yang mengaktifkan token.
 
