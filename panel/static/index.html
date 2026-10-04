@@ -1037,11 +1037,11 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
         <div class="stat-tile-note"><span>Terdaftar</span><span>dnsdist</span></div>
       </div>
       <div class="stat-tile tone-emerald">
-        <div class="stat-tile-head"><span>Sehat</span>
-          <span class="stat-tile-ico" style="color:var(--emerald)"><svg viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        <div class="stat-tile-head"><span>Status Resolver</span>
+          <span class="stat-tile-ico" style="color:var(--outline)"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
         </div>
-        <div class="stat-tile-val tabular" id="up-healthy">—</div>
-        <div class="stat-tile-note"><span>Status terpasang</span><span>OK</span></div>
+        <div class="stat-tile-val tabular" id="up-healthy" style="font-size:1rem">—</div>
+        <div class="stat-tile-note"><span>Panel tidak memprobe resolver</span><span id="up-health-src">—</span></div>
       </div>
       <div class="stat-tile tone-indigo">
         <div class="stat-tile-head"><span>DoT / DoH</span>
@@ -2327,21 +2327,33 @@ async function fetchUpstreamStatus() {
     const d = await api('/api/upstream/status');
     const ups = d.upstreams || [];
     document.getElementById('up-count').textContent = ups.length;
-    document.getElementById('up-healthy').textContent = ups.filter(u => u.healthy).length;
+    // Health is tri-state from the server; do not invent a green "UP".
+    const healthState = ups.length ? (ups[0].health || 'unknown') : '—';
+    const healthLabel = healthState === 'inactive' ? 'dnsdist mati' : (healthState === 'unknown' ? 'tidak diprobe' : healthState);
+    const hv = document.getElementById('up-healthy');
+    hv.textContent = healthLabel;
+    hv.style.color = healthState === 'inactive' ? 'var(--rose)' : 'var(--outline)';
+    const hsrc = document.getElementById('up-health-src');
+    if (hsrc) hsrc.textContent = d.health_source || '—';
     document.getElementById('up-encrypted').textContent = ups.filter(u => u.protocol === 'DoT' || u.protocol === 'DoH').length;
     const tb = document.getElementById('upstream-tbody');
     if (!ups.length) {
       tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada upstream terkonfigurasi.</td></tr>';
     } else {
-      tb.innerHTML = ups.map(u => `<tr>
+      tb.innerHTML = ups.map(u => {
+        const st = u.health || 'unknown';
+        const dotClass = st === 'inactive' ? 'bad' : 'warn';
+        const label = st === 'inactive' ? 'INACTIVE' : (st === 'healthy' ? 'UP' : 'UNPROBED');
+        return `<tr>
         <td class="mono">${esc(u.address)}</td>
         <td>${esc(u.protocol)}</td>
         <td style="min-width:120px">
           <div class="kv-row" style="margin-bottom:0.3rem"><dt></dt><dd>${u.weight}%</dd></div>
           <div class="bar-track"><div class="bar-fill" style="width:${u.weight}%"></div></div>
         </td>
-        <td><span class="dot-led ${u.healthy ? '' : 'bad'}"></span> ${u.healthy ? 'UP' : 'DOWN'}</td>
-      </tr>`).join('');
+        <td><span class="dot-led ${dotClass}"></span> ${label}</td>
+      </tr>`;
+      }).join('');
     }
   } catch (e) {
     toast('Gagal memuat upstream: ' + e.message, 'error');

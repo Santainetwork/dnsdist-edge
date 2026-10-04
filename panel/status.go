@@ -110,13 +110,18 @@ type upstreamDetail struct {
 	Address  string `json:"address"`
 	Protocol string `json:"protocol"`
 	Weight   int    `json:"weight"`
-	Healthy  bool   `json:"healthy"`
-	Latency  string `json:"latency,omitempty"`
+	// Health is reported as a tri-state string because the panel has no per
+	// resolver probe. Claiming bool true previously made the UI show a green
+	// "UP" badge for resolvers that were never contacted.
+	//   "unknown"  - configured, dnsdist running, no per-resolver probe exists
+	//   "inactive" - dnsdist itself is not running, so no resolver is serving
+	Health  string `json:"health"`
+	Latency string `json:"latency,omitempty"`
 }
 
 // handleUpstreamStatus reports configured upstreams with parsed protocol and a
-// stable ordering. Read-only; latency stays empty because the panel does not
-// probe resolvers itself.
+// stable ordering. Read-only. It never probes resolvers, so it reports
+// "unknown" rather than asserting health it cannot prove.
 func handleUpstreamStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		jsonErr(w, http.StatusMethodNotAllowed, "GET only")
@@ -124,21 +129,30 @@ func handleUpstreamStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg := loadNodeConfig()
 
+	// The only health signal the panel actually owns is whether dnsdist runs.
+	health := "unknown"
+	if !dnsdistRunning() {
+		health = "inactive"
+	}
+
 	details := make([]upstreamDetail, 0, len(cfg.Upstreams))
 	for i, addr := range cfg.Upstreams {
 		details = append(details, upstreamDetail{
 			Address:  addr,
 			Protocol: detectUpstreamProtocol(addr),
 			Weight:   upstreamWeights(len(cfg.Upstreams), i),
-			Healthy:  true,
+			Health:   health,
 		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"ok":        true,
-		"upstreams": details,
-		"count":     len(details),
+		"ok":            true,
+		"upstreams":     details,
+		"count":         len(details),
+		"health_source": "dnsdist.service",
+		"health_note":   "panel does not probe individual resolvers; health reflects dnsdist run state only",
+		"probe_support": false,
 	})
 }
 

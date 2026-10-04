@@ -74,14 +74,69 @@ func TestUpstreamStatusShape(t *testing.T) {
 			Address  string `json:"address"`
 			Protocol string `json:"protocol"`
 			Weight   int    `json:"weight"`
+			Health   string `json:"health"`
 		} `json:"upstreams"`
-		Count int `json:"count"`
+		Count        int    `json:"count"`
+		HealthSource string `json:"health_source"`
+		ProbeSupport bool   `json:"probe_support"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("invalid json: %v", err)
 	}
 	if got.Count != len(got.Upstreams) {
 		t.Errorf("count=%d but len(upstreams)=%d", got.Count, len(got.Upstreams))
+	}
+	if got.ProbeSupport {
+		t.Error("probe_support must be false: the panel does not probe resolvers")
+	}
+	if got.HealthSource == "" {
+		t.Error("health_source must be stated so the UI can attribute the signal")
+	}
+}
+
+// TestUpstreamStatusDoesNotFabricateHealth is a regression guard. The endpoint
+// previously returned "healthy": true for every resolver without contacting any
+// of them, which the UI rendered as a green "UP" badge. Health must now be a
+// tri-state string that never claims a probe that did not happen.
+func TestUpstreamStatusDoesNotFabricateHealth(t *testing.T) {
+	dir := t.TempDir()
+	up := filepath.Join(dir, "upstreams.conf")
+	// 192.0.2.0/24 (TEST-NET-1) is reserved and never routable.
+	if err := os.WriteFile(up, []byte("newServer({address='192.0.2.99:53', name='unreachable'})\n"), 0o644); err != nil {
+		t.Fatalf("write upstreams: %v", err)
+	}
+	old := *flagUpstreams
+	*flagUpstreams = up
+	defer func() { *flagUpstreams = old }()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/upstream/status", nil)
+	rec := httptest.NewRecorder()
+	handleUpstreamStatus(rec, req)
+
+	var got struct {
+		Upstreams []struct {
+			Address string `json:"address"`
+			Health  string `json:"health"`
+			Healthy *bool  `json:"healthy"`
+		} `json:"upstreams"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	if len(got.Upstreams) != 1 {
+		t.Fatalf("expected 1 upstream, got %d", len(got.Upstreams))
+	}
+	u := got.Upstreams[0]
+	if u.Healthy != nil {
+		t.Error("legacy bool `healthy` field must be gone; it asserted unproven health")
+	}
+	switch u.Health {
+	case "unknown", "inactive":
+		// acceptable: honest about not probing
+	case "healthy":
+		t.Errorf("unroutable %s reported healthy=%q without any probe", u.Address, u.Health)
+	default:
+		t.Errorf("unexpected health value %q", u.Health)
 	}
 }
 
