@@ -248,10 +248,42 @@ func handleRPZTest(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// wireDomainKey encodes a domain into the DNS wire format used as the CDB key.
+//
+// This must match how the CDB is written and how dnsdist looks it up:
+//   - tools/trust-builder/main.go writes keys via dns.PackDomainName, producing
+//     length-prefixed labels: "pornhub.com" -> \x07pornhub\x03com\x00
+//   - setup/dnsdist.conf uses KeyValueLookupKeyQName(true), i.e. wire format
+//
+// An earlier version searched for the plain text "domain." and therefore never
+// matched a real trust.db, so /api/rpz/test always answered "not found" even for
+// domains that dnsdist was correctly blocking.
+func wireDomainKey(domain string) ([]byte, bool) {
+	d := strings.ToLower(strings.TrimSpace(domain))
+	d = strings.Trim(d, ".")
+	if d == "" || len(d) > 253 {
+		return nil, false
+	}
+	key := make([]byte, 0, len(d)+2)
+	for _, label := range strings.Split(d, ".") {
+		if label == "" || len(label) > 63 {
+			return nil, false
+		}
+		key = append(key, byte(len(label)))
+		key = append(key, label...)
+	}
+	key = append(key, 0)
+	return key, true
+}
+
 // cdbContainsDomain performs an exact-name lookup in a TinyCDB file using the
-// DJB hash the format uses. Mirrors tools/gen-cdb.py so panel and generator agree.
+// DJB hash the format uses. The key is encoded in DNS wire format so it matches
+// both the builder and dnsdist.
 func cdbContainsDomain(data []byte, domain string) bool {
-	key := []byte(domain + ".")
+	key, ok := wireDomainKey(domain)
+	if !ok {
+		return false
+	}
 	const (
 		hashInit = 5381
 		slots    = 256
@@ -266,8 +298,8 @@ func cdbContainsDomain(data []byte, domain string) bool {
 	slot := (h >> 8) & (slots - 1)
 	base := int(slot) * 8
 
-	pos := be32(data, base)
-	length := be32(data, base+4)
+	pos := le32(data, base)
+	length := le32(data, base+4)
 	if pos > uint32(len(data)) || uint32(len(data))-pos < length {
 		return false
 	}
@@ -275,15 +307,15 @@ func cdbContainsDomain(data []byte, domain string) bool {
 		if off+8 > uint32(len(data)) {
 			return false
 		}
-		th := be32(data, int(off))
-		tpos := be32(data, int(off)+4)
+		th := le32(data, int(off))
+		tpos := le32(data, int(off)+4)
 		if th != h {
 			continue
 		}
 		if int(tpos)+8 > len(data) {
 			continue
 		}
-		klen := be32(data, int(tpos))
+		klen := le32(data, int(tpos))
 		if int(tpos)+8+int(klen) > len(data) {
 			continue
 		}
@@ -294,9 +326,10 @@ func cdbContainsDomain(data []byte, domain string) bool {
 	return false
 }
 
-// be32 reads a big-endian uint32. TinyCDB stores offsets in host byte order on
-// little-endian builds, so this reads little-endian to match the generator.
-func be32(b []byte, off int) uint32 {
+// le32 reads a little-endian uint32. TinyCDB stores its offsets little-endian,
+// which is what tools/trust-builder and tools/gen-cdb.py both emit.
+// (Previously misnamed be32, which described the opposite byte order.)
+func le32(b []byte, off int) uint32 {
 	if off+4 > len(b) {
 		return 0
 	}

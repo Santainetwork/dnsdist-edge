@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -279,7 +280,12 @@ func writeTestCDB(path string, names []string) error {
 	var recs []rec
 	pos := uint32(header)
 	for _, n := range names {
-		key := []byte(n + ".")
+		// Wire-format key, matching trust-builder and dnsdist's
+		// KeyValueLookupKeyQName(true). Plain "domain." keys would not match.
+		key, ok := wireDomainKey(n)
+		if !ok {
+			return fmt.Errorf("invalid test domain %q", n)
+		}
 		val := []byte("x")
 		recs = append(recs, rec{h: hash(key), pos: pos, key: key, val: val})
 		pos += uint32(len(key) + len(val) + 8)
