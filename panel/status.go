@@ -17,10 +17,15 @@ import (
 // forced the UI to show input forms instead of live operational data.
 
 // rpzFeed describes one blocklist source as observed on disk.
+//
+// Status is a string, not a bool: the panel can only see that a source is
+// listed in the sources file. It cannot prove the feed was fetched. Reporting
+// `active: true` previously made the UI draw a green "Aktif" dot for feeds that
+// had never synced.
 type rpzFeed struct {
 	Name     string `json:"name"`
 	ZoneID   string `json:"zone_id"`
-	Active   bool   `json:"active"`
+	Status   string `json:"status"`
 	Rules    int64  `json:"rules"`
 	LastSync string `json:"last_sync,omitempty"`
 }
@@ -94,7 +99,9 @@ func loadRPZFeeds() []rpzFeed {
 				out = append(out, rpzFeed{
 					Name:   name,
 					ZoneID: filepath.Base(name),
-					Active: true,
+					// "configured" is the strongest truthful claim: the source
+					// is listed, but the panel did not fetch or verify it.
+					Status: "configured",
 				})
 			}
 			if len(out) > 0 {

@@ -47,6 +47,50 @@ func TestRPZStatusRejectsNonGet(t *testing.T) {
 	}
 }
 
+// TestRPZStatusDoesNotFabricateFeedActive is a regression guard. A source that
+// is merely listed in sources.txt was previously reported as `active: true`,
+// which the UI drew as a green "Aktif" dot for feeds that had never synced.
+func TestRPZStatusDoesNotFabricateFeedActive(t *testing.T) {
+	dir := t.TempDir()
+	sf := filepath.Join(dir, "sources.txt")
+	if err := os.WriteFile(sf, []byte("https://example.invalid/never-synced.txt\n"), 0o644); err != nil {
+		t.Fatalf("write sources: %v", err)
+	}
+	oldFiles := *flagFilesDir
+	oldSources := *flagSourcesFile
+	*flagFilesDir = dir
+	*flagSourcesFile = sf
+	defer func() { *flagFilesDir = oldFiles; *flagSourcesFile = oldSources }()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/rpz/status", nil)
+	rec := httptest.NewRecorder()
+	handleRPZStatus(rec, req)
+
+	var got struct {
+		Feeds []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+			Active *bool  `json:"active"`
+		} `json:"feeds"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	if len(got.Feeds) != 1 {
+		t.Fatalf("expected 1 feed, got %d", len(got.Feeds))
+	}
+	f := got.Feeds[0]
+	if f.Active != nil {
+		t.Error("legacy bool `active` must be gone; it asserted an unverified sync")
+	}
+	if f.Status == "" {
+		t.Error("feed must carry an explicit status string")
+	}
+	if f.Status == "active" {
+		t.Errorf("never-synced feed reported status=%q", f.Status)
+	}
+}
+
 // TestUpstreamStatusWeights verifies weights always sum to 100, which the UI
 // renders as a share bar. A wrong total would silently mis-draw the chart.
 func TestUpstreamStatusWeights(t *testing.T) {

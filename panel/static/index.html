@@ -2288,7 +2288,7 @@ async function fetchRPZStatus() {
       tb.innerHTML = feeds.map(f => `<tr>
         <td>${esc(f.name)}</td>
         <td class="mono">${esc(f.zone_id || '—')}</td>
-        <td><span class="dot-led"></span> ${f.active ? 'Aktif' : 'Nonaktif'}</td>
+        <td><span class="dot-led warn"></span> ${esc(f.status === 'active' ? 'Aktif' : (f.status || 'configured'))}</td>
         <td class="tabular">${f.rules ? fmtNum(f.rules) : '—'}</td>
       </tr>`).join('');
     }
