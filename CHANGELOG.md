@@ -5,12 +5,35 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
-## [Unreleased]
+## [3.1.0] — 2026-10-04
 
 ### Panel — PostgreSQL Cluster Storage (Central Master)
 - Adapter `PostgresClusterStore` pure-Go via `pgx/v5` stdlib (tanpa CGO): skema `cluster_tokens` + `cluster_nodes` dibuat otomatis, kontrak method 1:1 dengan engine JSON/SQLite (token single-use, status dinamis, `Key` tidak bocor di `ListNodes`).
 - Seleksi backend: `--database-url` / `PANEL_DATABASE_URL` (atau komponen `PANEL_DB_HOST/PORT/USER/PASSWORD/NAME`), atau `postgres://` di `--cluster-nodes-file`.
 - Versi panel/UI/installer naik ke 3.1.0; test `pgstore_test.go` (lifecycle live bila `PANEL_TEST_DATABASE_URL` diset, `TestPostgresDSNFromEnv` selalu jalan).
+
+### Panel — Obsidian Telemetry UI & endpoint status read-only
+- Tampilan Dashboard, RPZ, Upstream, dan Cluster dibangun ulang memakai design system Obsidian Telemetry. Panel tetap 100% offline (tanpa CDN/Tailwind runtime).
+- Endpoint read-only baru: `GET /api/rpz/status`, `/api/rpz/test`, `/api/upstream/status`, `/api/dnstap/status`, `/api/cluster/tokens`, dan liveness publik `/api/health`. Semua endpoint data tetap di balik autentikasi (401 tanpa token).
+- **Perbaikan integritas data:** `/api/upstream/status` tidak lagi mengklaim `healthy: true` untuk setiap resolver tanpa probe apa pun, dan `/api/rpz/status` tidak lagi mengklaim `active: true` untuk setiap feed. Nilai diganti string jujur (`unknown`/`inactive`/`configured`) lengkap dengan provenance (`health_source`, `health_note`, `probe_support: false`). Ini mengoreksi badge hijau "UP/Aktif" yang sebelumnya tidak berdasar.
+- `GET /api/rpz/test` melakukan pencarian CDB nyata dengan hash DJB yang sama seperti `tools/gen-cdb.py`.
+
+### Panel — Perbaikan CSS
+- Menghapus lima kelas CSS mati pasca-rebuild (`chart-card`, `chart-header`, `chart-title`, `node-table`, `node-table-wrap`).
+- Memperbaiki `.modal-card` yang mereferensikan tiga custom property tak terdefinisi (`--bg-card`, `--radius-md`, `--shadow-modal`) sehingga setiap modal tampil transparan, bersudut siku, dan tanpa bayangan.
+
+### Addon — SmartDNS plugin
+- Guard input pada semua entry point publik (`smartdns_ip_set`, `smartdns_domain_set`, `smartdns_cname`, `smartdns_ip_rules_alias`) agar konfigurasi tidak valid dilewati dengan `errlog` alih-alih menghentikan pemuatan config dnsdist.
+- Alias `ip-rules` mengisi setiap record yang cocok dari daftar target secara round-robin; mode speedcheck `first-ping` dipisahkan dari `fastest-response`; `SPEEDCHECK_SKIP` tidak lagi menulis ulang dari cache.
+
+### Test
+- `tests/smartdns-plugin-contracts.sh` dan `tests/dnsdist-panel-contracts.sh` sebagai contract guard (permukaan API addon, registrasi endpoint panel, jaminan offline, integritas variabel CSS).
+- Test CDB memvalidasi terhadap output nyata `tools/gen-cdb.py`, termasuk penolakan false-positive dan input terpotong.
+- Test end-to-end menyajikan UI via HTTP dan memastikan layout terkirim, tetap offline, serta endpoint baru memerlukan autentikasi.
+
+### Catatan validasi
+- Lulus: `gofmt`, `go vet`, `go test` (termasuk `-race`), suite shell `tests/*.sh` 5/5, matriks dnsdist terisolasi `ALL_DNSDIST_CHECKS_PASSED`, serta verifikasi live binary di atas HTTPS+JWT.
+- Belum diverifikasi pada rilis ini: integrasi Postgres live (audit DB), alur deployment/upgrade produksi, DNS eksternal nyata, dan Trust+ blockpage end-to-end di host nginx.
 
 ## [3.0.0] — 2026-10-02
 
