@@ -191,13 +191,29 @@ Halaman baru di panel:
 
 ## 9. Roadmap
 
-| Fase | Isi | Estimasi |
-|------|-----|----------|
-| **1. Multi-URL failover** ✅ Selesai | `update-blacklist.sh` v3.0.0: multi-source failover + manifest sidecar (tested) | ✅ |
-| **2. SHA256 + symlink** ✅ Selesai | `blacklist.<sha>.db` + symlink swap + manifest (v3.1.0, tested) | ✅ |
-| **3. CDB Publisher** ✅ Selesai | Panel route `/cdb/*` + `X-CDB-Token` (panel repo v0.2.0, tested) | ✅ |
-| **4. Peer & Cluster** ✅ Selesai | `--set-cdb-sources` (setup-edge v2.2.0) + `SAVED_CDB_SOURCES` (update-blacklist v3.1.0) | ✅ |
-| **5. Panel cluster view** ✅ Selesai | `/api/cluster/*` + halaman Cluster (panel v0.3.0, tested) | ✅ |
+Status diverifikasi ulang 2026-10-04. Sebelumnya tabel ini menandai fase 3
+"Selesai" padahal route `/cdb/*` tidak ada di kode; klaim itu keliru dan sudah
+diperbaiki bersama implementasinya.
+
+| Fase | Isi | Status sebenarnya |
+|------|-----|-------------------|
+| **1. Multi-URL failover** | `update-blacklist.sh`: multi-source failover berurutan | ✅ Terverifikasi |
+| **2. SHA256 + symlink** | `blacklist.<sha>.db` + symlink swap + manifest sidecar | ✅ Terverifikasi |
+| **3. CDB Publisher** | Panel route `/cdb/manifest.json`, `/cdb/blacklist.db`, `/cdb/healthz`, `/cdb/sources.json` + auth `X-CDB-Token` | ✅ Baru diimplementasikan (commit `8ffbc7f`); sebelumnya hanya klaim |
+| **4. Peer & Cluster** | `--set-cdb-sources` + `SAVED_CDB_SOURCES` | ✅ Terverifikasi |
+| **5. Panel cluster view** | `/api/cluster/*` + halaman Cluster | ✅ Terverifikasi |
+
+Catatan penting untuk fase 3 (jangan diubah tanpa alasan):
+
+- **Auth tanpa token tidak lagi 401.** Permintaan tanpa `X-CDB-Token` tetap
+  diizinkan agar edge baru bisa bootstrap, tetapi dibatasi rate limit per IP
+  (burst 3, lalu 1 permintaan / 30 detik) dan membalas `429` + `Retry-After`.
+  Token yang valid melewati limit sepenuhnya. Lihat `panel/cdb_ratelimit.go`.
+- **Format key CDB wajib DNS wire format.** dnsdist memakai
+  `KeyValueLookupKeyQName(true)`. `tools/gen-cdb.py` menulis key plain-text
+  sehingga CDB-nya tidak pernah cocok; pakai `tools/gen-cdb-go`.
+- **Edge mengirim token** lewat `SAVED_CDB_TOKEN` di `node.conf`; tanpa ini edge
+  tidak bisa menarik dari master yang mengaktifkan token.
 
 ---
 
