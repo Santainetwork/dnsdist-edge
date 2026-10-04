@@ -248,22 +248,6 @@ nav a.active svg { opacity: 1; stroke: var(--sky); }
 }
 
 /* ── Live Chart Section ── */
-.chart-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  position: relative;
-}
-.chart-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-.chart-title h3 { font-size: 0.95rem; font-weight: 600; color: #fff; }
-.chart-title p { font-size: 0.75rem; color: var(--text-muted); }
 .chart-canvas-wrap {
   width: 100%;
   height: 180px;
@@ -487,38 +471,7 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
   #sidebar.open { transform: translateX(0); }
   #main { margin-left: 0; padding: 1.25rem; max-width: 100%; }
 }
-/* ── Node Table & Cluster Styles ── */
-.node-table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  margin-top: 1rem;
-}
-.node-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-  text-align: left;
-}
-.node-table th {
-  padding: 0.75rem 1rem;
-  font-weight: 600;
-  color: var(--text-sub);
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-.node-table td {
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  color: var(--text-main);
-  white-space: nowrap;
-}
-.node-table tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
-}
+/* ── Status Badges ── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -707,13 +660,13 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
   z-index: 999;
 }
 .modal-card {
-  background: var(--bg-card);
+  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   max-width: 540px;
   width: 90%;
   padding: 1.75rem;
-  box-shadow: var(--shadow-modal);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
 }
 </style>
 </head>
