@@ -5,6 +5,16 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [Unreleased] — 2026-10-05
+
+### CDB Wire-Format & Parity Fix
+- **gen-cdb.py:** Kini menulis DNS wire-format dengan bucket selection `h & 0xFF` dan probing `(h>>8) % slotCount`, kompatibel dengan dnsdist `KeyValueLookupKeyQName(true)` dan `tools/gen-cdb-go`.
+- **Panel reader:** `cdbContainsDomain` serta test fixture `writeTestCDB` kini mengikuti CDB lookup semantics. `/api/rpz/test` melaporkan keputusan blokir yang sama dengan dnsdist.
+- **Regression guard:** `TestGenCDBPyWritesWireKeys` dan `TestPanelCDBAgreesWithDnsdist` melindungi format serta parity lookup.
+- Collision handling diverifikasi manual dengan 10 domain pada bucket sama, memakai reader `github.com/colinmarc/cdb`.
+
+---
+
 ## [3.1.0] — 2026-10-04
 
 ### Panel — PostgreSQL Cluster Storage (Central Master)
@@ -26,14 +36,9 @@ Format: [versi] — tanggal, deskripsi singkat.
 - Guard input pada semua entry point publik (`smartdns_ip_set`, `smartdns_domain_set`, `smartdns_cname`, `smartdns_ip_rules_alias`) agar konfigurasi tidak valid dilewati dengan `errlog` alih-alih menghentikan pemuatan config dnsdist.
 - Alias `ip-rules` mengisi setiap record yang cocok dari daftar target secara round-robin; mode speedcheck `first-ping` dipisahkan dari `fastest-response`; `SPEEDCHECK_SKIP` tidak lagi menulis ulang dari cache.
 
-### CDB Wire-Format & Parity Fix
-- **gen-cdb.py:** Kini menulis DNS wire-format (bukan plain-text) dengan bucket selection `h & 0xFF` (bukan `(h>>8)&0xFF`) dan probing `(h>>8) % slotCount`. Kompatibel dengan dnsdist `KeyValueLookupKeyQName(true)` dan `tools/gen-cdb-go`.
-- **Panel reader:** `cdbContainsDomain` dan test fixture `writeTestCDB` diperbaiki agar cocok dengan CDB spec dnsdist. `/api/rpz/test` kini melaporkan keputusan blokir yang sama dengan dnsdist.
-- **Regression guard:** Test baru `TestPanelCDBAgreesWithDnsdist` memastikan panel lookup cocok dengan output `tools/gen-cdb-go`.
-
 ### Test
 - `tests/smartdns-plugin-contracts.sh` dan `tests/dnsdist-panel-contracts.sh` sebagai contract guard (permukaan API addon, registrasi endpoint panel, jaminan offline, integritas variabel CSS).
-- Test CDB memvalidasi terhadap output nyata `tools/gen-cdb.py`, termasuk penolakan false-positive dan input terpotong; collision handling diverifikasi manual dengan 10 domain di bucket sama.
+- Test CDB memvalidasi terhadap output nyata `tools/gen-cdb.py`, termasuk penolakan false-positive dan input terpotong.
 - Test end-to-end menyajikan UI via HTTP dan memastikan layout terkirim, tetap offline, serta endpoint baru memerlukan autentikasi.
 
 ### Catatan validasi
