@@ -25,13 +25,11 @@ package main
 
 import (
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -218,27 +216,11 @@ func cdbFileSHA256(path string) (string, int64, error) {
 }
 
 // ─── Auth & request guards ───────────────────────────────────────────────────
-
-var cdbNoTokenWarn sync.Once
-
-// cdbAuthorize enforces the X-CDB-Token shared secret. With no token configured
-// it allows the request but warns once so the operator notices the exposure.
-func cdbAuthorize(w http.ResponseWriter, r *http.Request) bool {
-	token := strings.TrimSpace(*flagCDBToken)
-	if token == "" {
-		cdbNoTokenWarn.Do(func() {
-			log.Printf("[cdb-publisher] WARNING: no --cdb-token/PANEL_CDB_TOKEN configured; /cdb/* is unauthenticated")
-		})
-		return true
-	}
-	got := strings.TrimSpace(r.Header.Get("X-CDB-Token"))
-	if subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
-		w.Header().Set("WWW-Authenticate", `X-CDB-Token realm="cdb-publisher"`)
-		jsonErr(w, http.StatusUnauthorized, "missing or invalid X-CDB-Token")
-		return false
-	}
-	return true
-}
+//
+// cdbAuthorize now lives in cdb_ratelimit.go, which implements the operator
+// policy: a valid X-CDB-Token is trusted and never throttled, while a request
+// without a token is still allowed but rate limited per IP so the download
+// endpoint cannot be used to flood the master.
 
 func cdbRequireGET(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {

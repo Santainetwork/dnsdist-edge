@@ -128,7 +128,11 @@ func TestCDBManifestUsesContentAddressedHash(t *testing.T) {
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
-func TestCDBAuthTokenEnforced(t *testing.T) {
+// TestCDBUntrustedIsAllowedButThrottled covers the operator policy: a request
+// without a valid token is NOT rejected outright (a fresh edge must be able to
+// bootstrap), but it is throttled hard per IP so the download endpoint cannot be
+// used to flood the master.
+func TestCDBUntrustedIsAllowedButThrottled(t *testing.T) {
 	dir := t.TempDir()
 	cdbTestFile(t, dir, "trust.db", []byte("data"))
 	withCDBPublisherEnv(t, dir, "s3cret-token")
@@ -139,22 +143,78 @@ func TestCDBAuthTokenEnforced(t *testing.T) {
 		"/cdb/healthz":       handleCDBHealthz,
 	}
 	for path, h := range handlers {
-		for _, tc := range []struct {
-			name  string
-			token string
-		}{
-			{"missing", ""},
-			{"wrong", "not-the-token"},
-			{"prefix", "s3cret"},
-		} {
-			rec := cdbDo(t, h, path, tc.token)
-			if rec.Code != http.StatusUnauthorized {
-				t.Errorf("%s token=%s: status = %d, want 401", path, tc.name, rec.Code)
+		resetCDBLimiter()
+		// First request without a token must succeed (bootstrap path).
+		rec := cdbDo(t, h, path, "")
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s: untrusted first request = %d, want 200 (must be allowed)", path, rec.Code)
+		}
+		if rec.Header().Get("X-CDB-Untrusted") != "1" {
+			t.Errorf("%s: untrusted response missing X-CDB-Untrusted marker", path)
+		}
+
+		// Hammering must eventually be refused with 429 + Retry-After.
+		var got429 bool
+		for i := 0; i < 20; i++ {
+			r := cdbDo(t, h, path, "")
+			if r.Code == http.StatusTooManyRequests {
+				got429 = true
+				if r.Header().Get("Retry-After") == "" {
+					t.Errorf("%s: 429 without Retry-After header", path)
+				}
+				break
 			}
 		}
-		if rec := cdbDo(t, h, path, "s3cret-token"); rec.Code == http.StatusUnauthorized {
-			t.Errorf("%s: correct token rejected with 401", path)
+		if !got429 {
+			t.Errorf("%s: flooding was never throttled (no 429 in 20 rapid requests)", path)
 		}
+	}
+}
+
+// TestCDBValidTokenBypassesThrottle verifies a trusted edge is never limited,
+// even after sustained requests.
+func TestCDBValidTokenBypassesThrottle(t *testing.T) {
+	dir := t.TempDir()
+	cdbTestFile(t, dir, "trust.db", []byte("data"))
+	withCDBPublisherEnv(t, dir, "s3cret-token")
+
+	resetCDBLimiter()
+	for i := 0; i < 50; i++ {
+		rec := cdbDo(t, handleCDBBlacklist, "/cdb/blacklist.db", "s3cret-token")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("trusted request #%d = %d, want 200 (token must bypass throttle)", i+1, rec.Code)
+		}
+		if rec.Header().Get("X-CDB-Untrusted") == "1" {
+			t.Fatalf("trusted request #%d wrongly marked untrusted", i+1)
+		}
+	}
+}
+
+// TestCDBWrongTokenIsThrottledLikeUntrusted confirms a near-miss token does not
+// grant the trusted fast path.
+func TestCDBWrongTokenIsThrottledLikeUntrusted(t *testing.T) {
+	dir := t.TempDir()
+	cdbTestFile(t, dir, "trust.db", []byte("data"))
+	withCDBPublisherEnv(t, dir, "s3cret-token")
+
+	resetCDBLimiter()
+	// A wrong token behaves as untrusted: allowed at first, then throttled.
+	first := cdbDo(t, handleCDBManifest, "/cdb/manifest.json", "wrong-token")
+	if first.Code != http.StatusOK {
+		t.Fatalf("wrong token first request = %d, want 200 (treated as untrusted)", first.Code)
+	}
+	if first.Header().Get("X-CDB-Untrusted") != "1" {
+		t.Error("wrong token was not treated as untrusted")
+	}
+	var got429 bool
+	for i := 0; i < 20; i++ {
+		if cdbDo(t, handleCDBManifest, "/cdb/manifest.json", "wrong-token").Code == http.StatusTooManyRequests {
+			got429 = true
+			break
+		}
+	}
+	if !got429 {
+		t.Error("wrong-token flooding was never throttled")
 	}
 }
 
@@ -163,6 +223,7 @@ func TestCDBNoTokenAllowsAccess(t *testing.T) {
 	cdbTestFile(t, dir, "trust.db", []byte("data"))
 	withCDBPublisherEnv(t, dir, "")
 
+	resetCDBLimiter()
 	rec := cdbDo(t, handleCDBManifest, "/cdb/manifest.json", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 when no token configured (body=%s)", rec.Code, rec.Body.String())
@@ -394,10 +455,14 @@ func TestCDBSourcesDedupesAndRequiresAuth(t *testing.T) {
 	withCDBPublisherEnv(t, dir, "tok")
 	withCDBFallback(t, "https://dup.example/db,https://dup.example/db")
 
-	// Token enforced.
+	// Untrusted requests are allowed but throttled, never hard-rejected.
+	resetCDBLimiter()
 	rec := cdbDo(t, handleCDBSources, "/cdb/sources.json", "")
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want 401 without token", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 for untrusted bootstrap (body=%s)", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("X-CDB-Untrusted") != "1" {
+		t.Error("untrusted sources request not marked X-CDB-Untrusted")
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/cdb/sources.json", nil)
@@ -455,11 +520,20 @@ func TestCDBPublisherRouteRegistration(t *testing.T) {
 		return resp, body
 	}
 
-	// Unauthenticated request is rejected by every route.
+	// Untrusted requests bootstrap successfully, then get throttled under load.
+	// They are never hard-rejected, and the trusted token always bypasses.
+	resetCDBLimiter()
 	for _, p := range []string{"/cdb/manifest.json", "/cdb/blacklist.db", "/cdb/healthz", "/cdb/sources.json"} {
 		resp, _ := get(p, "")
-		if resp.StatusCode != http.StatusUnauthorized {
-			t.Errorf("GET %s without token: status %d, want 401", p, resp.StatusCode)
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusTooManyRequests {
+			t.Errorf("GET %s without token: status %d, want 200 (bootstrap) or 429 (throttled)", p, resp.StatusCode)
+		}
+	}
+	// A trusted request must never be throttled.
+	for _, p := range []string{"/cdb/manifest.json", "/cdb/blacklist.db", "/cdb/healthz", "/cdb/sources.json"} {
+		resp, _ := get(p, "route-token")
+		if resp.StatusCode == http.StatusTooManyRequests {
+			t.Errorf("GET %s with valid token was throttled; token must bypass", p)
 		}
 	}
 
