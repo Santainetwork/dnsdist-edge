@@ -33,7 +33,7 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ### Test
 - `tests/smartdns-plugin-contracts.sh` dan `tests/dnsdist-panel-contracts.sh` sebagai contract guard (permukaan API addon, registrasi endpoint panel, jaminan offline, integritas variabel CSS).
-- Test CDB memvalidasi terhadap output nyata `tools/gen-cdb.py`, termasuk penolakan false-positive dan input terpotong; collision handling di-test dengan 10 domain yg hash ke bucket yg sama.
+- Test CDB memvalidasi terhadap output nyata `tools/gen-cdb.py`, termasuk penolakan false-positive dan input terpotong; collision handling diverifikasi manual dengan 10 domain di bucket sama.
 - Test end-to-end menyajikan UI via HTTP dan memastikan layout terkirim, tetap offline, serta endpoint baru memerlukan autentikasi.
 
 ### Catatan validasi
