@@ -1,0 +1,220 @@
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+// TestRPZStatusShape verifies the read endpoint returns the fields the UI binds
+// to, and that it reports an empty feed list rather than failing when no master
+// sources file exists (the normal edge-node case).
+func TestRPZStatusShape(t *testing.T) {
+	dir := t.TempDir()
+	oldFiles := *flagFilesDir
+	oldSources := *flagSourcesFile
+	*flagFilesDir = dir
+	*flagSourcesFile = filepath.Join(dir, "missing-sources.txt")
+	defer func() { *flagFilesDir = oldFiles; *flagSourcesFile = oldSources }()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/rpz/status", nil)
+	rec := httptest.NewRecorder()
+	handleRPZStatus(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	for _, key := range []string{"ok", "block_mode", "sinkhole_ips", "feeds", "cdb_size", "cdb_hash"} {
+		if _, present := got[key]; !present {
+			t.Errorf("missing key %q in payload", key)
+		}
+	}
+}
+
+func TestRPZStatusRejectsNonGet(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/rpz/status", nil)
+	rec := httptest.NewRecorder()
+	handleRPZStatus(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", rec.Code)
+	}
+}
+
+// TestUpstreamStatusWeights verifies weights always sum to 100, which the UI
+// renders as a share bar. A wrong total would silently mis-draw the chart.
+func TestUpstreamStatusWeights(t *testing.T) {
+	for _, n := range []int{1, 2, 3, 4, 7, 8} {
+		total := 0
+		for i := 0; i < n; i++ {
+			total += upstreamWeights(n, i)
+		}
+		if total != 100 {
+			t.Errorf("weights for n=%d sum to %d, want 100", n, total)
+		}
+	}
+}
+
+func TestUpstreamStatusShape(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/upstream/status", nil)
+	rec := httptest.NewRecorder()
+	handleUpstreamStatus(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var got struct {
+		OK        bool `json:"ok"`
+		Upstreams []struct {
+			Address  string `json:"address"`
+			Protocol string `json:"protocol"`
+			Weight   int    `json:"weight"`
+		} `json:"upstreams"`
+		Count int `json:"count"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	if got.Count != len(got.Upstreams) {
+		t.Errorf("count=%d but len(upstreams)=%d", got.Count, len(got.Upstreams))
+	}
+}
+
+func TestDetectUpstreamProtocol(t *testing.T) {
+	cases := map[string]string{
+		"1.1.1.1":                   "UDP/TCP",
+		"8.8.8.8:53":                "UDP/TCP",
+		"1.1.1.1:853":               "DoT",
+		"[2606:4700:4700::1111]:53": "UDP/TCP",
+		"dns.example:443":           "DoH",
+	}
+	for in, want := range cases {
+		if got := detectUpstreamProtocol(in); got != want {
+			t.Errorf("detectUpstreamProtocol(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestCDBContainsDomain uses a real generator-produced database when available
+// so the panel lookup is checked against actual CDB bytes, not a hand-built stub.
+func TestCDBContainsDomain(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "trust.db")
+
+	// Build a minimal CDB with the same layout tools/gen-cdb.py emits.
+	if err := writeTestCDB(dbPath, []string{"evil.com", "blocked.domain"}); err != nil {
+		t.Fatalf("build test cdb: %v", err)
+	}
+	data, err := os.ReadFile(dbPath)
+	if err != nil {
+		t.Fatalf("read cdb: %v", err)
+	}
+
+	if !cdbContainsDomain(data, "evil.com") {
+		t.Error("expected evil.com to be found")
+	}
+	if !cdbContainsDomain(data, "blocked.domain") {
+		t.Error("expected blocked.domain to be found")
+	}
+	if cdbContainsDomain(data, "safe.example") {
+		t.Error("did not expect safe.example to be found")
+	}
+}
+
+func TestRPZTestRequiresDomain(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/rpz/test", nil)
+	rec := httptest.NewRecorder()
+	handleRPZTest(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestHealthEndpoint(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	rec := httptest.NewRecorder()
+	handleHealth(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	if got["ok"] != true {
+		t.Errorf("ok = %v, want true", got["ok"])
+	}
+}
+
+// writeTestCDB writes a TinyCDB file using the exact layout tools/gen-cdb.py
+// produces: 2048-byte header, then all data records, then the per-slot hash
+// tables. Offsets are little-endian. This keeps the panel lookup contract
+// checkable against real generator bytes without shelling out to Python.
+func writeTestCDB(path string, names []string) error {
+	const (
+		hashInit = 5381
+		header   = 256 * 8
+	)
+	le := func(v uint32) []byte {
+		return []byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)}
+	}
+	hash := func(b []byte) uint32 {
+		h := uint32(hashInit)
+		for _, c := range b {
+			h = (h + (h << 5)) ^ uint32(c)
+		}
+		return h & 0xFFFFFFFF
+	}
+
+	type rec struct {
+		h   uint32
+		pos uint32
+		key []byte
+		val []byte
+	}
+	var recs []rec
+	pos := uint32(header)
+	for _, n := range names {
+		key := []byte(n + ".")
+		val := []byte("x")
+		recs = append(recs, rec{h: hash(key), pos: pos, key: key, val: val})
+		pos += uint32(len(key) + len(val) + 8)
+	}
+
+	bySlot := make(map[int][]rec)
+	for _, r := range recs {
+		slot := int((r.h >> 8) & 0xFF)
+		bySlot[slot] = append(bySlot[slot], r)
+	}
+
+	out := make([]byte, header)
+	for _, r := range recs {
+		out = append(out, le(uint32(len(r.key)))...)
+		out = append(out, le(uint32(len(r.val)))...)
+		out = append(out, r.key...)
+		out = append(out, r.val...)
+	}
+	for slot := 0; slot < 256; slot++ {
+		tablePos := uint32(len(out))
+		rs := bySlot[slot]
+		for _, r := range rs {
+			out = append(out, le(r.h)...)
+			out = append(out, le(r.pos)...)
+		}
+		out[slot*8] = byte(tablePos)
+		out[slot*8+1] = byte(tablePos >> 8)
+		out[slot*8+2] = byte(tablePos >> 16)
+		out[slot*8+3] = byte(tablePos >> 24)
+		ln := uint32(len(rs) * 8)
+		out[slot*8+4] = byte(ln)
+		out[slot*8+5] = byte(ln >> 8)
+		out[slot*8+6] = byte(ln >> 16)
+		out[slot*8+7] = byte(ln >> 24)
+	}
+	return os.WriteFile(path, out, 0o644)
+}

@@ -7,30 +7,40 @@
 <style>
 /* ── Design System & Variables ── */
 :root {
-  --bg: #09090b;
-  --surface: #0c0c0f;
-  --card: #111113;
-  --card-hover: #18181b;
-  --border: #27272a;
-  --border-focus: #fafafa;
-  --text-main: #fafafa;
-  --text-muted: #a1a1aa;
-  --text-sub: #71717a;
-  
-  --sky: #f4f4f5;
-  --sky-glow: rgba(250, 250, 250, 0.08);
-  --emerald: #10b981;
-  --emerald-glow: rgba(16, 185, 129, 0.2);
+  /* Obsidian Telemetry design system (from Stitch DESIGN.md) */
+  --bg: #131315;
+  --surface: #131315;
+  --surface-dim: #131315;
+  --card: #1c1b1d;
+  --card-low: #1c1b1d;
+  --card-hover: #201f22;
+  --surface-container: #201f22;
+  --surface-container-high: #2a2a2c;
+  --surface-container-highest: #353437;
+  --border: #3e484f;
+  --border-focus: #8ed5ff;
+  --text-main: #e5e1e4;
+  --text-muted: #bdc8d1;
+  --text-sub: #87929a;
+  --outline: #87929a;
+  --outline-variant: #3e484f;
+
+  --sky: #8ed5ff;
+  --sky-glow: rgba(142, 213, 255, 0.1);
+  --emerald: #4edea3;
+  --emerald-glow: rgba(78, 222, 163, 0.2);
   --amber: #f59e0b;
-  --rose: #f43f5e;
-  --indigo: #6366f1;
-  
+  --rose: #ffb4ab;
+  --rose-container: #93000a;
+  --indigo: #d5c3ff;
+  --tertiary: #d5c3ff;
+
   --sidebar-w: 240px;
-  --header-h: 60px;
-  --radius-sm: 7px;
-  --radius: 10px;
-  --radius-lg: 12px;
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --header-h: 48px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -518,6 +528,169 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
   font-size: 0.72rem;
   font-weight: 600;
 }
+
+/* ── Obsidian Telemetry: data-dense components ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.75rem;
+}
+.stat-tile {
+  background: var(--bg);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.stat-tile:hover { border-color: var(--sky); }
+.stat-tile::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--sky), transparent);
+  opacity: 0.4;
+}
+.stat-tile.tone-emerald::after { background: linear-gradient(90deg, var(--emerald), transparent); }
+.stat-tile.tone-rose::after { background: linear-gradient(90deg, var(--rose), transparent); }
+.stat-tile.tone-indigo::after { background: linear-gradient(90deg, var(--indigo), transparent); }
+.stat-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--outline);
+}
+.stat-tile-val {
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+  line-height: 1.1;
+  margin-top: 0.35rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.stat-tile-val small { font-size: 0.72rem; font-weight: 500; color: var(--outline); }
+.stat-tile-note {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--outline-variant);
+  font-size: 0.68rem;
+  color: var(--outline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.stat-tile-ico {
+  width: 28px; height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--sky);
+}
+.stat-tile-ico svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.75; }
+
+.panel {
+  background: var(--bg);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 1rem;
+}
+.panel-head {
+  padding: 0.7rem 0.9rem;
+  background: var(--surface-container);
+  border-bottom: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.panel-head h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.panel-head h3 svg { width: 15px; height: 15px; stroke: var(--sky); fill: none; stroke-width: 1.75; }
+.panel-head p { font-size: 0.72rem; color: var(--outline); margin-top: 0.15rem; }
+
+.dtable-wrap { overflow-x: auto; }
+.dtable { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.dtable th {
+  text-align: left;
+  padding: 0.5rem 0.9rem;
+  background: var(--surface-container-high);
+  color: var(--outline);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--outline-variant);
+  white-space: nowrap;
+}
+.dtable td {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--outline-variant);
+  color: var(--text-main);
+  vertical-align: middle;
+}
+.dtable tbody tr:hover td { background: var(--card); }
+.dtable tbody tr:last-child td { border-bottom: none; }
+
+.bar-track { width: 100%; height: 6px; background: var(--surface-container-high); border-radius: 9999px; overflow: hidden; display: flex; }
+.bar-fill { height: 100%; background: var(--sky); }
+.bar-fill.ok { background: var(--emerald); }
+.bar-fill.warn { background: var(--amber); }
+.bar-fill.bad { background: var(--rose); }
+
+.dot-led { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--emerald); }
+.dot-led.off { background: var(--outline); }
+.dot-led.warn { background: var(--amber); }
+.dot-led.bad { background: var(--rose); }
+
+.split-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 1100px) { .split-2 { grid-template-columns: 1fr; } }
+
+.kv-list { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.9rem; font-size: 0.78rem; }
+.kv-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.kv-row dt { color: var(--outline); font-size: 0.72rem; }
+.kv-row dd { color: var(--text-main); font-family: ui-monospace, Menlo, monospace; font-size: 0.74rem; text-align: right; }
+.kv-row dd.ok { color: var(--emerald); }
+.kv-row dd.bad { color: var(--rose); }
+
+.code-block {
+  background: #0e0e10;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 .badge-online { background: rgba(16, 185, 129, 0.15); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
 .badge-degraded { background: rgba(245, 158, 11, 0.15); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.3); }
 .badge-offline { background: rgba(244, 63, 94, 0.15); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.3); }
@@ -631,171 +804,299 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
   <div id="page-dashboard" class="page active">
     <div class="top-bar">
       <div class="page-title">
-        <h2>Ringkasan Node</h2>
-        <p>Telemetri performa dan resolusi DNS secara real-time</p>
+        <h2>Dashboard</h2>
+        <p>Telemetri real-time node edge: trafik, pemblokiran, dan kesehatan upstream</p>
       </div>
-      <button class="btn btn-secondary" onclick="fetchStats()">
-        <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
-        <span>Refresh</span>
-      </button>
+      <div style="display:flex;gap:0.5rem;align-items:center">
+        <span class="chip" id="dash-fresh">—</span>
+        <button class="btn btn-secondary" onclick="fetchStats()">
+          <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
+          <span>Refresh</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Live QPS Sparkline Chart -->
-    <div class="chart-card">
-      <div class="chart-header">
-        <div class="chart-title">
-          <h3>Traffic Query per Detik (QPS)</h3>
+    <!-- KPI tiles -->
+    <section class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-tile-head">
+          <span>Query per Detik</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular"><span id="s-qps">0</span> <small>QPS</small></div>
+        <div class="stat-tile-note"><span>Peak</span><span class="tabular" id="peak-qps">0</span></div>
+      </div>
+
+      <div class="stat-tile">
+        <div class="stat-tile-head">
+          <span>Total Resolusi</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="s-total">—</div>
+        <div class="stat-tile-note"><span>Akumulasi request</span><span id="dash-uptime">—</span></div>
+      </div>
+
+      <div class="stat-tile tone-rose">
+        <div class="stat-tile-head">
+          <span>Query Diblokir</span>
+          <span class="stat-tile-ico" style="color:var(--rose)"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="s-blocked">—</div>
+        <div class="stat-tile-note"><span>Rasio blokir</span><span class="tabular" id="s-blocked-pct">—</span></div>
+      </div>
+
+      <div class="stat-tile tone-emerald">
+        <div class="stat-tile-head">
+          <span>Cache Hit</span>
+          <span class="stat-tile-ico" style="color:var(--emerald)"><svg viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="s-cache">—%</div>
+        <div class="stat-tile-note"><span>Efisiensi upstream</span><span id="s-dnsdist">Aktif</span></div>
+      </div>
+    </section>
+
+    <!-- Traffic chart -->
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Trafik Query (QPS)</h3>
           <p>Aktivitas query UDP / TCP yang diproses node</p>
         </div>
-        <div class="chip" id="peak-qps-chip">Peak: 0 QPS</div>
+        <span class="chip tabular" id="chart-peak-chip">Peak: 0 QPS</span>
       </div>
-      <div class="chart-canvas-wrap">
-        <canvas id="qps-canvas"></canvas>
-      </div>
+      <div class="chart-canvas-wrap"><canvas id="qps-canvas"></canvas></div>
     </div>
 
-    <!-- Metrics Grid -->
-    <div class="metrics-grid">
-      <div class="metric-card accent-sky">
-        <div class="metric-header">
-          <span class="metric-label">Beban QPS</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <div class="split-2">
+      <!-- System resources -->
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg> Sumber Daya Sistem</h3>
+            <p>Beban CPU, memori, dan status daemon</p>
+          </div>
         </div>
-        <div class="metric-val tabular" id="s-qps">0</div>
-        <div class="metric-sub">Query per detik</div>
+        <div style="padding:0.9rem;display:flex;flex-direction:column;gap:1rem">
+          <div>
+            <div class="kv-row" style="margin-bottom:0.35rem"><dt>CPU</dt><dd id="res-cpu">0%</dd></div>
+            <div class="bar-track"><div class="bar-fill" id="p-cpu" style="width:0%"></div></div>
+          </div>
+          <div>
+            <div class="kv-row" style="margin-bottom:0.35rem"><dt>Memori</dt><dd id="res-ram">0 GB</dd></div>
+            <div class="bar-track"><div class="bar-fill ok" id="p-ram" style="width:0%"></div></div>
+          </div>
+          <div>
+            <div class="kv-row" style="margin-bottom:0.35rem"><dt>Uptime</dt><dd id="res-uptime">—</dd></div>
+          </div>
+        </div>
       </div>
 
-      <div class="metric-card accent-indigo">
-        <div class="metric-header">
-          <span class="metric-label">Total Resolusi</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      <!-- Service health -->
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Kesehatan Layanan</h3>
+            <p>Status komponen inti node</p>
+          </div>
         </div>
-        <div class="metric-val tabular" id="s-total">—</div>
-        <div class="metric-sub">Akumulasi request</div>
-      </div>
-
-      <div class="metric-card accent-rose">
-        <div class="metric-header">
-          <span class="metric-label">Query Ditolak</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        <div class="metric-val tabular" id="s-blocked">—</div>
-        <div class="metric-sub">Filter blacklist/RPZ</div>
-      </div>
-
-      <div class="metric-card accent-emerald">
-        <div class="metric-header">
-          <span class="metric-label">Cache Hit</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        </div>
-        <div class="metric-val tabular" id="s-cache">—%</div>
-        <div class="metric-sub">Efisiensi upstream</div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-header">
-          <span class="metric-label">Utilisasi CPU</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
-        </div>
-        <div class="metric-val tabular" id="s-cpu">0%</div>
-        <div class="progress-bar"><div class="progress-fill" id="p-cpu" style="width:0%"></div></div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-header">
-          <span class="metric-label">Pemakaian RAM</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M6 19v-3M10 19v-3M14 19v-3M18 19v-3M6 5v3M10 5v3M14 5v3M18 5v3M2 8h20v8H2z"/></svg>
-        </div>
-        <div class="metric-val tabular" id="s-ram">0 GB</div>
-        <div class="metric-sub" id="s-ram-sub">dari — GB</div>
-        <div class="progress-bar"><div class="progress-fill" id="p-ram" style="width:0%"></div></div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-header">
-          <span class="metric-label">Uptime Sistem</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <div class="metric-val tabular" id="s-uptime" style="font-size:1.35rem">—</div>
-        <div class="metric-sub">Waktu aktif mesin</div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-header">
-          <span class="metric-label">Status Layanan</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        </div>
-        <div class="metric-val tabular" id="s-dnsdist" style="font-size:1.2rem;color:var(--emerald)">Aktif</div>
-        <div class="metric-sub">dnsdist core daemon</div>
+        <dl class="kv-list">
+          <div class="kv-row"><dt>dnsdist core</dt><dd id="hc-dnsdist">—</dd></div>
+          <div class="kv-row"><dt>dnstap decoder</dt><dd id="hc-dnstap">—</dd></div>
+          <div class="kv-row"><dt>Blok mode</dt><dd id="hc-blockmode">—</dd></div>
+          <div class="kv-row"><dt>Sinkhole IP</dt><dd id="hc-sinkhole">—</dd></div>
+          <div class="kv-row"><dt>Upstream aktif</dt><dd id="hc-upstream">—</dd></div>
+        </dl>
       </div>
     </div>
   </div>
-
-  <!-- RPZ Page -->
   <div id="page-rpz" class="page">
     <div class="top-bar">
       <div class="page-title">
         <h2>RPZ Sinkhole Filtering</h2>
-        <p>Arahkan domain berbahaya / terblokir ke halaman peringatan khusus</p>
+        <p>Domain berbahaya diarahkan ke IP sinkhole; lihat feed aktif, hash CDB, dan uji domain</p>
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn btn-secondary" onclick="fetchRPZStatus()">
+          <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>Segarkan</span>
+        </button>
       </div>
     </div>
 
-    <div class="card-box">
-      <div class="card-box-header">
+    <section class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-tile-head"><span>Total Rule CDB</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="rpz-total-rules">—</div>
+        <div class="stat-tile-note"><span>Mode blok</span><span id="rpz-block-mode">—</span></div>
+      </div>
+      <div class="stat-tile tone-indigo">
+        <div class="stat-tile-head"><span>Ukuran CDB</span>
+          <span class="stat-tile-ico" style="color:var(--indigo)"><svg viewBox="0 0 24 24"><path d="M4 7v10c0 2 1.5 3 8 3s8-1 8-3V7"/><path d="M4 7c0 2 1.5 3 8 3s8-1 8-3-1.5-3-8-3-8 1-8 3z"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="rpz-cdb-size">—</div>
+        <div class="stat-tile-note"><span>Diperbarui</span><span id="rpz-cdb-updated">—</span></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-head"><span>Hash CDB</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg></span>
+        </div>
+        <div class="stat-tile-val mono" style="font-size:0.85rem" id="rpz-cdb-hash">—</div>
+        <div class="stat-tile-note"><span>Verifikasi sinkron</span><span>SHA-256</span></div>
+      </div>
+      <div class="stat-tile tone-emerald">
+        <div class="stat-tile-head"><span>IP Sinkhole</span>
+          <span class="stat-tile-ico" style="color:var(--emerald)"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" style="font-size:0.95rem" id="rpz-sinkhole-count">—</div>
+        <div class="stat-tile-note"><span>IPv4 + IPv6</span><span id="rpz-sinkhole-list">—</span></div>
+      </div>
+    </section>
+
+    <div class="panel">
+      <div class="panel-head">
         <div>
-          <h3>Daftar IP Sinkhole Saat Ini</h3>
-          <p>IP target yang dikembalikan saat domain blacklist diakses</p>
+          <h3><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg> Feed Sumber RPZ / CDB</h3>
+          <p>Sumber blocklist yang dikompilasi ke CDB aktif</p>
+        </div>
+        <span class="chip" id="rpz-feed-count">0 feed</span>
+      </div>
+      <div class="dtable-wrap">
+        <table class="dtable">
+          <thead><tr><th>Nama Feed</th><th>Zone / File</th><th>Status</th><th>Rule</th></tr></thead>
+          <tbody id="rpz-feed-tbody">
+            <tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Memuat feed...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="split-2">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/></svg> Ubah IP Sinkhole</h3>
+            <p>IP yang dikembalikan ketika domain blacklist diakses</p>
+          </div>
+        </div>
+        <div style="padding:0.9rem">
+          <div id="rpz-current" class="chips-wrap" style="margin-bottom:1rem"><span class="chip">Memuat...</span></div>
+          <div class="form-group">
+            <label>Alamat IP Sinkhole Baru</label>
+            <textarea id="rpz-input" placeholder="10.10.10.10&#10;2001:db8::1"></textarea>
+            <div class="hint">Multi-IP (IPv4 &amp; IPv6), pisahkan koma atau baris baru.</div>
+          </div>
+          <button class="btn btn-primary" onclick="saveRPZ()">
+            <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+            <span>Terapkan IP Sinkhole</span>
+          </button>
         </div>
       </div>
-      <div id="rpz-current" class="chips-wrap" style="margin-bottom:1.5rem">
-        <span class="chip">Memuat data...</span>
-      </div>
 
-      <div class="form-group">
-        <label>Perbarui Alamat IP Sinkhole</label>
-        <textarea id="rpz-input" placeholder="10.10.10.10&#10;2001:db8::1"></textarea>
-        <div class="hint">Mendukung multi-IP (IPv4 & IPv6). Pisahkan dengan koma atau baris baru. DNSDist otomatis mengelompokkan record <code>A</code> ke IPv4 dan <code>AAAA</code> ke IPv6.</div>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Uji Domain RPZ</h3>
+            <p>Cek apakah domain ada di CDB aktif</p>
+          </div>
+        </div>
+        <div style="padding:0.9rem">
+          <div style="display:flex;gap:0.5rem">
+            <input id="rpz-test-input" placeholder="test-malware.domain.com" style="flex:1" onkeydown="if(event.key==='Enter')testRPZDomain()">
+            <button class="btn btn-primary" onclick="testRPZDomain()">Uji</button>
+          </div>
+          <dl class="kv-list" id="rpz-test-result" style="display:none;padding:0.9rem 0 0">
+            <div class="kv-row"><dt>Status</dt><dd id="rt-status">—</dd></div>
+            <div class="kv-row"><dt>Aksi</dt><dd id="rt-action">—</dd></div>
+            <div class="kv-row"><dt>Sinkhole</dt><dd id="rt-sinkhole">—</dd></div>
+            <div class="kv-row"><dt>Database</dt><dd id="rt-db" style="word-break:break-all">—</dd></div>
+          </dl>
+        </div>
       </div>
-      <button class="btn btn-primary" onclick="saveRPZ()">
-        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        <span>Terapkan IP Sinkhole</span>
-      </button>
     </div>
   </div>
-
-  <!-- Upstream Page -->
   <div id="page-upstream" class="page">
     <div class="top-bar">
       <div class="page-title">
         <h2>Upstream DNS Resolver</h2>
-        <p>Tentukan server induk untuk meneruskan query non-blacklist</p>
+        <p>Server induk untuk query non-blacklist, beserta bobot distribusi dan status</p>
       </div>
-    </div>
-
-    <div class="card-box">
-      <div class="card-box-header">
-        <div>
-          <h3>Upstream Resolver Aktif</h3>
-          <p>Server resolver recursive yang saat ini digunakan</p>
-        </div>
-      </div>
-      <div id="upstream-current" class="chips-wrap" style="margin-bottom:1.5rem">
-        <span class="chip">Memuat data...</span>
-      </div>
-
-      <div class="form-group">
-        <label>Daftar Server Upstream Baru</label>
-        <textarea id="upstream-input" placeholder="1.1.1.1&#10;8.8.8.8&#10;[2606:4700:4700::1111]:53"></textarea>
-        <div class="hint">Format valid: <code>1.1.1.1</code>, <code>8.8.8.8:53</code>, atau IPv6 <code>[2606:4700:4700::1111]:53</code>.</div>
-      </div>
-      <button class="btn btn-primary" onclick="saveUpstream()">
-        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        <span>Simpan & Muat Ulang Upstream</span>
+      <button class="btn btn-secondary" onclick="fetchUpstreamStatus()">
+        <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        <span>Segarkan</span>
       </button>
     </div>
-  </div>
 
-  <!-- SafeSearch Page -->
+    <section class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-tile-head"><span>Total Upstream</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3"/><path d="M18 12h4m-2-2 2 2-2 2"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="up-count">—</div>
+        <div class="stat-tile-note"><span>Terdaftar</span><span>dnsdist</span></div>
+      </div>
+      <div class="stat-tile tone-emerald">
+        <div class="stat-tile-head"><span>Sehat</span>
+          <span class="stat-tile-ico" style="color:var(--emerald)"><svg viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="up-healthy">—</div>
+        <div class="stat-tile-note"><span>Status terpasang</span><span>OK</span></div>
+      </div>
+      <div class="stat-tile tone-indigo">
+        <div class="stat-tile-head"><span>DoT / DoH</span>
+          <span class="stat-tile-ico" style="color:var(--indigo)"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="up-encrypted">—</div>
+        <div class="stat-tile-note"><span>Port 853 / 443</span><span>terenkripsi</span></div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-tile-head"><span>Mode Distribusi</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg></span>
+        </div>
+        <div class="stat-tile-val" style="font-size:1rem">Round-robin</div>
+        <div class="stat-tile-note"><span>Bobot setara</span><span>100%</span></div>
+      </div>
+    </section>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3"/><path d="M18 12h4m-2-2 2 2-2 2"/></svg> Resolver Terkonfigurasi</h3>
+          <p>Daftar upstream dengan protokol dan bobot</p>
+        </div>
+      </div>
+      <div class="dtable-wrap">
+        <table class="dtable">
+          <thead><tr><th>Alamat</th><th>Protokol</th><th>Bobot</th><th>Status</th></tr></thead>
+          <tbody id="upstream-tbody">
+            <tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Memuat upstream...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg> Ubah Daftar Upstream</h3>
+          <p>Simpan &amp; muat ulang konfigurasi resolver</p>
+        </div>
+      </div>
+      <div style="padding:0.9rem">
+        <div id="upstream-current" class="chips-wrap" style="margin-bottom:1rem"><span class="chip">Memuat...</span></div>
+        <div class="form-group">
+          <label>Server Upstream Baru</label>
+          <textarea id="upstream-input" placeholder="1.1.1.1&#10;8.8.8.8&#10;[2606:4700:4700::1111]:53"></textarea>
+          <div class="hint">Format valid: <code>1.1.1.1</code>, <code>8.8.8.8:53</code>, atau IPv6 <code>[2606:4700:4700::1111]:53</code>.</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveUpstream()">
+          <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+          <span>Simpan &amp; Muat Ulang Upstream</span>
+        </button>
+      </div>
+    </div>
+  </div>
   <div id="page-safesearch" class="page">
     <div class="top-bar">
       <div class="page-title">
@@ -1037,94 +1338,110 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
     <div class="top-bar">
       <div class="page-title">
         <h2>Cluster Edge Nodes</h2>
-        <p>Pemantauan terpusat metrik dan status sinkronisasi seluruh node edge</p>
+        <p>Inventaris node, status sinkronisasi, dan enrollment token</p>
       </div>
-      <div style="display:flex;gap:0.75rem;">
+      <div style="display:flex;gap:0.5rem">
         <button class="btn btn-secondary" onclick="fetchClusterNodes()">
           <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
           <span>Segarkan</span>
         </button>
         <button class="btn btn-primary" id="add-node-button" style="display:none" onclick="openAddNodeModal()">
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          <span>Tambah Node</span>
+          <span>Enroll Node</span>
         </button>
       </div>
     </div>
 
-    <!-- Cluster Aggregate Cards -->
-    <div class="metrics-grid">
-      <div class="metric-card accent-sky">
-        <div class="metric-header">
-          <span class="metric-label">Node Aktif / Total</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <section class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-tile-head"><span>Total Node</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></span>
         </div>
-        <div class="metric-val tabular" id="cl-nodes" style="font-size:1.5rem">0 / 0</div>
-        <div class="metric-sub" id="cl-nodes-sub">0 online, 0 offline</div>
+        <div class="stat-tile-val tabular" id="cl-nodes">0 / 0</div>
+        <div class="stat-tile-note"><span>Online</span><span id="cl-nodes-sub">0 online</span></div>
       </div>
-
-      <div class="metric-card accent-indigo">
-        <div class="metric-header">
-          <span class="metric-label">Total Cluster QPS</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <div class="stat-tile">
+        <div class="stat-tile-head"><span>Total QPS Cluster</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
         </div>
-        <div class="metric-val tabular" id="cl-qps">0</div>
-        <div class="metric-sub">Query / detik seluruh node</div>
+        <div class="stat-tile-val tabular" id="cl-qps">0</div>
+        <div class="stat-tile-note"><span>Agregat semua node</span><span>QPS</span></div>
       </div>
-
-      <div class="metric-card accent-emerald">
-        <div class="metric-header">
-          <span class="metric-label">Total Queries</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+      <div class="stat-tile tone-emerald">
+        <div class="stat-tile-head"><span>Total Query</span>
+          <span class="stat-tile-ico" style="color:var(--emerald)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg></span>
         </div>
-        <div class="metric-val tabular" id="cl-queries">0</div>
-        <div class="metric-sub" id="cl-blocked-sub">0 diblokir</div>
+        <div class="stat-tile-val tabular" id="cl-queries">0</div>
+        <div class="stat-tile-note"><span>Diblokir</span><span id="cl-blocked-sub">0</span></div>
       </div>
-
-      <div class="metric-card">
-        <div class="metric-header">
-          <span class="metric-label">Rata-rata Cache Hit</span>
-          <svg class="metric-icon" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      <div class="stat-tile tone-indigo">
+        <div class="stat-tile-head"><span>Rata-rata Cache Hit</span>
+          <span class="stat-tile-ico" style="color:var(--indigo)"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg></span>
         </div>
-        <div class="metric-val tabular" id="cl-cache">0.0%</div>
-        <div class="metric-sub">Efisiensi cache cluster</div>
+        <div class="stat-tile-val tabular" id="cl-cache">0.0%</div>
+        <div class="stat-tile-note"><span>Efisiensi cluster</span><span>cache</span></div>
       </div>
-    </div>
+    </section>
 
-    <!-- Node Table -->
-    <div class="card-box" style="margin-top:1.5rem">
-      <div class="card-box-header">
+    <div class="panel">
+      <div class="panel-head">
         <div>
-          <h3>Daftar Node Terhubung</h3>
-          <p>Status telemetri live yang dilaporkan edge setiap interval heartbeat</p>
+          <h3><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> Inventaris Edge Node</h3>
+          <p>Telemetri live yang dilaporkan edge setiap heartbeat</p>
         </div>
+        <span class="chip tabular" id="cl-sync-state">memuat</span>
       </div>
-      <div class="node-table-wrap">
-        <table class="node-table">
+      <div class="dtable-wrap">
+        <table class="dtable">
           <thead>
             <tr>
-              <th>Status</th>
-              <th>Nama Node</th>
-              <th>IP Node</th>
-              <th>QPS</th>
-              <th>Total Query</th>
-              <th>Ditolak</th>
-              <th>Cache Hit</th>
-              <th>Hash CDB</th>
-              <th>Last Seen</th>
-              <th>Aksi</th>
+              <th>Status</th><th>Nama Node</th><th>IP</th><th>QPS</th>
+              <th>Total Query</th><th>Ditolak</th><th>Cache</th><th>Hash CDB</th><th>Last Seen</th><th>Aksi</th>
             </tr>
           </thead>
           <tbody id="cluster-nodes-tbody">
-            <tr>
-              <td colspan="10" style="text-align:center;color:var(--text-sub);padding:2rem;">Belum ada edge node yang terhubung ke master ini.</td>
-            </tr>
+            <tr><td colspan="10" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada edge node yang terhubung.</td></tr>
           </tbody>
         </table>
       </div>
     </div>
-  </div>
 
-  <!-- Settings Page -->
+    <div class="split-2">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3><svg viewBox="0 0 24 24"><path d="M15 7a5 5 0 1 0-4 8l1 1h2v2h2v2h3l1-1v-3l-5-4z"/></svg> Enrollment Token</h3>
+            <p>Token sekali pakai untuk mendaftarkan edge baru</p>
+          </div>
+        </div>
+        <div style="padding:0.9rem">
+          <dl class="kv-list" style="padding:0 0 0.9rem">
+            <div class="kv-row"><dt>Mode master</dt><dd id="ctk-master">—</dd></div>
+            <div class="kv-row"><dt>Token didukung</dt><dd id="ctk-supported">—</dd></div>
+            <div class="kv-row"><dt>Node terdaftar</dt><dd id="ctk-nodes">—</dd></div>
+          </dl>
+          <div id="ctk-note" class="hint" style="margin-bottom:0.9rem"></div>
+          <button class="btn btn-primary" id="ctk-generate" onclick="openTokenModal()">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            <span>Generate Token</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3><svg viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg> Bootstrap Edge</h3>
+            <p>Perintah pendaftaran node baru</p>
+          </div>
+          <button class="btn btn-secondary" onclick="copyBootstrapCmd()">Salin</button>
+        </div>
+        <div style="padding:0.9rem">
+          <div class="code-block" id="bootstrap-cmd">Menunggu token...</div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="page-settings" class="page">
     <div class="top-bar">
       <div class="page-title">
@@ -1312,6 +1629,7 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
 const API = '';
 let token = localStorage.getItem('panel_token') || '';
 let statsInterval = null;
+let healthInterval = null;
 
 // ── Chart State ──
 const qpsHistory = Array(30).fill(0);
@@ -1453,6 +1771,12 @@ function nav(page, el) {
     if (clusterPoller) { clearInterval(clusterPoller); clusterPoller = null; }
   }
   if (page === 'settings') loadBlockpageInfo();
+  if (page === 'rpz') {
+    fetchRPZStatus();
+    fetchRPZTrend();
+  }
+  if (page === 'upstream') fetchUpstreamStatus();
+  if (page === 'cluster') fetchClusterTokens();
   if (page === 'rpz' || page === 'upstream' || page === 'safesearch' || page === 'dotdoh' || page === 'settings') {
     fetchConfig();
   }
@@ -1533,45 +1857,61 @@ function fmtUptime(s) {
 async function fetchStats() {
   try {
     const d = await api('/api/stats');
-    
-    // Update metric cards
-    document.getElementById('s-qps').textContent = fmtNum(d.qps);
-    document.getElementById('s-total').textContent = fmtNum(d.queries_total);
-    document.getElementById('s-blocked').textContent = fmtNum(d.blocked_total);
-    document.getElementById('s-cache').textContent = d.cache_hit_pct.toFixed(1) + '%';
-    document.getElementById('s-cpu').textContent = d.cpu_pct.toFixed(1) + '%';
-    document.getElementById('p-cpu').style.width = Math.min(d.cpu_pct, 100) + '%';
-    
-    const ramUsedGB = (d.mem_used_mb / 1024).toFixed(1);
-    const ramTotalGB = (d.mem_total_mb / 1024).toFixed(1);
-    document.getElementById('s-ram').textContent = ramUsedGB + ' GB';
-    document.getElementById('s-ram-sub').textContent = 'dari ' + ramTotalGB + ' GB';
+
+    const qps = d.qps || 0;
+    const total = d.queries_total || 0;
+    const blocked = d.blocked_total || 0;
+    const cachePct = d.cache_hit_pct || 0;
+    const cpuPct = d.cpu_pct || 0;
+
+    document.getElementById('s-qps').textContent = fmtNum(qps);
+    document.getElementById('s-total').textContent = fmtNum(total);
+    document.getElementById('s-blocked').textContent = fmtNum(blocked);
+    document.getElementById('s-blocked-pct').textContent = total > 0 ? ((blocked / total) * 100).toFixed(2) + '%' : '0%';
+    document.getElementById('s-cache').textContent = cachePct.toFixed(1) + '%';
+    document.getElementById('res-cpu').textContent = cpuPct.toFixed(1) + '%';
+    document.getElementById('p-cpu').style.width = Math.min(cpuPct, 100) + '%';
+
+    const ramUsedGB = ((d.mem_used_mb || 0) / 1024).toFixed(1);
+    const ramTotalGB = ((d.mem_total_mb || 0) / 1024).toFixed(1);
+    document.getElementById('res-ram').textContent = ramUsedGB + ' / ' + ramTotalGB + ' GB';
     const ramPct = d.mem_total_mb > 0 ? (d.mem_used_mb / d.mem_total_mb) * 100 : 0;
     document.getElementById('p-ram').style.width = Math.min(ramPct, 100) + '%';
 
-    document.getElementById('s-uptime').textContent = fmtUptime(d.uptime_sec);
-    
+    const up = fmtUptime(d.uptime_sec || 0);
+    document.getElementById('res-uptime').textContent = up;
+    document.getElementById('dash-uptime').textContent = up;
+
     const ds = document.getElementById('s-dnsdist');
+    const hc = document.getElementById('hc-dnsdist');
     const dot = document.getElementById('status-dot');
     const txt = document.getElementById('status-text');
 
     if (d.dnsdist_running) {
       ds.textContent = 'Aktif';
       ds.style.color = 'var(--emerald)';
+      if (hc) { hc.textContent = 'running'; hc.className = 'ok'; }
       dot.className = 'pulse-dot online';
       txt.textContent = 'DNS Online';
     } else {
       ds.textContent = 'Mati';
       ds.style.color = 'var(--rose)';
+      if (hc) { hc.textContent = 'stopped'; hc.className = 'bad'; }
       dot.className = 'pulse-dot offline';
       txt.textContent = 'DNS Mati';
     }
 
+    const fresh = document.getElementById('dash-fresh');
+    if (fresh) fresh.textContent = 'diperbarui ' + new Date().toLocaleTimeString('id-ID');
+
     // Update QPS History & Chart
     qpsHistory.shift();
-    qpsHistory.push(d.qps);
-    if (d.qps > peakQPS) peakQPS = d.qps;
-    document.getElementById('peak-qps-chip').textContent = `Peak: ${peakQPS} QPS`;
+    qpsHistory.push(qps);
+    if (qps > peakQPS) peakQPS = qps;
+    const peakTxt = `Peak: ${peakQPS} QPS`;
+    document.getElementById('chart-peak-chip').textContent = peakTxt;
+    const pc = document.getElementById('peak-qps');
+    if (pc) pc.textContent = fmtNum(peakQPS);
     drawChart();
 
   } catch (e) {
@@ -1869,36 +2209,31 @@ async function fetchClusterNodes() {
     }
 
     tbody.innerHTML = nodes.map(n => {
-      let badgeClass = 'badge-offline';
+      let dotClass = 'bad';
       let badgeText = 'Offline';
-      if (n.status === 'online') {
-        badgeClass = 'badge-online';
-        badgeText = 'Online';
-      } else if (n.status === 'degraded') {
-        badgeClass = 'badge-degraded';
-        badgeText = 'Degraded';
-      }
+      if (n.status === 'online') { dotClass = ''; badgeText = 'Online'; }
+      else if (n.status === 'degraded') { dotClass = 'warn'; badgeText = 'Degraded'; }
 
       const nodeID = esc(n.id);
       const nodeName = esc(n.name || n.id);
       const nodeIP = esc(n.ip || '—');
-      const hashShort = n.db_hash ? esc(n.db_hash.substring(0, 8)) + '...' : '—';
+      const hashShort = n.db_hash ? esc(n.db_hash.substring(0, 8)) + '…' : '—';
       const dbHashFull = esc(n.db_hash || '');
-      const lastSeenStr = n.last_seen_at ? esc(new Date(n.last_seen_at).toLocaleTimeString()) : '—';
+      const lastSeenStr = n.last_seen_at ? relTime(n.last_seen_at) : '—';
 
       return `
         <tr>
-          <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+          <td><span class="dot-led ${dotClass}"></span> ${badgeText}</td>
           <td style="font-weight:600">${nodeName}</td>
-          <td style="font-family:ui-monospace,monospace">${nodeIP}</td>
+          <td class="mono">${nodeIP}</td>
           <td class="tabular">${fmtNum(n.qps)}</td>
           <td class="tabular">${fmtNum(n.queries_total)}</td>
           <td class="tabular" style="color:var(--amber)">${fmtNum(n.blocked_total)}</td>
           <td class="tabular">${(n.cache_hit_pct || 0).toFixed(1)}%</td>
-          <td style="font-family:ui-monospace,monospace;font-size:0.75rem" title="${dbHashFull}">${hashShort}</td>
-          <td class="tabular" style="color:var(--text-sub);font-size:0.75rem">${lastSeenStr}</td>
+          <td class="mono" style="font-size:0.72rem" title="${dbHashFull}">${hashShort}</td>
+          <td class="tabular" style="color:var(--outline);font-size:0.72rem">${lastSeenStr}</td>
           <td>
-            <button class="btn btn-secondary" style="padding:0.25rem 0.5rem;font-size:0.72rem;color:var(--rose)" onclick="deleteClusterNode('${nodeID}')">Hapus</button>
+            <button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.7rem;color:var(--rose)" onclick="deleteClusterNode('${nodeID}')">Hapus</button>
           </td>
         </tr>
       `;
@@ -1919,6 +2254,165 @@ async function deleteClusterNode(id) {
   } catch (e) {
     toast('Gagal menghapus node: ' + e.message, 'error');
   }
+}
+
+// ── Status readers for the Obsidian Telemetry layouts ──
+
+function fmtBytes(n) {
+  if (!n || n <= 0) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB'];
+  let i = 0, v = n;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return v.toFixed(i === 0 ? 0 : 1) + ' ' + u[i];
+}
+
+async function fetchRPZStatus() {
+  try {
+    const d = await api('/api/rpz/status');
+    document.getElementById('rpz-total-rules').textContent = fmtNum(d.total_rules || 0);
+    document.getElementById('rpz-block-mode').textContent = (d.block_mode || 'rpz').toUpperCase();
+    document.getElementById('rpz-cdb-size').innerHTML = fmtBytes(d.cdb_size) + ' <small>CDB</small>';
+    document.getElementById('rpz-cdb-updated').textContent = d.cdb_updated ? relTime(d.cdb_updated) : '—';
+    const hash = d.cdb_hash || '';
+    document.getElementById('rpz-cdb-hash').textContent = hash ? hash.slice(0, 16) + '…' : '—';
+    const ips = d.sinkhole_ips || [];
+    document.getElementById('rpz-sinkhole-count').innerHTML = ips.length + ' <small>IP</small>';
+    document.getElementById('rpz-sinkhole-list').textContent = ips.slice(0, 2).join(', ') || '—';
+
+    const feeds = d.feeds || [];
+    document.getElementById('rpz-feed-count').textContent = feeds.length + ' feed';
+    const tb = document.getElementById('rpz-feed-tbody');
+    if (!feeds.length) {
+      tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Tidak ada feed master terkonfigurasi pada node edge ini. CDB lokal tetap aktif.</td></tr>';
+    } else {
+      tb.innerHTML = feeds.map(f => `<tr>
+        <td>${esc(f.name)}</td>
+        <td class="mono">${esc(f.zone_id || '—')}</td>
+        <td><span class="dot-led"></span> ${f.active ? 'Aktif' : 'Nonaktif'}</td>
+        <td class="tabular">${f.rules ? fmtNum(f.rules) : '—'}</td>
+      </tr>`).join('');
+    }
+  } catch (e) {
+    toast('Gagal memuat status RPZ: ' + e.message, 'error');
+  }
+}
+
+// fetchRPZTrend is a placeholder kept explicit so nav() never calls an undefined
+// function. The panel has no per-feed timeline endpoint yet; the tile values come
+// from fetchRPZStatus instead of a fabricated series.
+async function fetchRPZTrend() {
+  return;
+}
+
+async function testRPZDomain() {
+  const input = document.getElementById('rpz-test-input');
+  const domain = (input.value || '').trim();
+  if (!domain) { toast('Masukkan domain untuk diuji', 'error'); return; }
+  try {
+    const d = await api('/api/rpz/test?domain=' + encodeURIComponent(domain));
+    document.getElementById('rpz-test-result').style.display = 'flex';
+    const status = document.getElementById('rt-status');
+    status.textContent = d.matched ? 'SINKHOLE HIT' : 'TIDAK DITEMUKAN';
+    status.className = d.matched ? 'bad' : 'ok';
+    document.getElementById('rt-action').textContent = d.action || '—';
+    document.getElementById('rt-sinkhole').textContent = (d.sinkhole_ips || []).join(', ') || '—';
+    document.getElementById('rt-db').textContent = d.database || '—';
+  } catch (e) {
+    toast('Uji domain gagal: ' + e.message, 'error');
+  }
+}
+
+async function fetchUpstreamStatus() {
+  try {
+    const d = await api('/api/upstream/status');
+    const ups = d.upstreams || [];
+    document.getElementById('up-count').textContent = ups.length;
+    document.getElementById('up-healthy').textContent = ups.filter(u => u.healthy).length;
+    document.getElementById('up-encrypted').textContent = ups.filter(u => u.protocol === 'DoT' || u.protocol === 'DoH').length;
+    const tb = document.getElementById('upstream-tbody');
+    if (!ups.length) {
+      tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada upstream terkonfigurasi.</td></tr>';
+    } else {
+      tb.innerHTML = ups.map(u => `<tr>
+        <td class="mono">${esc(u.address)}</td>
+        <td>${esc(u.protocol)}</td>
+        <td style="min-width:120px">
+          <div class="kv-row" style="margin-bottom:0.3rem"><dt></dt><dd>${u.weight}%</dd></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${u.weight}%"></div></div>
+        </td>
+        <td><span class="dot-led ${u.healthy ? '' : 'bad'}"></span> ${u.healthy ? 'UP' : 'DOWN'}</td>
+      </tr>`).join('');
+    }
+  } catch (e) {
+    toast('Gagal memuat upstream: ' + e.message, 'error');
+  }
+}
+
+async function fetchClusterTokens() {
+  try {
+    const d = await api('/api/cluster/tokens');
+    const m = document.getElementById('ctk-master');
+    m.textContent = d.is_master ? 'aktif' : 'nonaktif';
+    m.className = d.is_master ? 'ok' : '';
+    const sup = document.getElementById('ctk-supported');
+    sup.textContent = d.token_supported ? 'ya' : 'tidak';
+    sup.className = d.token_supported ? 'ok' : 'bad';
+    document.getElementById('ctk-nodes').textContent = (d.nodes || 0) + ' node (' + (d.online || 0) + ' online)';
+    document.getElementById('ctk-note').textContent = d.note || '';
+    const btn = document.getElementById('ctk-generate');
+    if (!d.token_supported) { btn.setAttribute('disabled', 'disabled'); btn.style.opacity = '0.5'; }
+    else { btn.removeAttribute('disabled'); btn.style.opacity = '1'; }
+    const sync = document.getElementById('cl-sync-state');
+    if (sync) sync.textContent = (d.online || 0) + '/' + (d.nodes || 0) + ' online';
+  } catch (e) {
+    // token endpoint is master-only; an edge node should not surface an error toast
+    const sync = document.getElementById('cl-sync-state');
+    if (sync) sync.textContent = 'edge mode';
+  }
+}
+
+function copyBootstrapCmd() {
+  const el = document.getElementById('bootstrap-cmd');
+  copyText(el.textContent || '');
+}
+
+// fetchBootstrapCmd renders the enrollment command using the panel's own origin,
+// so the snippet is copy-pasteable without inventing a hostname.
+async function fetchBootstrapCmd() {
+  const el = document.getElementById('bootstrap-cmd');
+  if (!el) return;
+  try {
+    const cfg = await api('/api/config');
+    if (cfg && cfg.is_master) {
+      el.textContent = 'Mode master: jalankan setup-edge.sh --master-url <URL_MASTER> --enroll-token <TOKEN> pada node edge baru.';
+      return;
+    }
+    const origin = window.location.origin;
+    el.textContent = `curl -fsSL ${origin}/api/cluster/token -X POST -H "Authorization: Bearer <JWT>" -d '{"hours":24}'`;
+  } catch (e) {
+    el.textContent = 'Tidak dapat memuat perintah bootstrap: ' + e.message;
+  }
+}
+
+function relTime(iso) {
+  const t = Date.parse(iso);
+  if (isNaN(t)) return '—';
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 60) return s + 's lalu';
+  if (s < 3600) return Math.floor(s / 60) + 'm lalu';
+  if (s < 86400) return Math.floor(s / 3600) + 'j lalu';
+  return Math.floor(s / 86400) + 'h lalu';
+}
+
+async function fetchHealth() {
+  try {
+    const d = await api('/api/health', 'GET');
+    const dd = document.getElementById('hc-dnsdist');
+    dd.textContent = d.dnsdist ? 'running' : 'stopped';
+    dd.className = d.dnsdist ? 'ok' : 'bad';
+    document.getElementById('res-uptime').textContent = fmtUptime(d.uptime || 0);
+    document.getElementById('dash-uptime').textContent = fmtUptime(d.uptime || 0);
+  } catch (e) { /* health probe is best-effort */ }
 }
 
 async function openTokenModal() {
@@ -2175,9 +2669,13 @@ async function saveMasterWhitelist(build) {
 function onLogin() {
   fetchConfig();
   fetchStats();
+  fetchHealth();
+  fetchBootstrapCmd();
   initChart();
   if (statsInterval) clearInterval(statsInterval);
   statsInterval = setInterval(fetchStats, 5000);
+  if (healthInterval) clearInterval(healthInterval);
+  healthInterval = setInterval(fetchHealth, 15000);
   applyEnrollmentHandoff();
 }
 

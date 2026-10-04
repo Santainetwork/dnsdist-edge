@@ -1273,6 +1273,12 @@ func main() {
 
 	// Protected
 	mux.HandleFunc("/api/stats", auth(handleStats))
+	mux.HandleFunc("/api/rpz/status", auth(handleRPZStatus))
+	mux.HandleFunc("/api/rpz/test", auth(handleRPZTest))
+	mux.HandleFunc("/api/upstream/status", auth(handleUpstreamStatus))
+	mux.HandleFunc("/api/dnstap/status", auth(handleDnstapStatus))
+	mux.HandleFunc("/api/cluster/tokens", auth(handleClusterTokens))
+	mux.HandleFunc("/api/health", handleHealth)
 	mux.HandleFunc("/api/config", auth(handleConfig))
 	mux.HandleFunc("/api/rpz", auth(handleRPZ))
 	mux.HandleFunc("/api/upstream", auth(handleUpstream))
