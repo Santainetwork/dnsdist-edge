@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,17 +68,13 @@ func TestCDBLookupMatchesTrustBuilderFormat(t *testing.T) {
 	}
 }
 
-// TestGenCDBPyProducesPlainKeysDocumentsIncompatibility documents a real defect in
-// the Python generator rather than asserting its output works.
+// TestGenCDBPyWritesWireKeys pins the Python generator to DNS wire format.
 //
-// tools/gen-cdb.py writes PLAIN TEXT keys ("evil.com."). dnsdist looks up WIRE
-// format keys, so a CDB from gen-cdb.py never matches and silently fails to block.
-// The panel lookup must NOT match such a database, because doing so would mean the
-// panel disagrees with dnsdist about what is blocked.
-//
-// The Go replacement (tools/gen-cdb-go) writes wire format and is the supported
-// path; this test pins the incompatibility so it cannot be forgotten.
-func TestGenCDBPyProducesPlainKeysDocumentsIncompatibility(t *testing.T) {
+// tools/gen-cdb.py previously returned plain text ("evil.com.") from a function
+// documented as wire format, so every CDB it produced silently failed to block
+// in dnsdist. It now emits real wire format, matching tools/trust-builder and
+// tools/gen-cdb-go. This test keeps it that way.
+func TestGenCDBPyWritesWireKeys(t *testing.T) {
 	gen := filepath.Join("..", "tools", "gen-cdb.py")
 	if _, err := os.Stat(gen); err != nil {
 		t.Skip("gen-cdb.py not present")
@@ -96,18 +93,22 @@ func TestGenCDBPyProducesPlainKeysDocumentsIncompatibility(t *testing.T) {
 		t.Fatalf("read: %v", err)
 	}
 
-	klen := le32(data, 2048)
-	if klen == 0 || int(2048+8+klen) > len(data) {
-		t.Fatalf("unexpected layout: klen=%d", klen)
+	// The record's key must be the wire encoding of evil.com.
+	key, ok := wireDomainKey("evil.com")
+	if !ok {
+		t.Fatal("wireDomainKey rejected evil.com")
 	}
-	key := data[2056 : 2056+klen]
-	if string(key) != "evil.com." {
-		t.Fatalf("expected gen-cdb.py to write the plain key %q, got %q", "evil.com.", key)
+	if string(key) != "\x04evil\x03com\x00" {
+		t.Fatalf("unexpected expected-key encoding: %q", key)
 	}
-	t.Logf("confirmed: gen-cdb.py writes PLAIN key %q, which dnsdist's wire lookup cannot match", key)
+	idx := bytes.Index(data, key)
+	if idx < 0 {
+		t.Fatalf("gen-cdb.py output does not contain the wire key %q", key)
+	}
+	t.Logf("confirmed: gen-cdb.py writes WIRE key %q", key)
 
-	// The panel agrees with dnsdist, so it must NOT find this domain.
-	if cdbContainsDomain(data, "evil.com") {
-		t.Error("panel matched a plain-text-key CDB; it would disagree with dnsdist about blocking")
+	// And the panel must find it, i.e. agree with dnsdist.
+	if !cdbContainsDomain(data, "evil.com") {
+		t.Error("panel could not find a name the Python generator wrote")
 	}
 }

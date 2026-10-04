@@ -40,10 +40,12 @@ def write_cdb(path: str, entries: "list[tuple[bytes, bytes]]") -> None:
         records.append((h, pos, len(key), len(val), key, val))
         pos += len(key) + len(val) + 8
 
-    # 2) Alokasikan 256 tabel hash (masing-masing 0x100 slot).
+    # 2) Alokasikan 256 tabel hash. Bucket dipilih dari BYTE RENDAH hash
+    #    (h & 0xFF) sesuai spec CDB. Sebelumnya memakai (h >> 8) & 0xFF,
+    #    sehingga dnsdist (yang mengikuti spec) tidak pernah menemukan entri.
     tables = {}
     for h, *_ in records:
-        slot = (h >> 8) & 0xFF
+        slot = h & 0xFF
         tables.setdefault(slot, []).append(h)
 
     # Tulis placeholder tabel (n * 4 byte), catat offset-nya.
@@ -65,21 +67,30 @@ def write_cdb(path: str, entries: "list[tuple[bytes, bytes]]") -> None:
             f.write(key)
             f.write(val)
 
-        # 4) Isi tabel hash dengan (hash, offset) terurut per slot.
+        # 4) Isi tabel hash. Posisi awal di dalam bucket = (h >> 8) % slotCount,
+        #    lalu linear probing sampai slot kosong - sama seperti pembaca dnsdist.
         for slot, hs in tables.items():
-            sorted_hs = sorted(hs)
+            slot_count = len(hs)
+            placed = [None] * slot_count
+            for h in hs:
+                start = (h >> 8) % slot_count
+                for i in range(slot_count):
+                    idx = (start + i) % slot_count
+                    if placed[idx] is None:
+                        placed[idx] = h
+                        break
             f.seek(table_pos[slot])
-            for h in sorted_hs:
+            for h in placed:
                 rpos = next(r[1] for r in records if r[0] == h)
                 f.write(h.to_bytes(4, "little"))
                 f.write(rpos.to_bytes(4, "little"))
 
-        # 5) Tulis header index.
+        # 5) Tulis header index. Field kedua adalah JUMLAH SLOT, bukan byte.
         f.seek(0)
         for slot in range(256):
             hs = tables.get(slot, [])
             f.write(table_pos[slot].to_bytes(4, "little"))
-            f.write((len(hs) * 8).to_bytes(4, "little"))
+            f.write(len(hs).to_bytes(4, "little"))
 
     # 6) Verifikasi: baca ulang dan hitung kembali hash.
     check_records(records)
@@ -94,11 +105,30 @@ def check_records(records: "list[tuple[int, int, int, int, bytes, bytes]]") -> N
 
 
 def wire_name(domain: str) -> bytes:
-    """'Example.COM' -> wire format 'example.com.' (RFC 1035)."""
+    """'Example.COM' -> DNS wire format b'\\x07example\\x03com\\x00' (RFC 1035).
+
+    This must be real wire format, not the plain text 'example.com.'. dnsdist
+    looks keys up with KeyValueLookupKeyQName(true), i.e. wire format, and
+    tools/trust-builder writes wire format via dns.PackDomainName. An earlier
+    version of this function returned plain text despite claiming wire format,
+    so CDBs it produced never matched and silently blocked nothing.
+    """
     d = domain.rstrip(".").lower()
     if not d:
         raise ValueError(f"domain kosong: {domain!r}")
-    return d.encode() + b"."
+    out = bytearray()
+    for label in d.split("."):
+        if not label:
+            raise ValueError(f"label kosong pada: {domain!r}")
+        raw = label.encode()
+        if len(raw) > 63:
+            raise ValueError(f"label > 63 byte: {label!r}")
+        out.append(len(raw))
+        out += raw
+    out.append(0)
+    if len(out) > 255:
+        raise ValueError(f"nama > 255 byte: {domain!r}")
+    return bytes(out)
 
 
 def main() -> int:
