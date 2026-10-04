@@ -291,9 +291,12 @@ func writeTestCDB(path string, names []string) error {
 		pos += uint32(len(key) + len(val) + 8)
 	}
 
+	// Index bucket selection uses the LOW byte of the hash, and the header's
+	// second field is a SLOT COUNT (not a byte count). Both details matter:
+	// getting them wrong makes the fixture disagree with real dnsdist.
 	bySlot := make(map[int][]rec)
 	for _, r := range recs {
-		slot := int((r.h >> 8) & 0xFF)
+		slot := int(r.h & 0xFF)
 		bySlot[slot] = append(bySlot[slot], r)
 	}
 
@@ -305,9 +308,28 @@ func writeTestCDB(path string, names []string) error {
 		out = append(out, r.val...)
 	}
 	for slot := 0; slot < 256; slot++ {
-		tablePos := uint32(len(out))
 		rs := bySlot[slot]
+		if len(rs) == 0 {
+			continue // empty bucket: leave offset and count at zero
+		}
+		// Build the bucket's slot array with the same probing rule dnsdist uses:
+		// start at (hash>>8) % slotCount and linear-probe on collision.
+		tablePos := uint32(len(out))
+		slotCount := uint32(len(rs))
+		bucket := make([]rec, slotCount)
+		placed := make([]bool, slotCount)
 		for _, r := range rs {
+			start := (r.h >> 8) % slotCount
+			for i := uint32(0); i < slotCount; i++ {
+				idx := (start + i) % slotCount
+				if !placed[idx] {
+					bucket[idx] = r
+					placed[idx] = true
+					break
+				}
+			}
+		}
+		for _, r := range bucket {
 			out = append(out, le(r.h)...)
 			out = append(out, le(r.pos)...)
 		}
@@ -315,11 +337,10 @@ func writeTestCDB(path string, names []string) error {
 		out[slot*8+1] = byte(tablePos >> 8)
 		out[slot*8+2] = byte(tablePos >> 16)
 		out[slot*8+3] = byte(tablePos >> 24)
-		ln := uint32(len(rs) * 8)
-		out[slot*8+4] = byte(ln)
-		out[slot*8+5] = byte(ln >> 8)
-		out[slot*8+6] = byte(ln >> 16)
-		out[slot*8+7] = byte(ln >> 24)
+		out[slot*8+4] = byte(slotCount)
+		out[slot*8+5] = byte(slotCount >> 8)
+		out[slot*8+6] = byte(slotCount >> 16)
+		out[slot*8+7] = byte(slotCount >> 24)
 	}
 	return os.WriteFile(path, out, 0o644)
 }

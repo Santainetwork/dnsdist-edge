@@ -276,9 +276,24 @@ func wireDomainKey(domain string) ([]byte, bool) {
 	return key, true
 }
 
-// cdbContainsDomain performs an exact-name lookup in a TinyCDB file using the
-// DJB hash the format uses. The key is encoded in DNS wire format so it matches
-// both the builder and dnsdist.
+// cdbContainsDomain reports whether domain is present in a TinyCDB database.
+//
+// CDB index semantics (verified against colinmarc/cdb's reader AND against real
+// dnsdist, which blocked a name this function previously failed to find):
+//
+//   - The 2048-byte header holds 256 index entries of 8 bytes each:
+//     uint32 tableOffset, uint32 tableSlotCount.
+//   - The index entry for a key is chosen by the LOW byte of the hash:
+//     index = hash & 0xff.   (NOT (hash>>8)&0xff - that was the bug.)
+//   - The second field is a SLOT COUNT, not a byte count. Each slot is 8 bytes,
+//     so the table occupies tableSlotCount*8 bytes.
+//   - Inside the table, probing starts at (hash >> 8) % tableSlotCount and walks
+//     forward with wraparound. A zero hash means an empty slot, which ends the
+//     probe chain.
+//
+// The earlier implementation used the wrong index byte and treated the length
+// field as bytes, so /api/rpz/test reported "not found" for names that dnsdist
+// was actively blocking - exactly the symptom reported by the operator.
 func cdbContainsDomain(data []byte, domain string) bool {
 	key, ok := wireDomainKey(domain)
 	if !ok {
@@ -286,37 +301,51 @@ func cdbContainsDomain(data []byte, domain string) bool {
 	}
 	const (
 		hashInit = 5381
-		slots    = 256
+		indexLen = 256
+		slotSize = 8
 	)
-	if len(data) < slots*8 {
+	if len(data) < indexLen*slotSize {
 		return false
 	}
+
+	// CDB hash: h = h*33 ^ byte, starting at 5381.
 	var h uint32 = hashInit
 	for _, c := range key {
 		h = ((h + (h << 5)) ^ uint32(c))
 	}
-	slot := (h >> 8) & (slots - 1)
-	base := int(slot) * 8
 
-	pos := le32(data, base)
-	length := le32(data, base+4)
-	if pos > uint32(len(data)) || uint32(len(data))-pos < length {
+	// Index entry is selected by the LOW byte of the hash.
+	idx := int(h&0xff) * slotSize
+	tableOff := le32(data, idx)
+	slotCount := le32(data, idx+4)
+	if slotCount == 0 {
+		return false // no entries hashed to this index bucket
+	}
+	// Guard against a corrupt header pointing outside the file.
+	if uint64(tableOff)+uint64(slotCount)*slotSize > uint64(len(data)) {
 		return false
 	}
-	for off := pos; off < pos+length; off += 8 {
-		if off+8 > uint32(len(data)) {
+
+	start := (h >> 8) % slotCount
+	for i := uint32(0); i < slotCount; i++ {
+		slot := (start + i) % slotCount
+		off := int(tableOff) + int(slot)*slotSize
+		if off+slotSize > len(data) {
 			return false
 		}
-		th := le32(data, int(off))
-		tpos := le32(data, int(off)+4)
+		th := le32(data, off)
+		if th == 0 {
+			return false // empty slot: end of probe chain
+		}
 		if th != h {
 			continue
 		}
-		if int(tpos)+8 > len(data) {
+		tpos := le32(data, off+4)
+		if uint64(tpos)+8 > uint64(len(data)) {
 			continue
 		}
 		klen := le32(data, int(tpos))
-		if int(tpos)+8+int(klen) > len(data) {
+		if uint64(tpos)+8+uint64(klen) > uint64(len(data)) {
 			continue
 		}
 		if string(data[tpos+8:tpos+8+klen]) == string(key) {
