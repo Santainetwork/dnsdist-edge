@@ -274,6 +274,37 @@ func TestDnstapServerSurvivesGarbage(t *testing.T) {
 	}
 }
 
+// TestDnstapAggregatorFloodBounded simulates a random-subdomain attack: a huge
+// number of unique qnames. The map must stay bounded at the configured cap and
+// the excess must funnel into the _other_ bucket, so cardinality floods cannot
+// cause unbounded memory growth (the aggregator's stated design guarantee).
+func TestDnstapAggregatorFloodBounded(t *testing.T) {
+	const capacity = 1000
+	agg := NewDnstapAggregator(capacity)
+	agg.loc = time.UTC
+	day := time.Now()
+	dayKey := day.In(time.UTC).Format("2006-01-02")
+
+	for i := 0; i < 200000; i++ {
+		agg.Add(day, fmt.Sprintf("a%08d.rand-attack.example", i), "A")
+	}
+
+	agg.mu.Lock()
+	got := len(agg.m)
+	other := agg.m[dnstapKey{day: dayKey, qname: OtherBucket, qtype: OtherBucket}]
+	agg.mu.Unlock()
+
+	if got > capacity+1 { // cap plus the single shared _other_ key
+		t.Fatalf("aggregator exceeded capacity: len=%d cap=%d", got, capacity)
+	}
+	if other == 0 {
+		t.Fatal("expected overflow traffic in the _other_ bucket")
+	}
+	if other != 200000-capacity {
+		t.Fatalf("unexpected _other_ count: got %d want %d", other, 200000-capacity)
+	}
+}
+
 func TestHandleDnstapTopEndpoint(t *testing.T) {
 	// Seed global dnstapAgg
 	now := time.Now()
