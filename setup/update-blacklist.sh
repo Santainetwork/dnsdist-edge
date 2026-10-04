@@ -22,6 +22,19 @@ if [ -f "$NODE_CONF" ]; then
     . "$NODE_CONF"
     [ -n "$SAVED_CENTRAL_DB_URL" ] && CENTRAL_DB_URLS="${CENTRAL_DB_URLS:-$SAVED_CENTRAL_DB_URL}"
     [ -n "$SAVED_CDB_SOURCES" ] && CENTRAL_DB_URLS="$SAVED_CDB_SOURCES"
+    [ -n "$SAVED_CDB_TOKEN" ] && CDB_TOKEN="${CDB_TOKEN:-$SAVED_CDB_TOKEN}"
+fi
+
+# Token untuk master CDB publisher (panel /cdb/*). Kosong = tanpa header.
+# Diperlukan agar edge dapat mengunduh dari master yang mengaktifkan --cdb-token.
+CDB_TOKEN="${CDB_TOKEN:-}"
+
+# Bangun argumen header untuk curl dan aria2c bila token diisi.
+CURL_AUTH=()
+ARIA_AUTH=()
+if [ -n "$CDB_TOKEN" ]; then
+    CURL_AUTH=(-H "X-CDB-Token: ${CDB_TOKEN}")
+    ARIA_AUTH=(--header="X-CDB-Token: ${CDB_TOKEN}")
 fi
 
 FORCE_FLAG="${DB_FILE}.force"
@@ -63,6 +76,7 @@ download_source() {
     if [ -f "$DB_FILE" ] && [ ! -f "$FORCE_FLAG" ]; then
         FILE_DATE=$(date -u -r "$DB_FILE" +"%a, %d %b %Y %H:%M:%S GMT")
         http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${CURL_AUTH[@]}" \
             -H "If-Modified-Since: $FILE_DATE" \
             --connect-timeout 10 -m 15 "$url")
     fi
@@ -80,6 +94,7 @@ download_source() {
     echo "   [↓] Download: $url"
     rm -f "$tmp_file"
     aria2c -x 8 -s 8 -k 1M \
+        "${ARIA_AUTH[@]}" \
         --connect-timeout=10 --timeout=120 --max-tries=3 \
         --out="$(basename "$tmp_file")" \
         --dir="$(dirname "$tmp_file")" \

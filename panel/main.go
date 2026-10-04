@@ -1279,6 +1279,15 @@ func main() {
 	mux.HandleFunc("/api/dnstap/status", auth(handleDnstapStatus))
 	mux.HandleFunc("/api/cluster/tokens", auth(handleClusterTokens))
 	mux.HandleFunc("/api/health", handleHealth)
+
+	// CDB publisher: lets a master serve its built CDB to edge nodes so they
+	// download instead of rebuilding. Auth via X-CDB-Token (see cdbpublisher.go).
+	// These are intentionally NOT wrapped in the panel JWT auth(): edge nodes do
+	// not hold a panel session, they present the shared CDB token instead.
+	mux.HandleFunc("/cdb/manifest.json", handleCDBManifest)
+	mux.HandleFunc("/cdb/blacklist.db", handleCDBBlacklist)
+	mux.HandleFunc("/cdb/healthz", handleCDBHealthz)
+	mux.HandleFunc("/cdb/sources.json", handleCDBSources)
 	mux.HandleFunc("/api/config", auth(handleConfig))
 	mux.HandleFunc("/api/rpz", auth(handleRPZ))
 	mux.HandleFunc("/api/upstream", auth(handleUpstream))
