@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -203,6 +204,76 @@ func TestDnstapServerStreamingAndPrivacy(t *testing.T) {
 	}
 }
 
+// TestDnstapServerSurvivesGarbage ensures a malformed or hostile stream cannot
+// crash the server goroutine or stop it from serving subsequent valid clients.
+// The listener is reachable by any local process, so this guards a real
+// robustness (not just correctness) property.
+func TestDnstapServerSurvivesGarbage(t *testing.T) {
+	agg := NewDnstapAggregator(50)
+	agg.loc = time.UTC
+	srv, err := NewDnstapServer("tcp", "127.0.0.1:0", agg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.Start()
+	defer srv.Stop()
+
+	// 1. Raw bytes that are not a framestream at all.
+	c1, err := net.Dial("tcp", srv.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = c1.Write([]byte("this is not a framestream\x00\xff\xfe"))
+	_ = c1.Close()
+
+	// 2. Bogus control frame, then abrupt close.
+	c2, err := net.Dial("tcp", srv.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = c2.Write([]byte{0, 0, 0, 0})
+	_ = c2.Close()
+
+	// 3. Absurd declared frame length (framestream ErrDataFrameTooLarge path).
+	c3, err := net.Dial("tcp", srv.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = c3.Write([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
+	_ = c3.Close()
+
+	time.Sleep(300 * time.Millisecond)
+
+	// The server must still accept and decode a valid client afterwards.
+	c4, err := net.Dial("tcp", srv.Addr().String())
+	if err != nil {
+		t.Fatalf("server stopped accepting after garbage: %v", err)
+	}
+	w, err := dt.NewWriter(c4, &dt.WriterOptions{Bidirectional: true, Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatalf("framestream writer after garbage: %v", err)
+	}
+	enc := dt.NewEncoder(w)
+	day := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
+	if err := enc.Encode(makeDnstapFrame(t, dt.Message_CLIENT_QUERY, "after-garbage.example.", dns.TypeA, day, "10.0.0.9")); err != nil {
+		t.Fatalf("encode after garbage: %v", err)
+	}
+	_ = w.Close()
+	_ = c4.Close()
+
+	deadline := time.Now().Add(2 * time.Second)
+	var items []BlockedItem
+	for time.Now().Before(deadline) {
+		time.Sleep(25 * time.Millisecond)
+		if items = agg.Take(); len(items) == 1 {
+			break
+		}
+	}
+	if len(items) != 1 || items[0].QName != "after-garbage.example" {
+		t.Fatalf("server did not recover after garbage: %+v", items)
+	}
+}
+
 func TestHandleDnstapTopEndpoint(t *testing.T) {
 	// Seed global dnstapAgg
 	now := time.Now()
@@ -238,5 +309,77 @@ func TestHandleDnstapTopEndpoint(t *testing.T) {
 	}
 	if res.TopBlocked[0].QName != "judibola.com" || res.TopBlocked[0].Count < 2 {
 		t.Fatalf("top rank mismatch: %+v", res.TopBlocked[0])
+	}
+}
+
+// TestTopBlockedIsReadOnly guards the contract the UI relies on: unlike Take,
+// TopBlocked must NOT drain the aggregation window, so repeated polls by the
+// dnstap page keep returning the same ranking.
+func TestTopBlockedIsReadOnly(t *testing.T) {
+	agg := NewDnstapAggregator(100)
+	agg.loc = time.UTC
+	day := time.Date(2026, 10, 2, 10, 0, 0, 0, time.UTC)
+	for i := 0; i < 3; i++ {
+		agg.Add(day, "readonly.example", "A")
+	}
+
+	first := agg.TopBlocked(10)
+	second := agg.TopBlocked(10)
+	if len(first) != 1 || len(second) != 1 {
+		t.Fatalf("TopBlocked must not drain: first=%v second=%v", first, second)
+	}
+	if first[0].Count != 3 || second[0].Count != 3 {
+		t.Fatalf("counts must be stable across reads: %+v / %+v", first[0], second[0])
+	}
+
+	// Take, by contrast, resets the window.
+	if drained := agg.Take(); len(drained) != 1 {
+		t.Fatalf("Take should return the single item, got %d", len(drained))
+	}
+	if after := agg.TopBlocked(10); len(after) != 0 {
+		t.Fatalf("window must be empty after Take, got %+v", after)
+	}
+}
+
+// TestHandleDnstapTopLimitBounds pins the limit parsing the UI depends on:
+// only 1..100 is honoured, everything else falls back to the default of 10.
+func TestHandleDnstapTopLimitBounds(t *testing.T) {
+	agg := dnstapAgg
+	agg.mu.Lock()
+	agg.m = make(map[dnstapKey]int64)
+	agg.mu.Unlock()
+
+	now := time.Now()
+	for i := 0; i < 15; i++ {
+		agg.Add(now, fmt.Sprintf("d%02d.example", i), "A")
+	}
+
+	cases := []struct {
+		query string
+		want  int
+	}{
+		{"", 10},        // default
+		{"?limit=3", 3}, // honoured
+		{"?limit=0", 10},
+		{"?limit=-5", 10},
+		{"?limit=101", 10}, // above cap -> default
+		{"?limit=abc", 10},
+		{"?limit=100", 15}, // cap allowed, fewer items exist
+	}
+	for _, tc := range cases {
+		rec := httptest.NewRecorder()
+		handleDnstapTop(rec, httptest.NewRequest(http.MethodGet, "/api/dnstap/top"+tc.query, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%q: expected 200, got %d", tc.query, rec.Code)
+		}
+		var res struct {
+			TopBlocked []BlockedItem `json:"top_blocked"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatalf("%q: %v", tc.query, err)
+		}
+		if len(res.TopBlocked) != tc.want {
+			t.Fatalf("%q: expected %d items, got %d", tc.query, tc.want, len(res.TopBlocked))
+		}
 	}
 }

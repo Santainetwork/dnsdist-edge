@@ -726,6 +726,10 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
       <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       <span>DoT / DoH</span>
     </a>
+    <a href="#" onclick="nav('dnstap',this)">
+      <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <span>dnstap Analytics</span>
+    </a>
     <a href="#" id="nav-master" style="display:none" onclick="nav('master',this)">
       <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       <span>Central Master</span>
@@ -1147,6 +1151,76 @@ input:checked + .slider::before { transform: translateX(20px); background: #0709
         <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span>Simpan & Muat Ulang TLS Listener</span>
       </button>
+    </div>
+  </div>
+
+  <!-- dnstap Analytics Page -->
+  <div id="page-dnstap" class="page">
+    <div class="top-bar">
+      <div class="page-title">
+        <h2>dnstap Analytics</h2>
+        <p>Domain terblokir teratas dari stream framestream dnsdist &mdash; tanpa menyimpan client IP</p>
+      </div>
+      <button class="btn btn-secondary" onclick="fetchDnstap()">
+        <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        <span>Segarkan</span>
+      </button>
+    </div>
+
+    <section class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-tile-head"><span>Status Decoder</span>
+          <span class="stat-tile-ico"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+        </div>
+        <div class="stat-tile-val" style="font-size:1.05rem"><span class="dot-led off" id="dt-led"></span> <span id="dt-state">—</span></div>
+        <div class="stat-tile-note"><span>Listener</span><span class="mono" id="dt-listener">—</span></div>
+      </div>
+      <div class="stat-tile tone-indigo">
+        <div class="stat-tile-head"><span>Domain Terblokir</span>
+          <span class="stat-tile-ico" style="color:var(--indigo)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="dt-domains">—</div>
+        <div class="stat-tile-note"><span>Jendela agregasi</span><span id="dt-window">aktif</span></div>
+      </div>
+      <div class="stat-tile tone-rose">
+        <div class="stat-tile-head"><span>Total Query Terekam</span>
+          <span class="stat-tile-ico" style="color:var(--rose)"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+        </div>
+        <div class="stat-tile-val tabular" id="dt-total">—</div>
+        <div class="stat-tile-note"><span>Privasi</span><span>zero client IP</span></div>
+      </div>
+    </section>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg> Top Domain Terblokir</h3>
+          <p>Peringkat domain berdasarkan jumlah query yang diblokir pada jendela berjalan</p>
+        </div>
+        <span class="chip" id="dt-top-chip">0 domain</span>
+      </div>
+      <div class="dtable-wrap">
+        <table class="dtable">
+          <thead><tr><th style="width:3rem">#</th><th>Domain</th><th style="width:40%">Proporsi</th><th style="width:6rem">Query</th></tr></thead>
+          <tbody id="dt-tbody">
+            <tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Memuat data dnstap...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> Cara Mengaktifkan</h3>
+          <p>dnstap nonaktif secara default; aktifkan pada dnsdist dan panel</p>
+        </div>
+      </div>
+      <dl class="kv-list">
+        <div class="kv-row"><dt>1. dnsdist</dt><dd>Environment DNSDIST_DNSTAP_ADDR=127.0.0.1:6000 lalu restart dnsdist</dd></div>
+        <div class="kv-row"><dt>2. panel</dt><dd>Jalankan dengan --dnstap-addr 127.0.0.1:6000</dd></div>
+        <div class="kv-row"><dt>Privasi</dt><dd>Client IP dibuang saat decode protobuf (UU PDP)</dd></div>
+      </dl>
     </div>
   </div>
 
@@ -1583,6 +1657,7 @@ const API = '';
 let token = localStorage.getItem('panel_token') || '';
 let statsInterval = null;
 let healthInterval = null;
+let dnstapStatusInterval = null;
 
 // ── Chart State ──
 const qpsHistory = Array(30).fill(0);
@@ -1729,6 +1804,12 @@ function nav(page, el) {
     fetchRPZTrend();
   }
   if (page === 'upstream') fetchUpstreamStatus();
+  if (page === 'dnstap') {
+    fetchDnstap();
+    if (!dnstapPoller) dnstapPoller = setInterval(fetchDnstap, 5000);
+  } else {
+    if (dnstapPoller) { clearInterval(dnstapPoller); dnstapPoller = null; }
+  }
   if (page === 'cluster') fetchClusterTokens();
   if (page === 'rpz' || page === 'upstream' || page === 'safesearch' || page === 'dotdoh' || page === 'settings') {
     fetchConfig();
@@ -2096,6 +2177,7 @@ async function resetBlockpage() {
 // ── Master Mode Handler ──
 let masterPoller = null;
 let clusterPoller = null;
+let dnstapPoller = null;
 let currentClusterNodes = [];
 
 // ── Cluster Management ──
@@ -2380,6 +2462,78 @@ async function fetchHealth() {
   } catch (e) { /* health probe is best-effort */ }
 }
 
+// ── dnstap Analytics ──
+// fetchDnstapStatus is a lightweight probe used by the dashboard health row.
+async function fetchDnstapStatus() {
+  try {
+    const d = await api('/api/dnstap/status', 'GET');
+    const el = document.getElementById('hc-dnstap');
+    if (!el) return;
+    if (!d.enabled) {
+      el.textContent = 'nonaktif';
+      el.className = '';
+    } else if (d.has_data) {
+      el.textContent = 'aktif';
+      el.className = 'ok';
+    } else {
+      el.textContent = 'menunggu stream';
+      el.className = '';
+    }
+  } catch (e) { /* dnstap probe is best-effort */ }
+}
+
+async function fetchDnstap() {
+  try {
+    const st = await api('/api/dnstap/status', 'GET');
+    const led = document.getElementById('dt-led');
+    const state = document.getElementById('dt-state');
+    document.getElementById('dt-listener').textContent = st.listening || '—';
+    if (!st.enabled) {
+      led.className = 'dot-led off';
+      state.textContent = 'Nonaktif';
+      document.getElementById('dt-window').textContent = 'nonaktif';
+    } else if (st.has_data) {
+      led.className = 'dot-led';
+      state.textContent = 'Aktif';
+      document.getElementById('dt-window').textContent = 'aktif';
+    } else {
+      led.className = 'dot-led warn';
+      state.textContent = 'Menunggu stream';
+      document.getElementById('dt-window').textContent = 'kosong';
+    }
+
+    const d = await api('/api/dnstap/top?limit=20', 'GET');
+    const items = d.top_blocked || [];
+    const total = items.reduce((a, it) => a + (it.count || 0), 0);
+    const max = items.length ? Math.max(...items.map(it => it.count || 0)) : 0;
+    document.getElementById('dt-domains').textContent = fmtNum(items.length);
+    document.getElementById('dt-total').textContent = fmtNum(total);
+    document.getElementById('dt-top-chip').textContent = items.length + ' domain';
+
+    const tb = document.getElementById('dt-tbody');
+    if (!items.length) {
+      const hint = st.enabled
+        ? 'Belum ada query terblokir terekam pada jendela ini.'
+        : 'dnstap nonaktif. Set DNSDIST_DNSTAP_ADDR pada dnsdist dan jalankan panel dengan --dnstap-addr.';
+      tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">${esc(hint)}</td></tr>`;
+      return;
+    }
+    tb.innerHTML = items.map((it, i) => {
+      const pct = max > 0 ? Math.round((it.count / max) * 100) : 0;
+      return `<tr>
+        <td class="tabular" style="color:var(--outline)">${i + 1}</td>
+        <td class="mono">${esc(it.qname)}</td>
+        <td>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        </td>
+        <td class="tabular">${fmtNum(it.count)}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    toast('Gagal memuat dnstap: ' + e.message, 'error');
+  }
+}
+
 async function openTokenModal() {
   try {
     const d = await api('/api/cluster/token', 'POST', { hours: 24 });
@@ -2635,12 +2789,15 @@ function onLogin() {
   fetchConfig();
   fetchStats();
   fetchHealth();
+  fetchDnstapStatus();
   fetchBootstrapCmd();
   initChart();
   if (statsInterval) clearInterval(statsInterval);
   statsInterval = setInterval(fetchStats, 5000);
   if (healthInterval) clearInterval(healthInterval);
   healthInterval = setInterval(fetchHealth, 15000);
+  if (dnstapStatusInterval) clearInterval(dnstapStatusInterval);
+  dnstapStatusInterval = setInterval(fetchDnstapStatus, 15000);
   applyEnrollmentHandoff();
 }
 
