@@ -7,6 +7,24 @@ import (
 	"testing"
 )
 
+func TestDashboardHealthMetricsMarkup(t *testing.T) {
+	page := string(indexHTML)
+	for _, marker := range []string{
+		`id="hc-uptile"`,
+		`id="hc-blmode"`,
+		`id="hc-noderole"`,
+		`id="hc-nodecnt"`,
+		"fetchHealthTiles()",
+		"/api/upstream/status",
+		"/api/rpz/status",
+		"/api/cluster/tokens",
+	} {
+		if !strings.Contains(page, marker) {
+			t.Fatalf("panel HTML missing health metric tile marker %q", marker)
+		}
+	}
+}
+
 func TestSettingsBlockModeCardMarkup(t *testing.T) {
 	page := string(indexHTML)
 	settings := regexp.MustCompile(`(?s)<div id="page-settings".*?<h3>Mode Pemblokiran Utama</h3>.*?<input type="checkbox" id="set-mode"`).FindString(page)
