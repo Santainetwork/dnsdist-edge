@@ -42,24 +42,50 @@ jobs:
           python3 tools/gen-cdb.py /tmp/blacklist.db evil.com blocked.domain. example.com
           python3 - <<'EOF'
           import struct
+
+          # CDB spec (cr.yp.to/cdb/cdb.txt), as implemented by dnsdist and
+          # github.com/colinmarc/cdb:
+          #   - header = 256 entries of (tableOffset uint32, slotCount uint32)
+          #   - bucket is chosen by the LOW byte of the hash: h & 0xFF
+          #   - the second header field is a SLOT COUNT, not a byte count
+          #   - probing starts at (h >> 8) % slotCount and walks forward
+          #   - keys are DNS wire format (KeyValueLookupKeyQName(true))
+          # An earlier version of this smoke test asserted the previous buggy
+          # layout ((h >> 8) & 0xFF buckets, byte-count field, plain-text keys),
+          # which made it fail against the corrected generator.
           data = open('/tmp/blacklist.db','rb').read()
           assert len(data) >= 2048
           for i in range(256):
-              pos, ln = struct.unpack('<II', data[i*8:i*8+8])
-              assert pos <= len(data) and ln % 4 == 0
+              pos, n = struct.unpack('<II', data[i*8:i*8+8])
+              assert pos >= 2048 and pos + n*8 <= len(data), f"header slot {i} rusak"
+
           def chash(b):
               h = 5381
               for c in b: h = ((h + (h << 5)) & 0xFFFFFFFF) ^ c
               return h & 0xFFFFFFFF
-          for name in [b'evil.com.', b'blocked.domain.', b'example.com.']:
-              h = chash(name); slot = (h >> 8) & 0xFF
-              pos, ln = struct.unpack('<II', data[slot*8:slot*8+8])
+
+          def wire(name):
+              out = bytearray()
+              for label in name.split('.'):
+                  out.append(len(label)); out += label.encode()
+              out.append(0)
+              return bytes(out)
+
+          for name in ['evil.com', 'blocked.domain', 'example.com']:
+              key = wire(name)
+              h = chash(key)
+              idx = h & 0xFF
+              pos, n = struct.unpack('<II', data[idx*8:idx*8+8])
+              assert n > 0, f"bucket {idx} kosong untuk {name}"
               hit = False
-              for off in range(pos, pos+ln, 8):
+              start = (h >> 8) % n
+              for i in range(n):
+                  off = pos + ((start + i) % n)*8
                   th, tpos = struct.unpack('<II', data[off:off+8])
+                  if th == 0: break
                   if th != h: continue
                   klen, _ = struct.unpack('<II', data[tpos:tpos+8])
-                  if data[tpos+8:tpos+8+klen] == name: hit = True; break
+                  if data[tpos+8:tpos+8+klen] == key: hit = True; break
               assert hit, f"lookup gagal: {name}"
           print("CDB smoke test PASS")
           EOF
