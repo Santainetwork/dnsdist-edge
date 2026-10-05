@@ -2483,11 +2483,10 @@ async function fetchHealthTiles() {
     const cl = await api('/api/cluster/tokens', 'GET');
     const roleTile = document.getElementById('hc-noderole');
     const cntTile = document.getElementById('hc-nodecnt');
-    if (cl.ok && roleTile && cntTile) {
-      const isMaster = cl.is_master === true;
-      const nodes = typeof cl.nodes === 'number' ? cl.nodes : 0;
-      roleTile.textContent = isMaster ? 'Master' : 'Edge';
-      cntTile.textContent = nodes === 0 ? '—' : `${nodes} node terdaftar`;
+    const nodes = cl.nodes;
+    if (cl.ok && roleTile && cntTile && typeof cl.is_master === 'boolean' && Number.isInteger(nodes) && nodes >= 0) {
+      roleTile.textContent = cl.is_master ? 'Master' : 'Edge';
+      cntTile.textContent = `${nodes} node terdaftar`;
     } else if (roleTile && cntTile) {
       roleTile.textContent = '—';
       cntTile.textContent = '—';
