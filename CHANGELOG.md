@@ -7,6 +7,11 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ## [Unreleased] — 2026-10-05
 
+### Dashboard — Service Health Metric Tiles
+- **Kesehatan Layanan:** Ditambahkan baris kartu metrik ringkasan di atas daftar status (kv-list) mencakup jumlah resolver upstream terkonfigurasi, mode pemblokiran RPZ aktif (`NXDOMAIN`, `REFUSED`, dsb.), serta peran klaster (`Master`/`Edge`) lengkap dengan jumlah total node terdaftar.
+- **Fail-closed & Provenance:** Data diambil dari endpoint terautentikasi (`/api/upstream/status`, `/api/rpz/status`, `/api/cluster/tokens`), membedakan nilai 0 valid dari kegagalan probe, dan menampilkan tanda fallback `—` tanpa memalsukan status kesehatan resolver atau node.
+- **Test:** Ditambahkan pengujian markup `TestDashboardHealthMetricsMarkup` di test suite panel.
+
 ### CDB Wire-Format & Parity Fix
 - **gen-cdb.py:** Kini menulis DNS wire-format dengan bucket selection `h & 0xFF` dan probing `(h>>8) % slotCount`, kompatibel dengan dnsdist `KeyValueLookupKeyQName(true)` dan `tools/gen-cdb-go`.
 - **Panel reader:** `cdbContainsDomain` serta test fixture `writeTestCDB` kini mengikuti CDB lookup semantics. `/api/rpz/test` melaporkan keputusan blokir yang sama dengan dnsdist.
