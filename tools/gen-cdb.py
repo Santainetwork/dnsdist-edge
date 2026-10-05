@@ -44,9 +44,9 @@ def write_cdb(path: str, entries: "list[tuple[bytes, bytes]]") -> None:
     #    (h & 0xFF) sesuai spec CDB. Sebelumnya memakai (h >> 8) & 0xFF,
     #    sehingga dnsdist (yang mengikuti spec) tidak pernah menemukan entri.
     tables = {}
-    for h, *_ in records:
+    for record_index, (h, *_) in enumerate(records):
         slot = h & 0xFF
-        tables.setdefault(slot, []).append(h)
+        tables.setdefault(slot, []).append(record_index)
 
     # Tulis placeholder tabel (n * 4 byte), catat offset-nya.
     hpos = 2048 + sum(len(key) + len(val) + 8 for _, _, _, _, key, val in records)
@@ -72,16 +72,17 @@ def write_cdb(path: str, entries: "list[tuple[bytes, bytes]]") -> None:
         for slot, hs in tables.items():
             slot_count = len(hs)
             placed = [None] * slot_count
-            for h in hs:
+            for record_index in hs:
+                h = records[record_index][0]
                 start = (h >> 8) % slot_count
                 for i in range(slot_count):
                     idx = (start + i) % slot_count
                     if placed[idx] is None:
-                        placed[idx] = h
+                        placed[idx] = record_index
                         break
             f.seek(table_pos[slot])
-            for h in placed:
-                rpos = next(r[1] for r in records if r[0] == h)
+            for record_index in placed:
+                h, rpos, *_ = records[record_index]
                 f.write(h.to_bytes(4, "little"))
                 f.write(rpos.to_bytes(4, "little"))
 

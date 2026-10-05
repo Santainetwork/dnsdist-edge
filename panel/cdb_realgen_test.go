@@ -68,6 +68,63 @@ func TestCDBLookupMatchesTrustBuilderFormat(t *testing.T) {
 	}
 }
 
+func TestGenCDBPyPreservesDistinctKeysWithHashCollision(t *testing.T) {
+	gen := filepath.Join("..", "tools", "gen-cdb.py")
+	if _, err := os.Stat(gen); err != nil {
+		t.Skip("gen-cdb.py not present")
+	}
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 not available")
+	}
+
+	// These distinct DNS wire keys have the same DJB CDB hash, 0x29fc79aa.
+	domains := []string{"a22.kk51n1by5n.8rm14bba5.vgtb", "lxyflxgmeu41.2yk"}
+	first, ok := wireDomainKey(domains[0])
+	if !ok {
+		t.Fatalf("wireDomainKey rejected %q", domains[0])
+	}
+	second, ok := wireDomainKey(domains[1])
+	if !ok {
+		t.Fatalf("wireDomainKey rejected %q", domains[1])
+	}
+	if string(first) == string(second) {
+		t.Fatal("collision fixture keys must differ")
+	}
+	// Verify that the fixture indeed collides.
+	hash := func(key []byte) uint32 {
+		h := uint32(5381)
+		for _, b := range key {
+			h = ((h + (h << 5)) ^ uint32(b))
+		}
+		return h
+	}
+	h1 := hash(first)
+	h2 := hash(second)
+	if h1 != h2 {
+		t.Fatalf("fixture domains do not share CDB hash: %08x vs %08x", h1, h2)
+	}
+	const expectedHash uint32 = 0x29fc79aa
+	if h1 != expectedHash {
+		t.Fatalf("fixture hash mismatch: got %08x, want %08x", h1, expectedHash)
+	}
+
+	dbPath := filepath.Join(t.TempDir(), "collision.db")
+	args := append([]string{gen, dbPath}, domains...)
+	out, err := exec.Command("python3", args...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("gen-cdb.py failed: %v\n%s", err, out)
+	}
+	data, err := os.ReadFile(dbPath)
+	if err != nil {
+		t.Fatalf("read db: %v", err)
+	}
+	for _, domain := range domains {
+		if !cdbContainsDomain(data, domain) {
+			t.Errorf("generator lost %q under full-hash collision", domain)
+		}
+	}
+}
+
 // TestGenCDBPyWritesWireKeys pins the Python generator to DNS wire format.
 //
 // tools/gen-cdb.py previously returned plain text ("evil.com.") from a function

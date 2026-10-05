@@ -11,7 +11,8 @@ Format: [versi] — tanggal, deskripsi singkat.
 - **gen-cdb.py:** Kini menulis DNS wire-format dengan bucket selection `h & 0xFF` dan probing `(h>>8) % slotCount`, kompatibel dengan dnsdist `KeyValueLookupKeyQName(true)` dan `tools/gen-cdb-go`.
 - **Panel reader:** `cdbContainsDomain` serta test fixture `writeTestCDB` kini mengikuti CDB lookup semantics. `/api/rpz/test` melaporkan keputusan blokir yang sama dengan dnsdist.
 - **Regression guard:** `TestGenCDBPyWritesWireKeys` dan `TestPanelCDBAgreesWithDnsdist` melindungi format serta parity lookup.
-- Collision handling diverifikasi manual dengan 10 domain pada bucket sama, memakai reader `github.com/colinmarc/cdb`.
+- Collision handling preserves distinct records with identical 32-bit CDB hashes; `TestGenCDBPyPreservesDistinctKeysWithHashCollision` guards this case.
+- Collision handling also verified manually with 10 domain names in one bucket using reader `github.com/colinmarc/cdb`.
 
 ---
 
