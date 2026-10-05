@@ -18,6 +18,9 @@ func TestDashboardHealthMetricsMarkup(t *testing.T) {
 		"/api/upstream/status",
 		"/api/rpz/status",
 		"/api/cluster/tokens",
+		"typeof cl.is_master === 'boolean'",
+		"Number.isInteger(nodes) && nodes >= 0",
+		"cntTile.textContent = cl.is_master ?",
 	} {
 		if !strings.Contains(page, marker) {
 			t.Fatalf("panel HTML missing health metric tile marker %q", marker)

@@ -2486,7 +2486,9 @@ async function fetchHealthTiles() {
     const nodes = cl.nodes;
     if (cl.ok && roleTile && cntTile && typeof cl.is_master === 'boolean' && Number.isInteger(nodes) && nodes >= 0) {
       roleTile.textContent = cl.is_master ? 'Master' : 'Edge';
-      cntTile.textContent = `${nodes} node terdaftar`;
+      // TotalNodes counts locally stored nodes, which is only meaningful on Master.
+      // On Edge the local store is empty, so show a dash instead of a misleading zero.
+      cntTile.textContent = cl.is_master ? `${nodes} node terdaftar` : '—';
     } else if (roleTile && cntTile) {
       roleTile.textContent = '—';
       cntTile.textContent = '—';
