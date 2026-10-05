@@ -91,7 +91,7 @@ func validWhitelistDomain(value string) bool {
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 // PanelVersion is the edge panel release version used in cluster telemetry.
-const PanelVersion = "3.1.0"
+const PanelVersion = "3.2.0"
 
 var (
 	flagAddr              = flag.String("addr", envOr("PANEL_ADDR", ":8443"), "Primary listen address (HTTPS if TLS enabled, else HTTP)")

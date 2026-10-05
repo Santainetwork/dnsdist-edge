@@ -1,13 +1,13 @@
 #!/bin/bash
 # ============================================================
 # DNSDist Central Master - Auto Setup Script (Native OS)
-# Versi: 1.0.0
+# Versi: 3.2.0
 # Mendukung mode Standalone (Tanpa DNSDist) atau Hybrid (Dengan DNSDist)
 # ============================================================
 
 set -e
 
-SCRIPT_VERSION="3.1.0"
+SCRIPT_VERSION="3.2.0"
 SELF_UPDATE_URL="${SELF_UPDATE_URL:-https://github.com/Santainetwork/dnsdist-edge/releases/latest/download/setup-master.sh}"
 MASTER_DIR="${MASTER_DIR:-$(pwd)}"
 CONF_DIR="/etc/dnsdist-master"

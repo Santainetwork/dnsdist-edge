@@ -1,14 +1,14 @@
 #!/bin/bash
 # ============================================================
 # DNSDist Edge Node - Auto Setup Script (Native OS)
-# Versi: 2.3.0
+# Versi: 3.2.0
 # Terinspirasi dari proyek Trust-NG
 # ============================================================
 
 set -e
 
 # --- Versi Script ---
-SCRIPT_VERSION="3.1.0"
+SCRIPT_VERSION="3.2.0"
 SELF_UPDATE_URL="${SELF_UPDATE_URL:-https://github.com/Santainetwork/dnsdist-edge/releases/latest/download/setup-edge.sh}"
 
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---

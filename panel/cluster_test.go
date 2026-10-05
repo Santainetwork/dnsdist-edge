@@ -11,8 +11,8 @@ import (
 )
 
 func TestPanelVersionMatchesReleaseUI(t *testing.T) {
-	if PanelVersion != "3.1.0" {
-		t.Fatalf("PanelVersion = %q, want 3.1.0", PanelVersion)
+	if PanelVersion != "3.2.0" {
+		t.Fatalf("PanelVersion = %q, want 3.2.0", PanelVersion)
 	}
 	html := string(indexHTML)
 	for _, marker := range []string{"DNSDist Edge Panel v" + PanelVersion, "setup-edge.sh (v" + PanelVersion + ")"} {

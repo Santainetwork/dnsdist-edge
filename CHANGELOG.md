@@ -5,19 +5,58 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
-## [Unreleased] — 2026-10-05
+## [3.2.0] — 2026-10-05
+
+### Master CDB Publisher — Edge Mengunduh, Bukan Membangun
+- **Rute publisher:** Panel Master kini melayani `GET /cdb/manifest.json` (version, sha256 nyata, size, `built_at`), `GET /cdb/blacklist.db` (CDB aktif), `GET /cdb/healthz` (200 bila DB terbaca, 500 bila tidak), dan `GET /cdb/sources.json` (daftar sumber terurut yang diiklankan ke edge). Sebelumnya roadmap sempat mengklaim tahap ini selesai padahal rutenya belum ada di kode.
+- **Autentikasi `X-CDB-Token`:** Shared secret via flag `--cdb-token` / env `PANEL_CDB_TOKEN`, sengaja bukan JWT panel karena edge tidak memegang sesi panel. Nama file wajib lolos whitelist ber-hash (`trust.db`, `blacklist.db`, atau `trust|blacklist.<sha256>.db`), lalu path di-`EvalSymlinks` dan dicek ulang agar tetap berada di dalam `--files-dir` — path traversal dan symlink escape ditolak `403`.
+- **Edge:** `setup/update-blacklist.sh` mengirim `X-CDB-Token` pada probe `If-Modified-Since` (curl) maupun unduhan (aria2c), membaca `SAVED_CDB_TOKEN` dari `node.conf`. Tanpa ini edge yang diarahkan ke publisher tidak akan pernah bisa autentikasi, sehingga jalur preferensi Master tak bisa berjalan tanpa awasi.
+- **Test:** `TestCDBManifestSuccess`, `TestCDBManifestUsesContentAddressedHash`, `TestCDBPublisherRouteRegistration`, `TestCDBBlacklistServesActiveFile`, `TestCDBPathTraversalRejected`, `TestCDBSymlinkEscapeRejected`, `TestCDBUnknownFileRejected`, `TestCDBSourcesPrefersMasterThenFallbacks`, `TestCDBSourcesRejectsNonHTTPSchemes`.
+
+### CDB Download Throttle — Bootstrap Tetap Bisa, Flood Dicegah
+- **Kebijakan:** Edge tanpa token tetap boleh mengunduh untuk bootstrap, tetapi endpoint tidak boleh dipakai membanjiri Master. Token `X-CDB-Token` yang valid = trusted dan tidak pernah di-throttle (fast path); tanpa/salah token = tetap dilayani namun token-bucket per IP (burst 3, lalu satu permintaan per 30 detik) → `429` + `Retry-After` saat terlampaui.
+- **Observability & batas memori:** Respons membawa `X-CDB-Untrusted: 1` agar operator dapat mengenali edge salah konfigurasi dari log. Token yang valid menghapus bucket IP tersebut (edge tidak dihukum karena trafik anonim sebelumnya), dan jumlah IP yang dilacak dibatasi 4096 dengan eviksi oldest-seen agar flood sumber palsu tidak menumbuhkan peta tanpa batas.
+- **Test:** `TestCDBUntrustedIsAllowedButThrottled`, `TestCDBValidTokenBypassesThrottle`, `TestCDBWrongTokenIsThrottledLikeUntrusted`, `TestCDBNoTokenAllowsAccess`.
+
+### dnstap Streaming Wiring + Generator CDB Go
+- **dnstap dnsdist:** Blok opt-in `[5.7]` di `setup/dnsdist.conf` mendaftarkan `DnstapLogAction` pada rule blacklist hanya bila `DNSDIST_DNSTAP_ADDR` (atau `PANEL_DNSTAP_ADDR`) diset, jadi tetap mati secara default. Ditempatkan sebelum action terminal mana pun karena action terminal akan mencegah record terekam.
+- **UI panel:** Halaman **dnstap Analytics** (nav + tabel + petunjuk aktivasi) kini mengonsumsi `/api/dnstap/top` yang sebelumnya ada tetapi tidak terpakai. Catatan privasi eksplisit: panel membuang client IP seketika saat decode.
+- **Generator CDB Go:** `tools/gen-cdb-go` menulis key DNS **wire format**, selaras `tools/trust-builder` dan `KeyValueLookupKeyQName(true)` dnsdist. (Skrip Python lama menulis key plain-text sehingga CDB-nya diam-diam tidak memblokir apa pun; lihat perbaikan wire-format di bawah.)
+- **Test:** `TestDnstapServerStreamingAndPrivacy`, `TestHandleDnstapTopEndpoint`, `TestTopBlockedIsReadOnly`, serta suite `tools/gen-cdb-go/main_test.go`.
 
 ### Dashboard — Service Health Metric Tiles
 - **Kesehatan Layanan:** Ditambahkan baris kartu metrik ringkasan di atas daftar status (kv-list) mencakup jumlah resolver upstream terkonfigurasi, mode pemblokiran RPZ aktif (`NXDOMAIN`, `REFUSED`, dsb.), serta peran klaster (`Master`/`Edge`) lengkap dengan jumlah total node terdaftar.
 - **Fail-closed & Provenance:** Data diambil dari endpoint terautentikasi (`/api/upstream/status`, `/api/rpz/status`, `/api/cluster/tokens`), membedakan nilai 0 valid dari kegagalan probe, dan menampilkan tanda fallback `—` tanpa memalsukan status kesehatan resolver atau node.
-- **Test:** Ditambahkan pengujian markup `TestDashboardHealthMetricsMarkup` di test suite panel.
+- **Perbaikan lanjutan:** Hitungan 0 node yang valid kini ditampilkan eksplisit (`0 node terdaftar`), sedangkan di Edge jumlah node lokal ditampilkan `—` (tidak tersedia) alih-alih angka nol yang menyesatkan; penjagaan `typeof is_master === 'boolean'` dan `Number.isInteger(nodes)` mempertahankan perilaku fail-closed.
+- **Test:** `TestDashboardHealthMetricsMarkup`.
 
 ### CDB Wire-Format & Parity Fix
 - **gen-cdb.py:** Kini menulis DNS wire-format dengan bucket selection `h & 0xFF` dan probing `(h>>8) % slotCount`, kompatibel dengan dnsdist `KeyValueLookupKeyQName(true)` dan `tools/gen-cdb-go`.
-- **Panel reader:** `cdbContainsDomain` serta test fixture `writeTestCDB` kini mengikuti CDB lookup semantics. `/api/rpz/test` melaporkan keputusan blokir yang sama dengan dnsdist.
-- **Regression guard:** `TestGenCDBPyWritesWireKeys` dan `TestPanelCDBAgreesWithDnsdist` melindungi format serta parity lookup.
-- Collision handling preserves distinct records with identical 32-bit CDB hashes; `TestGenCDBPyPreservesDistinctKeysWithHashCollision` guards this case.
-- Collision handling also verified manually with 10 domain names in one bucket using reader `github.com/colinmarc/cdb`.
+- **Panel reader:** `cdbContainsDomain` serta test fixture `writeTestCDB` kini mengikuti CDB lookup semantics. `/api/rpz/test` melaporkan keputusan blokir yang sama dengan dnsdist. (Sebelumnya tester RPZ selalu menjawab `TIDAK DITEMUKAN` karena meng-hash key plain-text, bukan wire format.)
+- **Regression guard:** `TestGenCDBPyWritesWireKeys` dan `TestPanelCDBAgreesWithDnsdist` melindungi format serta parity lookup; `TestCDBWireFormatKeys`/`TestWireDomainKeyEncoding` memaku encoding wire.
+- **Collision handling:** Generator Python kini mempertahankan record berbeda yang memiliki hash CDB 32-bit identik (`TestGenCDBPyPreservesDistinctKeysWithHashCollision`); sebelumnya record dengan hash sama saling menimpa. Kasus ini juga diverifikasi manual dengan 10 nama domain dalam satu bucket memakai reader `github.com/colinmarc/cdb`.
+
+### Test & CI
+- Smoke test CDB di CI diselaraskan ke spec `cr.yp.to/cdb/cdb.txt` (bucket `h & 0xFF`, field kedua = jumlah slot, probe mulai `(h>>8) % slotCount`, key DNS wire format) setelah sebelumnya mengunci layout lama yang keliru; versi baru juga menolak output generator lama (CI-only).
+
+### Rilis
+- Panel, UI, installer Edge/Master (`setup-edge.sh`, `setup-master.sh`), dan `update-blacklist.sh` disinkronkan ke v3.2.0; binary `dnsdist-panel` di `tools/` dan `panel/` dibangun ulang dari sumber yang sama.
+- `rpz-master` kini ikut dipublikasikan sebagai aset rilis, sehingga `setup-master.sh` dapat memakai jalur `verified-release` (unduh + verifikasi `SHA256SUMS`) di samping jalur `bundled` dari tarball.
+
+### Catatan validasi
+- Lulus: `gofmt` bersih, `go vet` bersih, `go test` panel lulus (termasuk `-race`), `go test` di `tools/gen-cdb-go` lulus, dan suite shell `tests/*.sh` 5/5 lulus (`dnsdist-panel-contracts.sh`, `setup-edge-url.sh`, `setup-master-modes.sh`, `smartdns-plugin-contracts.sh`, `update-blacklist-cleanup.sh`).
+- Belum diverifikasi pada rilis ini: integrasi Postgres live (audit DB), alur deployment/upgrade produksi, DNS eksternal nyata, Trust+ blockpage end-to-end di host nginx, serta rendering piksel kartu kesehatan di peramban.
+- Catatan kejujuran: klaim validasi live publisher/throttle di atas HTTPS+token berasal dari pesan commit; berkas bukti `validation/*.md` yang dirujuk tidak ada di dalam repo ini.
+
+---
+
+---
+
+## [3.2.0] — update-blacklist.sh — 2026-10-05
+
+- Dukungan `X-CDB-Token` untuk mengunduh dari master CDB publisher: header dikirim pada probe `If-Modified-Since` (curl) dan unduhan (aria2c).
+- Token dibaca dari `SAVED_CDB_TOKEN` di `node.conf`; bila kosong, tidak ada header (perilaku lama tetap).
+- Selaras dengan rute panel `/cdb/*` (`--cdb-token` / `PANEL_CDB_TOKEN`).
 
 ---
 
