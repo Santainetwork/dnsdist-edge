@@ -91,6 +91,8 @@ type HeartbeatResponse struct {
 	OK             bool      `json:"ok"`
 	AcknowledgedAt time.Time `json:"ack_at"`
 	MasterDBHash   string    `json:"master_db_hash,omitempty"`
+	ProfileID      string    `json:"profile_id,omitempty"`
+	ProfileHash    string    `json:"profile_hash,omitempty"`
 }
 
 // ─── Cluster Store ───────────────────────────────────────────────────────────
@@ -524,11 +526,18 @@ func handleClusterHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(HeartbeatResponse{
+	resp := HeartbeatResponse{
 		OK:             true,
 		AcknowledgedAt: time.Now().UTC(),
 		MasterDBHash:   masterDBHash,
-	})
+	}
+	// Tell the node which SmartDist profile it should be running. Consumed by
+	// EdgeClusterAgent.sendHeartbeat -> syncSmartDistProfile.
+	if pid, hash, ok := getSmartDistStore().ProfileForNode(req.NodeID); ok {
+		resp.ProfileID = pid
+		resp.ProfileHash = hash
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 // handleClusterNodes lists all nodes & aggregate stats, or deletes a node (Protected via JWT)
@@ -566,6 +575,7 @@ type EdgeAgentState struct {
 	Name          string `json:"name"`
 	LastHeartbeat string `json:"last_heartbeat,omitempty"`
 	LastError     string `json:"last_error,omitempty"`
+	ProfileHash   string `json:"profile_hash,omitempty"`
 }
 
 type EdgeClusterAgent struct {
@@ -840,6 +850,7 @@ func (a *EdgeClusterAgent) sendHeartbeat() error {
 	_ = a.saveState()
 	a.mu.Unlock()
 
+	_ = a.syncSmartDistProfile(hbResp.ProfileID, hbResp.ProfileHash)
 	return nil
 }
 
