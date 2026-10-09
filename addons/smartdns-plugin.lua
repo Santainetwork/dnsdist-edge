@@ -483,6 +483,32 @@ function smartdns_has_rrsig(answer_records)
     return false
 end
 
+-- Node-local SmartDist profile file (written by the panel agent). Overridable
+-- so tests can point it at a temp file.
+smartdns_profile_path = smartdns_profile_path or "/etc/dnsdist/smartdist-profile.lua"
+
+-- Node-local SmartDist profile flag (written by the panel agent as Lua).
+-- Fail closed: a missing, unreadable, or broken file disables SmartDist.
+-- The file is run in an empty environment, so it cannot reach dnsdist globals.
+function smartdns_profile_enabled_from_file(path)
+    local f = io.open(path, "r")
+    if not f then
+        return false
+    end
+    f:close()
+    local env = {}
+    local chunk, err = loadfile(path)
+    if not chunk then
+        return false
+    end
+    setfenv(chunk, env)
+    local ok = pcall(chunk)
+    if not ok then
+        return false
+    end
+    return env.SMARTDIST_ENABLED == true
+end
+
 function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
     -- Pastikan ip-set sudah dideklarasikan
     if not smartdns_nmg[ip_set_name] then
@@ -586,6 +612,12 @@ function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
             if smartdns_has_rrsig(answer_rrs) then
                 return DNSResponseAction.None, ""
             end
+        end
+
+        -- Per-node profile gate: when the node's profile disables SmartDist,
+        -- do not rewrite. Missing or broken profile fails closed (disabled).
+        if not smartdns_profile_enabled_from_file(smartdns_profile_path) then
+            return DNSResponseAction.None, ""
         end
 
         -- Kumpulkan offset record target yang cocok ip-set (urutan paket)

@@ -35,6 +35,10 @@ function newDNSName(s) return s end
 
 dofile(PLUGIN)
 smartdns_nmg["test-set"] = nmg
+-- Enable SmartDist for this node: write a profile flag pointing at a temp file.
+local prof = os.tmpname()
+local pf = assert(io.open(prof, "w")); pf:write("SMARTDIST_ENABLED = true\n"); pf:close()
+smartdns_profile_path = prof
 smartdns_ip_rules_alias("test-set", { "10.0.0.9" })
 
 check("response action captured", type(captured) == "function")
@@ -70,4 +74,11 @@ function newDNSPacketOverlay() return make_overlay({1}) end
 captured(dr)
 check("unsigned answer rewritten", state.set == true)
 
+-- Case 3: profile disabled -> no rewrite even for an unsigned answer.
+state.set = false
+local pf2 = assert(io.open(prof, "w")); pf2:write("SMARTDIST_ENABLED = false\n"); pf2:close()
+captured(dr)
+check("profile disabled -> not rewritten", state.set == false)
+
+os.remove(prof)
 os.exit(fails == 0 and 0 or 1)
