@@ -489,14 +489,22 @@ smartdns_profile_path = smartdns_profile_path or "/etc/dnsdist/smartdist-profile
 
 -- Node-local SmartDist profile flag (written by the panel agent as Lua).
 -- Fail closed: a missing, unreadable, or broken file disables SmartDist.
--- The file is run in an empty environment, so it cannot reach dnsdist globals.
+-- The file is run in an empty environment (rule calls stubbed), so it cannot
+-- reach dnsdist globals.
 function smartdns_profile_enabled_from_file(path)
     local f = io.open(path, "r")
     if not f then
         return false
     end
     f:close()
-    local env = {}
+    -- Rule lines in the file call smartdns_* functions. Stub them as no-ops so
+    -- reading the flag has no side effects and rule lines cannot abort the run.
+    -- The real rules are applied by the normal plugin load, not here.
+    local env = {
+        smartdns_ip_set = function() end,
+        smartdns_cname = function() end,
+        smartdns_ip_rules_alias = function() end,
+    }
     local chunk, err = loadfile(path)
     if not chunk then
         return false
