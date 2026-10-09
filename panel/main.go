@@ -208,7 +208,14 @@ func jwtVerify(token string) (map[string]any, error) {
 	if err := json.Unmarshal(pb, &claims); err != nil {
 		return nil, err
 	}
-	if exp, ok := claims["exp"].(float64); ok && time.Now().Unix() > int64(exp) {
+	// exp is required and must be a numeric timestamp. A missing or
+	// non-numeric exp previously fell through and the token was accepted as
+	// never-expiring; treat those as invalid.
+	exp, ok := claims["exp"].(float64)
+	if !ok {
+		return nil, errors.New("token missing or invalid exp")
+	}
+	if time.Now().Unix() > int64(exp) {
 		return nil, errors.New("token expired")
 	}
 	return claims, nil
