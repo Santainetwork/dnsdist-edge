@@ -488,33 +488,27 @@ end
 smartdns_profile_path = smartdns_profile_path or "/etc/dnsdist/smartdist-profile.lua"
 
 -- Node-local SmartDist profile flag (written by the panel agent as Lua).
--- Fail closed: a missing, unreadable, or broken file disables SmartDist.
--- The file is run in an empty environment (rule calls stubbed), so it cannot
--- reach dnsdist globals.
+-- Reads the flag from the text; does NOT execute the file. Reading one boolean
+-- must not run arbitrary profile content or depend on which globals the file
+-- touches (io, locals, rule calls). Fail closed: missing/unreadable/no flag
+-- line -> disabled.
 function smartdns_profile_enabled_from_file(path)
     local f = io.open(path, "r")
     if not f then
         return false
     end
+    local content = f:read("*a")
     f:close()
-    -- Rule lines in the file call smartdns_* functions. Stub them as no-ops so
-    -- reading the flag has no side effects and rule lines cannot abort the run.
-    -- The real rules are applied by the normal plugin load, not here.
-    local env = {
-        smartdns_ip_set = function() end,
-        smartdns_cname = function() end,
-        smartdns_ip_rules_alias = function() end,
-    }
-    local chunk, err = loadfile(path)
-    if not chunk then
+    if not content then
         return false
     end
-    setfenv(chunk, env)
-    local ok = pcall(chunk)
-    if not ok then
-        return false
+    for line in content:gmatch("[^\n]+") do
+        local v = line:match("^%s*SMARTDIST_ENABLED%s*=%s*(%a+)")
+        if v then
+            return v == "true"
+        end
     end
-    return env.SMARTDIST_ENABLED == true
+    return false
 end
 
 function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
@@ -858,4 +852,28 @@ function smartdns_enable_speedcheck()
     end), {name="SmartDist Speed Check Hook"})
 
     infolog("[SmartDist] Speed Check hook aktif untuk SEMUA domain.")
+end
+
+-- Apply the node profile's rules at load time. The profile file calls the
+-- smartdns_* functions above, so running it in the real environment registers
+-- the rules. Flag false or missing file -> nothing is registered (fail closed).
+-- ponytail: loaded once at dnsdist start. Profile changes need a restart or
+-- reload; add a reload hook when the panel pushes profiles live.
+function smartdns_apply_profile(path)
+    if not smartdns_profile_enabled_from_file(path) then
+        infolog("[SmartDist] profil: nonaktif atau tidak ada, rule tidak diterapkan.")
+        return false
+    end
+    local chunk, err = loadfile(path)
+    if not chunk then
+        errlog("smartdns: gagal memuat profil " .. path .. ": " .. tostring(err))
+        return false
+    end
+    local ok, perr = pcall(chunk)
+    if not ok then
+        errlog("smartdns: error saat menerapkan profil: " .. tostring(perr))
+        return false
+    end
+    infolog("[SmartDist] profil diterapkan dari " .. path)
+    return true
 end
