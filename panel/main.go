@@ -1323,6 +1323,11 @@ func main() {
 		// Public Cluster Ingestion
 		mux.HandleFunc("/api/cluster/register", handleClusterRegister)
 		mux.HandleFunc("/api/cluster/heartbeat", handleClusterHeartbeat)
+		// SmartDist profiles: fetch authenticates the node via node_id+node_key
+		// query params (no admin JWT); CRUD/assign are admin-only.
+		mux.HandleFunc("/api/cluster/profile", handleClusterProfileFetch)
+		mux.HandleFunc("/api/cluster/profiles", auth(handleSmartDistProfiles))
+		mux.HandleFunc("/api/cluster/profile/assign", auth(handleSmartDistAssign))
 	}
 
 	// Edge Cluster Agent & Config (available on all nodes)
