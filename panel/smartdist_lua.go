@@ -84,7 +84,14 @@ func luaQuote(s string) string {
 		case '\r':
 			b.WriteString(`\r`)
 		default:
-			b.WriteRune(r)
+			// Control bytes keep the generated Lua well-formed and keep the value
+			// byte-identical round-trip after loadfile. Always three digits (\ddd):
+			// Lua reads up to 3, so \1 followed by "2" would otherwise become \12.
+			if r < 0x20 || r == 0x7f {
+				fmt.Fprintf(&b, `\%03d`, r)
+			} else {
+				b.WriteRune(r)
+			}
 		}
 	}
 	b.WriteByte('"')

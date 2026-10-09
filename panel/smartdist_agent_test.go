@@ -3,9 +3,11 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -131,6 +133,43 @@ func TestSmartDistEmptyProfileDisables(t *testing.T) {
 	}
 	if a.state.ProfileHash != "" {
 		t.Errorf("hash belum dikosongkan")
+	}
+}
+
+// TestLuaQuoteRoundTripControlBytes checks that every control byte survives the
+// generated Lua literal unchanged. Uses the real luaQuote output, not a hand copy.
+// Includes \x01 followed by '2' to catch the \1 + '2' -> \12 ambiguity.
+func TestLuaQuoteRoundTripControlBytes(t *testing.T) {
+	in := "a\x00b\x01" + "2\x7f\x1f\"\\z"
+	lit := luaQuote(in)
+	if strings.ContainsAny(lit, "\x00\x01\x1f\x7f") {
+		t.Fatalf("raw control byte left in literal: %q", lit)
+	}
+	lua, err := exec.LookPath("lua5.1")
+	if err != nil {
+		t.Skip("lua5.1 not installed")
+	}
+	dir := t.TempDir()
+	lf := filepath.Join(dir, "lit.lua")
+	if err := os.WriteFile(lf, []byte("return "+lit), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Load the literal the way dnsdist would, then print its bytes as hex.
+	script := "local f=assert(loadfile(arg[1]));local v=f();for i=1,#v do io.write(string.format('%02x',v:byte(i))) end"
+	sf := filepath.Join(dir, "rt.lua")
+	if err := os.WriteFile(sf, []byte(script), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(lua, sf, lf).CombinedOutput()
+	if err != nil {
+		t.Fatalf("lua load failed: %v\n%s", err, out)
+	}
+	want := ""
+	for i := 0; i < len(in); i++ {
+		want += fmt.Sprintf("%02x", in[i])
+	}
+	if string(out) != want {
+		t.Fatalf("round-trip mismatch:\n got  %s\n want %s", out, want)
 	}
 }
 
