@@ -128,6 +128,21 @@ func TestSmartDistEmptyProfileDisables(t *testing.T) {
 	if !strings.Contains(string(b), "SMARTDIST_ENABLED = false") {
 		t.Errorf("tidak nonaktif:\n%s", b)
 	}
+	// Behavioural check, not just the substring: the plugin's own flag reader must
+	// see enabled=false on the written file. Skipped if lua5.1 is absent.
+	if lua, err := exec.LookPath("lua5.1"); err == nil {
+		reader := filepath.Join(t.TempDir(), "reader.lua")
+		src := "local env={smartdns_ip_set=function() end,smartdns_cname=function() end,smartdns_ip_rules_alias=function() end}\n" +
+			"local c=assert(loadfile(arg[1])); setfenv(c,env); c()\n" +
+			"io.write(env.SMARTDIST_ENABLED==true and \"yes\" or \"no\")\n"
+		if err := os.WriteFile(reader, []byte(src), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out, err := exec.Command(lua, reader, smartDistProfilePath).CombinedOutput()
+		if err != nil || string(out) != "no" {
+			t.Errorf("plugin reader on empty-profile file: out=%q err=%v, want no", out, err)
+		}
+	}
 	if hits.Load() != 0 {
 		t.Errorf("profil kosong tetap fetch")
 	}
