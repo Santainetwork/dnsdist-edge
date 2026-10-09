@@ -125,3 +125,6 @@ jobs:
           for test_file in tests/*.sh; do
             bash "$test_file"
           done
+          for test_file in tools/test-*.sh; do
+            bash "$test_file"
+          done

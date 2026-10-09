@@ -467,6 +467,22 @@ end
 -- Hanya alias dengan famili yang sama dengan record yang dipakai (cek
 -- addr_len di _dns_server_process_ip_alias) — alias beda famili dilewati.
 -- ============================================================================
+-- DNSSEC safety: detect an RRSIG (qtype 46) among answer records.
+-- SmartDist rewrites A/AAAA without re-signing, so a signed answer must be
+-- left untouched (operator decision: skip, not re-sign). See RRSIG handling
+-- in smartdns_ip_rules_alias / speed check.
+function smartdns_has_rrsig(answer_records)
+    if type(answer_records) ~= "table" then
+        return false
+    end
+    for _, rr in ipairs(answer_records) do
+        if type(rr) == "table" and rr.qtype == 46 then
+            return true
+        end
+    end
+    return false
+end
+
 function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
     -- Pastikan ip-set sudah dideklarasikan
     if not smartdns_nmg[ip_set_name] then
@@ -557,6 +573,20 @@ function smartdns_ip_rules_alias(ip_set_name, target_ips, exclude_domain_set)
         local pkt = dr:getContent()
         local overlay = newDNSPacketOverlay(pkt)
         local record_count = overlay:getRecordsCountInSection(DNSSection.Answer)
+
+        -- DNSSEC skip (operator decision): if this answer carries an RRSIG,
+        -- leave it untouched. Rewriting A/AAAA without re-signing would make
+        -- validating resolvers reject the answer (SERVFAIL).
+        do
+            local answer_rrs = {}
+            for i = 0, record_count - 1 do
+                local rec = overlay:getRecord(i)
+                answer_rrs[#answer_rrs + 1] = { qtype = rec.type }
+            end
+            if smartdns_has_rrsig(answer_rrs) then
+                return DNSResponseAction.None, ""
+            end
+        end
 
         -- Kumpulkan offset record target yang cocok ip-set (urutan paket)
         local matched_offsets = {}

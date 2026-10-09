@@ -27,7 +27,7 @@ require '--transparent-subnet <CIDR>'
 require 'do_configure_transparent_dns() {'
 require '"$tproxy_helper" "${args[@]}"'
 require 'do_configure_transparent_dns'
-require 'SAVED_TRANSPARENT_MODE="${TRANSPARENT_MODE:-off}"'
+require 'SAVED_TRANSPARENT_MODE="$(_sq_escape "${TRANSPARENT_MODE:-off}")"'
 
 dispatch=$(sed -n '/if \[ "$TRANSPARENT_EXPLICIT" = true \]/,$p' "$installer")
 [[ "$dispatch" == *$'    do_configure_transparent_dns\n    exit 0\nfi'* ]] || {

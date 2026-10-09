@@ -33,4 +33,18 @@ grep -Fq 'SPEEDCHECK_ENABLED = false' "$PLUGIN"
 # Docs must match the implemented alias semantics (per-record, round-robin).
 grep -Fq 'setiap record yang cocok ip-set diisi dari daftar target secara round-robin' "$ROOT/TOPSTATS-README.md"
 
+# Ordering: an active (uncommented) smartdns_cname call is a terminal action.
+# It must not be registered before blocking ([7] kvsRule). Only the commented
+# example may precede it. Passes today because no active call exists.
+CONF="$ROOT/setup/dnsdist.conf"
+active_cname_line=$(grep -n '^[[:space:]]*smartdns_cname(' "$CONF" | head -1 | cut -d: -f1 || true)
+block_line=$(grep -n '^-- \[7\] FILTERING RULES' "$CONF" | cut -d: -f1)
+if [ -n "$active_cname_line" ] && [ "$active_cname_line" -lt "$block_line" ]; then
+  echo "FAIL: active smartdns_cname (line $active_cname_line) before blocking [7] (line $block_line)" >&2
+  exit 1
+fi
+
+# Harness smoke: plugin must load and register via stubbed dnsdist API.
+lua5.1 "$ROOT/tests/smartdns-order-harness.lua" "$PLUGIN" >/dev/null
+
 echo "smartdns-plugin contracts OK"
