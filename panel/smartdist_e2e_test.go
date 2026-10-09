@@ -129,6 +129,39 @@ func TestSmartDistEndToEndMasterToNodeFile(t *testing.T) {
 	if hits != 0 {
 		t.Errorf("same hash refetched %d time(s), want 0", hits)
 	}
+
+	// Step 5: a tampered body (hash mismatch) must be rejected: sync errors, the
+	// file is not rewritten, and the stored hash does not advance. This exercises
+	// the sha256 verification branch as a rejection, not just a happy path.
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/cluster/profile" {
+			w.Write([]byte(`{"id":"cfg-a","name":"TAMPERED","smartdist":{"enabled":true,"rules":[]}}`))
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
+	before, err := os.ReadFile(smartDistProfilePath)
+	if err != nil {
+		t.Fatalf("read before tamper: %v", err)
+	}
+	prevHash := agent.state.ProfileHash
+	// A different wantHash forces a fetch so the verification branch actually runs.
+	// Body is VALID JSON (so the parser accepts it) but differs from the hash the
+	// heartbeat promised. Only the sha256 check can reject it; a non-JSON body would
+	// be rejected by the parser and would not prove the hash branch is enforced.
+	if err := agent.syncSmartDistProfile("cfg-a", "deadbeef"); err == nil {
+		t.Fatalf("tampered body accepted; verification branch not enforced")
+	}
+	if agent.state.ProfileHash != prevHash {
+		t.Errorf("stored hash advanced on tampered body: %q -> %q", prevHash, agent.state.ProfileHash)
+	}
+	after, err := os.ReadFile(smartDistProfilePath)
+	if err != nil {
+		t.Fatalf("read after tamper: %v", err)
+	}
+	if string(before) != string(after) {
+		t.Errorf("file rewritten despite hash mismatch")
+	}
 }
 
 func heartbeatForNode(t *testing.T, nodeID, nodeKey string) HeartbeatResponse {
