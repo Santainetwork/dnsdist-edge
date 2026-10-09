@@ -553,8 +553,16 @@ do_set_rpz() {
 do_set_webserver() {
     echo -e "${CYAN}=== Mengonfigurasi Web Server & API Key ===${NC}"
     if [ -f "$DNSDIST_CONF" ]; then
-        sed -i "s|password = '[^']*'|password = '${WEBSERVER_PASSWORD}'|g" "$DNSDIST_CONF"
-        sed -i "s|apiKey   = '[^']*'|apiKey   = '${WEBSERVER_APIKEY}'|g" "$DNSDIST_CONF"
+        # Nilai ditulis ke literal Lua '...' lalu jadi replacement sed. Escape
+        # keduanya: kutip tunggal/backslash untuk Lua; & | \ untuk sed (F15,
+        # tanpa escape, sed mengganti dengan seluruh match atau rusak).
+        local _pw _key
+        _pw=${WEBSERVER_PASSWORD//\\/\\\\}; _pw=${_pw//\'/\\\'}
+        _key=${WEBSERVER_APIKEY//\\/\\\\}; _key=${_key//\'/\\\'}
+        _pw=${_pw//\\/\\\\}; _pw=${_pw//&/\\&}; _pw=${_pw//|/\\|}
+        _key=${_key//\\/\\\\}; _key=${_key//&/\\&}; _key=${_key//|/\\|}
+        sed -i "s|password = '[^']*'|password = '${_pw}'|g" "$DNSDIST_CONF"
+        sed -i "s|apiKey   = '[^']*'|apiKey   = '${_key}'|g" "$DNSDIST_CONF"
         echo -e "  ${GREEN}[✓] Web Console Password & API Key telah diset.${NC}"
         
         if [ -d "$CONF_DIR" ]; then
