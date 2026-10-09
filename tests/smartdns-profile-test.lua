@@ -49,6 +49,21 @@ if type(smartdns_profile_enabled_from_file) == "function" then
   write("this is not lua ((\n")
   check("broken file -> disabled (fail closed)", smartdns_profile_enabled_from_file(tmp) == false)
 
+  -- Flag must be a real line start, not a token inside a comment/string/rule call.
+  -- These lock the shape: a future "simplify to substring match" would break them.
+  write("-- SMARTDIST_ENABLED = true\n")
+  check("flag inside a comment -> disabled", smartdns_profile_enabled_from_file(tmp) == false)
+  write("local s = \"SMARTDIST_ENABLED = true\"\n")
+  check("flag inside a string -> disabled", smartdns_profile_enabled_from_file(tmp) == false)
+  write("smartdns_ip_set(\"SMARTDIST_ENABLED = true\", \"/x\")\n")
+  check("flag inside a rule call -> disabled", smartdns_profile_enabled_from_file(tmp) == false)
+
+  -- Only lowercase true enables; anything else fails closed.
+  write("SMARTDIST_ENABLED = TRUE\n")
+  check("uppercase TRUE -> disabled (fail closed)", smartdns_profile_enabled_from_file(tmp) == false)
+  write("SMARTDIST_ENABLED = truex\n")
+  check("truex -> disabled (fail closed)", smartdns_profile_enabled_from_file(tmp) == false)
+
   os.remove(tmp)
   check("missing file -> disabled (fail closed)", smartdns_profile_enabled_from_file(tmp) == false)
 end
