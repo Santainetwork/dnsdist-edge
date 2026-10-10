@@ -192,7 +192,7 @@ save_config() {
     cat > "$CONFIG_SAVE_FILE" <<EOF
 # Trust-NG Edge Node - Saved Config (auto-generated)
 # Jangan edit manual kecuali Anda tahu apa yang Anda lakukan.
-SAVED_VERSION="$SCRIPT_VERSION"
+SAVED_VERSION="$(_sq_escape "$SCRIPT_VERSION")"
 SAVED_CENTRAL_DB_URL="$(_sq_escape "$CENTRAL_DB_URL")"
 SAVED_CDB_SOURCES="$(_sq_escape "${CDB_SOURCES:-}")"
 SAVED_UPSTREAM_DNS="$(_sq_escape "$UPSTREAM_DNS")"
@@ -212,7 +212,7 @@ SAVED_NODE_NAME="$(_sq_escape "${NODE_NAME:-}")"
 SAVED_TRANSPARENT_MODE="$(_sq_escape "${TRANSPARENT_MODE:-off}")"
 SAVED_TRANSPARENT_INTERFACE="$(_sq_escape "${TRANSPARENT_INTERFACE:-}")"
 SAVED_TRANSPARENT_SUBNET="$(_sq_escape "${TRANSPARENT_SUBNET:-}")"
-SAVED_INSTALL_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+SAVED_INSTALL_DATE="$(_sq_escape "$(date -u +"%Y-%m-%dT%H:%M:%SZ")")"
 EOF
     echo -e "${GREEN}[✓] Konfigurasi disimpan ke $CONFIG_SAVE_FILE (v${SCRIPT_VERSION})${NC}"
 }
