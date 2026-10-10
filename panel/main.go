@@ -1219,6 +1219,7 @@ func registerMasterRoutes(mux *http.ServeMux, enabled bool) {
 	mux.HandleFunc("/api/master/build", auth(handleMasterBuild))
 	mux.HandleFunc("/api/master/sources", auth(handleMasterSources))
 	mux.HandleFunc("/api/master/whitelist", auth(handleMasterWhitelist))
+	mux.HandleFunc("/api/master/custom-blacklist", auth(handleMasterCustomBlacklist))
 }
 
 func masterAutoBuildEnabled(master bool, sourceMode string, interval time.Duration) bool {
