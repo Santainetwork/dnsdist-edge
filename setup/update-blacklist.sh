@@ -1,10 +1,10 @@
 #!/bin/bash
 # ============================================================
-# DNSDist Edge Node - DB Sync Script (v3.2.0)
+# DNSDist Edge Node - DB Sync Script (v3.3.0)
 # Konsep: Edge hanya menerima file blacklist.db (pre-compiled)
 # Fitur baru: Multi-URL failover (central + mirror + peer)
 # ============================================================
-SCRIPT_VERSION="3.2.0"
+SCRIPT_VERSION="3.3.0"
 
 # --- Konfigurasi Default ---
 DB_DIR="${DB_DIR:-/var/lib/dnsdist}"

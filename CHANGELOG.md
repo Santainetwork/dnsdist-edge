@@ -5,6 +5,35 @@ Format: [versi] — tanggal, deskripsi singkat.
 
 ---
 
+## [3.3.0] — 2026-10-10
+
+### Keamanan — node.conf dibaca sebagai DATA, bukan dieksekusi sebagai root (F17/F18)
+- **Perubahan perilaku:** `setup-edge.sh` (4 titik) dan `update-blacklist.sh` tidak lagi `source`/`.` `node.conf`. Nilai dibaca oleh `_load_node_conf` sebagai data: hanya baris `SAVED_KEY="..."` yang diambil, `$(...)`/backtick/`;` tidak dieksekusi.
+- **Penulisan:** `save_config` meng-escape setiap nilai `SAVED_*` dengan `_sq_escape` (termasuk `SAVED_VERSION` dan `SAVED_INSTALL_DATE`, yang sebelumnya belum). `do_set_cdb_sources` hanya memanggil `save_config` (jalur sed/echo dihapus).
+- **Dampak operator:** Instalasi lama dengan `node.conf` format sebelumnya tetap terbaca (diuji: nilai dan urutan sama). Tidak perlu tindakan manual.
+- **Tes:** `tests/setup-edge-node-conf-data.sh` dan `tests/setup-edge-node-conf-injection.sh` menjalankan `save_config`/`do_set_cdb_sources`/`_load_node_conf` asli dengan 15 payload hostile (tidak mengeksekusi) dan nilai legitimate (utuh). Mutasi: menghapus escape atau mengembalikan `source` membuat tes gagal.
+
+### Panel — binary dibangun ulang
+- `panel/dnsdist-panel` dan `tools/dnsdist-panel` dibangun ulang dari sumber HEAD dengan `panel/build.sh`. Binary lama tidak cocok dengan sumber. Kedua binary identik (sha256 `3baa51b2`).
+- Konten: JWT exp wajib numerik (F3), tes SmartDist profile List/GET, handler error SmartDist (405/400/404), dan escape byte kontrol di literal Lua (`luaQuote`).
+
+### SmartDist (fitur baru sejak v3.2.0)
+- Panel master menyimpan profil per node, node menariknya via heartbeat, plugin dnsdist menerapkan on/off dan daftar aturan. Profil dibaca sebagai teks (tidak dieksekusi); profil dengan hash tidak cocok ditolak (fail closed).
+- **Catatan produksi:** flag on/off berlaku langsung; perubahan daftar aturan memerlukan restart dnsdist. Plugin membaca file profil di setiap respons.
+
+### Perbaikan lain sejak v3.2.0
+- F15: password webserver di-escape untuk literal Lua dan sed.
+- F17c: `trim_blocks` Ansible tidak lagi menggabungkan baris `SAVED_*`.
+- F3: verifikasi JWT menolak `exp` yang tidak numerik.
+- Tes dan CI: tes setup dan self-update.
+
+### Diketahui belum selesai
+- `task-007`: `clientIP` mempercayai `X-Forwarded-For` (perlu keputusan trusted-proxy).
+- `tools/test-setup-contracts.sh` punya kontrak yang perlu diselaraskan dengan kode saat ini (lihat riwayat).
+- `scratch/` pada host pengembangan terbuka ke LAN (F22); bukan bagian rilis.
+
+---
+
 ## [3.2.0] — 2026-10-05
 
 ### Master CDB Publisher — Edge Mengunduh, Bukan Membangun
