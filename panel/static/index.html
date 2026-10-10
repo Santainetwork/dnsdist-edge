@@ -959,6 +959,27 @@ input:checked + .slider::before { transform: translateX(20px); background: var(-
         </div>
       </div>
     </div>
+
+    <!-- Blokir Lokal (node ini) -->
+    <div class="card-box" id="localblock-card">
+      <div class="card-box-header">
+        <div>
+          <h3>Blokir Lokal (node ini)</h3>
+          <p>Domain yang diblokir hanya pada node ini, tidak disebarkan ke node lain</p>
+        </div>
+        <span class="chip" id="localblock-count">0 domain</span>
+      </div>
+      <div class="form-group">
+        <label>Tambah Domain</label>
+        <textarea id="localblock-input" placeholder="contoh.com&#10;iklan.example.net" style="min-height:110px"></textarea>
+        <div class="hint">Satu domain per baris. Baris kosong diabaikan.</div>
+      </div>
+      <button class="btn btn-primary" onclick="addLocalBlock()">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>Tambah</span>
+      </button>
+      <div id="localblock-list" class="chips-wrap" style="margin-top:1rem"><span class="chip">Memuat...</span></div>
+    </div>
   </div>
   <div id="page-upstream" class="page">
     <div class="top-bar">
@@ -1331,6 +1352,27 @@ input:checked + .slider::before { transform: translateX(20px); background: var(-
         <button class="btn btn-primary" id="btn-whitelist-build" onclick="saveMasterWhitelist(true)">Simpan & Build CDB</button>
         <button class="btn btn-secondary" onclick="findWhitelistEntry()">Cari Berikutnya</button>
       </div>
+    </div>
+
+    <!-- Blokir Central (master, semua node) -->
+    <div class="card-box" id="master-blacklist-card" style="display:none">
+      <div class="card-box-header">
+        <div>
+          <h3>Blokir Central (master, semua node)</h3>
+          <p>Domain yang diblokir di semua node edge setelah distribusi CDB master</p>
+        </div>
+        <span class="chip" id="master-blacklist-count">0 domain</span>
+      </div>
+      <div class="form-group">
+        <label>Tambah Domain</label>
+        <textarea id="master-blacklist-input" placeholder="contoh.com&#10;iklan.example.net" style="min-height:110px"></textarea>
+        <div class="hint">Satu domain per baris. Baris kosong diabaikan.</div>
+      </div>
+      <button class="btn btn-primary" onclick="saveMasterBlacklist()">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span>Simpan</span>
+      </button>
+      <div id="master-blacklist-list" class="chips-wrap" style="margin-top:1rem"><span class="chip">Memuat...</span></div>
     </div>
 
     <!-- Build Logs Card -->
@@ -1810,6 +1852,7 @@ function nav(page, el) {
     fetchMasterStatus();
     fetchMasterSources();
     fetchMasterWhitelist();
+    fetchMasterBlacklist();
     if (!masterPoller) masterPoller = setInterval(fetchMasterStatus, 3000);
   } else {
     if (masterPoller) { clearInterval(masterPoller); masterPoller = null; }
@@ -1824,6 +1867,7 @@ function nav(page, el) {
   if (page === 'rpz') {
     fetchRPZStatus();
     fetchRPZTrend();
+    fetchLocalBlock();
   }
   if (page === 'upstream') fetchUpstreamStatus();
   if (page === 'dnstap') {
@@ -1986,15 +2030,18 @@ async function fetchConfig() {
     const navCluster = document.getElementById('nav-cluster');
     const addNodeButton = document.getElementById('add-node-button');
     const edgeCard = document.getElementById('edge-cluster-card');
+    const masterBlacklistCard = document.getElementById('master-blacklist-card');
     addNodeButton.style.display = cfg.is_master ? '' : 'none';
 
     if (cfg.is_master) {
       if (navMaster) navMaster.style.display = 'flex';
       if (navCluster) navCluster.style.display = 'flex';
       if (edgeCard) edgeCard.style.display = 'none'; // master tidak perlu enroll ke master lain
+      if (masterBlacklistCard) masterBlacklistCard.style.display = '';
     } else {
       if (navMaster) navMaster.style.display = 'none';
       if (navCluster) navCluster.style.display = 'none';
+      if (masterBlacklistCard) masterBlacklistCard.style.display = 'none';
       if (edgeCard) {
         edgeCard.style.display = 'block';
         fetchEdgeClusterStatus();
@@ -2058,6 +2105,17 @@ async function fetchConfig() {
 // ── Actions ──
 function parseIPList(txt) {
   return txt.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+}
+
+// Satu domain per baris, dedup case-insensitive, buang baris kosong.
+function parseDomainList(txt) {
+  const seen = new Set();
+  const out = [];
+  txt.split(/\r?\n/).forEach(line => {
+    const d = line.trim().toLowerCase();
+    if (d && !seen.has(d)) { seen.add(d); out.push(d); }
+  });
+  return out;
 }
 
 function validateIPv4(s) { return /^(\d{1,3}\.){3}\d{1,3}(:\d+)?$/.test(s); }
@@ -2193,6 +2251,115 @@ async function resetBlockpage() {
     loadBlockpageInfo();
   } catch (e) {
     toast('Gagal reset halaman: ' + e.message, 'error');
+  }
+}
+
+// ── Blokir Lokal (node ini) ──
+// GET /api/localblock, POST {domains:[...]} untuk tambah, DELETE ?domain=x.
+function renderLocalBlock(domains) {
+  const box = document.getElementById('localblock-list');
+  const count = document.getElementById('localblock-count');
+  count.textContent = `${domains.length} domain`;
+  if (!domains.length) {
+    box.innerHTML = '<span class="chip" style="color:var(--text-sub)">Belum ada domain diblokir lokal</span>';
+    return;
+  }
+  box.innerHTML = domains.map(d => `
+    <span class="chip">
+      <span>${esc(d)}</span>
+      <button class="copy-btn" onclick="removeLocalBlock('${esc(d)}')" title="Hapus">
+        <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </span>
+  `).join('');
+}
+
+async function fetchLocalBlock() {
+  try {
+    const d = await api('/api/localblock');
+    renderLocalBlock(d.domains || []);
+  } catch (e) {
+    toast('Gagal memuat blokir lokal: ' + e.message, 'error');
+  }
+}
+
+async function addLocalBlock() {
+  const domains = parseDomainList(document.getElementById('localblock-input').value);
+  if (!domains.length) { toast('Masukkan minimal satu domain', 'error'); return; }
+  try {
+    await api('/api/localblock', 'POST', { domains });
+    document.getElementById('localblock-input').value = '';
+    toast(`Ditambahkan ke blokir lokal: ${domains.length} domain`);
+    fetchLocalBlock();
+  } catch (e) {
+    toast('Gagal menambah blokir lokal: ' + e.message, 'error');
+  }
+}
+
+async function removeLocalBlock(domain) {
+  try {
+    await api('/api/localblock?domain=' + encodeURIComponent(domain), 'DELETE');
+    toast('Dihapus dari blokir lokal: ' + domain);
+    fetchLocalBlock();
+  } catch (e) {
+    toast('Gagal menghapus blokir lokal: ' + e.message, 'error');
+  }
+}
+
+// ── Blokir Central (master, semua node) ──
+// GET /api/master/custom-blacklist, POST {domains:[...]} menggantikan daftar.
+let masterBlacklistDomains = [];
+
+function renderMasterBlacklist(domains) {
+  masterBlacklistDomains = domains.slice();
+  const box = document.getElementById('master-blacklist-list');
+  const count = document.getElementById('master-blacklist-count');
+  count.textContent = `${domains.length} domain`;
+  if (!domains.length) {
+    box.innerHTML = '<span class="chip" style="color:var(--text-sub)">Belum ada domain blokir central</span>';
+    return;
+  }
+  box.innerHTML = domains.map(d => `
+    <span class="chip">
+      <span>${esc(d)}</span>
+      <button class="copy-btn" onclick="removeMasterBlacklist('${esc(d)}')" title="Hapus">
+        <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </span>
+  `).join('');
+}
+
+async function fetchMasterBlacklist() {
+  try {
+    const d = await api('/api/master/custom-blacklist');
+    renderMasterBlacklist(d.domains || []);
+  } catch (e) {
+    toast('Gagal memuat blokir central: ' + e.message, 'error');
+  }
+}
+
+async function saveMasterBlacklist() {
+  const added = parseDomainList(document.getElementById('master-blacklist-input').value);
+  if (!added.length) { toast('Masukkan minimal satu domain', 'error'); return; }
+  const merged = Array.from(new Set(masterBlacklistDomains.concat(added))).sort();
+  try {
+    const d = await api('/api/master/custom-blacklist', 'POST', { domains: merged });
+    document.getElementById('master-blacklist-input').value = '';
+    toast(`Blokir central tersimpan: ${d.count} domain`);
+    fetchMasterBlacklist();
+  } catch (e) {
+    toast('Gagal menyimpan blokir central: ' + e.message, 'error');
+  }
+}
+
+async function removeMasterBlacklist(domain) {
+  const remaining = masterBlacklistDomains.filter(d => d !== domain);
+  try {
+    await api('/api/master/custom-blacklist', 'POST', { domains: remaining });
+    toast('Dihapus dari blokir central: ' + domain);
+    fetchMasterBlacklist();
+  } catch (e) {
+    toast('Gagal menghapus blokir central: ' + e.message, 'error');
   }
 }
 
