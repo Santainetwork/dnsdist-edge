@@ -1041,6 +1041,31 @@ if "safesearch.conf" not in c:
 PYEOF
                 conf_reloaded=true
             fi
+            if ! grep -q "local-block.txt" "$DNSDIST_CONF"; then
+                python3 - "$DNSDIST_CONF" << 'PYEOF'
+import sys
+path = sys.argv[1]
+with open(path) as f: c = f.read()
+hook = """
+-- [7.1] BLOKIR LOKAL PER NODE (dikontrol panel, file terpisah dari blacklist.db)
+local localBlockFile = "/etc/dnsdist/local-block.txt"
+local lbf = io.open(localBlockFile, "r")
+if lbf then
+  lbf:close()
+  localBlockSmn = newSuffixMatchNode()
+  for line in io.lines(localBlockFile) do
+    local d = line:match("^%s*(%S+)%s*$")
+    if d then localBlockSmn:add(newDNSName(d)) end
+  end
+  addAction(SuffixMatchNodeRule(localBlockSmn), RCodeAction(DNSRCode.NXDOMAIN))
+end
+"""
+if "local-block.txt" not in c:
+    c = c.replace("-- [7] FILTERING RULES", hook + "\n-- [7] FILTERING RULES")
+    with open(path, 'w') as f: f.write(c)
+PYEOF
+                conf_reloaded=true
+            fi
             if [ "$conf_reloaded" = true ] && systemctl is-active --quiet dnsdist; then
                 systemctl restart dnsdist
                 echo -e "  ${GREEN}[✓] Hook SafeSearch & DoT/DoH ditambahkan ke dnsdist.conf${NC}"

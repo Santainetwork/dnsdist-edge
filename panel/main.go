@@ -761,6 +761,11 @@ addDOHLocal('[::]:443', '%s', '%s', '/dns-query', {provider='openssl',minTLSVers
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 func restartDnsdist() error {
+	return restartDnsdistFn()
+}
+
+// restartDnsdistFn dibungkus agar tes bisa mencegah systemctl sungguhan.
+var restartDnsdistFn = func() error {
 	return exec.Command("systemctl", "restart", "dnsdist").Run()
 }
 

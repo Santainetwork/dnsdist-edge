@@ -12,6 +12,16 @@ const localBlockPath = "/etc/dnsdist/local-block.txt"
 
 var localBlock = newLocalBlockStore(envOr("PANEL_LOCAL_BLOCK_FILE", localBlockPath))
 
+// reloadLocalBlock menerapkan perubahan: dnsdist hanya membaca config saat start.
+// Gagal restart -> 500 agar UI tahu perubahan belum aktif.
+func reloadLocalBlock(w http.ResponseWriter) {
+	if err := restartDnsdist(); err != nil {
+		jsonErr(w, http.StatusInternalServerError, "daftar tersimpan, tetapi restart dnsdist gagal: "+err.Error())
+		return
+	}
+	jsonOK(w)
+}
+
 // handleLocalBlock: GET daftar, POST {"domains":[...]} tambah, DELETE ?domain=x hapus.
 // Di belakang auth() (lihat main.go).
 func handleLocalBlock(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +45,7 @@ func handleLocalBlock(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, status, err.Error())
 			return
 		}
-		jsonOK(w)
+		reloadLocalBlock(w)
 	case http.MethodDelete:
 		d := r.URL.Query().Get("domain")
 		if strings.TrimSpace(d) == "" {
@@ -46,7 +56,7 @@ func handleLocalBlock(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		jsonOK(w)
+		reloadLocalBlock(w)
 	default:
 		jsonErr(w, http.StatusMethodNotAllowed, "GET, POST, or DELETE only")
 	}

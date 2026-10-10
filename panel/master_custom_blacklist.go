@@ -11,6 +11,14 @@ import (
 	"strings"
 )
 
+// masterBuildFn memicu kompilasi CDB di background, seperti handleMasterBuild.
+// Dibungkus agar tes tidak menjalankan kompilasi sungguhan.
+var masterBuildFn = func() {
+	go func() {
+		_ = BuildMasterCDB(*flagFilesDir, *flagSourcesFile, *flagWhitelistFile, *flagCustomBLFile, 8, true)
+	}()
+}
+
 // handleMasterCustomBlacklist: jalur 2 (central). GET daftar, POST
 // {"domains":[...]} menggantikan daftar. Ditulis ke flagCustomBLFile, yang
 // dikompilasi BuildMasterCDB ke CDB dan didistribusikan ke edge.
@@ -66,7 +74,8 @@ func handleMasterCustomBlacklist(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, http.StatusInternalServerError, "cannot save custom blacklist: "+err.Error())
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "count": len(keys)})
+		masterBuildFn()
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "count": len(keys), "build": "started"})
 	default:
 		jsonErr(w, http.StatusMethodNotAllowed, "GET or POST only")
 	}

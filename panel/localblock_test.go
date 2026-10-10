@@ -85,6 +85,7 @@ func TestLocalBlockHandler(t *testing.T) {
 	prev := localBlock
 	localBlock = newLocalBlockStore(filepath.Join(t.TempDir(), "local-block.txt"))
 	t.Cleanup(func() { localBlock = prev })
+	stubRestartDnsdist(t)
 
 	// POST tambah banyak domain.
 	rr := httptest.NewRecorder()
@@ -129,4 +130,12 @@ func TestLocalBlockHandler(t *testing.T) {
 	if rr.Code != http.StatusMethodNotAllowed {
 		t.Errorf("PATCH = %d, want 405", rr.Code)
 	}
+}
+
+// stubRestartDnsdist mencegah systemctl sungguhan selama tes.
+func stubRestartDnsdist(t *testing.T) {
+	t.Helper()
+	prev := restartDnsdistFn
+	restartDnsdistFn = func() error { return nil }
+	t.Cleanup(func() { restartDnsdistFn = prev })
 }

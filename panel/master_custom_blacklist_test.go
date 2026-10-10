@@ -20,6 +20,9 @@ func TestMasterCustomBlacklistHandler(t *testing.T) {
 	oldSrc := *flagSourceMode
 	*flagSourceMode = "feeds"
 	t.Cleanup(func() { *flagSourceMode = oldSrc })
+	prevBuild := masterBuildFn
+	masterBuildFn = func() {}
+	t.Cleanup(func() { masterBuildFn = prevBuild })
 
 	rr := httptest.NewRecorder()
 	handleMasterCustomBlacklist(rr, httptest.NewRequest(http.MethodPost, "/api/master/custom-blacklist",
