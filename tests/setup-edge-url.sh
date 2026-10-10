@@ -9,7 +9,9 @@ install_exports=$(grep -c 'export CENTRAL_DB_URLS' "$ROOT/setup/setup-edge.sh")
 [ "$install_exports" -ge 2 ]
 
 # Saved config remains the durable source after first install.
-grep -q 'SAVED_CENTRAL_DB_URL="$CENTRAL_DB_URL"' "$ROOT/setup/setup-edge.sh"
+# The value must pass through _sq_escape: node.conf is `source`d as root, so an
+# unescaped value would be executable shell (see the CDB_SOURCES injection).
+grep -qE '^SAVED_CENTRAL_DB_URL="\$\(_sq_escape "\$CENTRAL_DB_URL"\)"' "$ROOT/setup/setup-edge.sh"
 grep -q 'SAVED_CENTRAL_DB_URL.*CENTRAL_DB_URLS=' "$ROOT/setup/update-blacklist.sh"
 
 # Runtime proof: caller-provided URL wins over updater default.

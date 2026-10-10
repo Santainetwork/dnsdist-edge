@@ -15,11 +15,26 @@ if [ -n "$CENTRAL_DB_URLS" ]; then
     CENTRAL_DB_URLS="$CENTRAL_DB_URLS"
 fi
 
-# Baca konfigurasi node (override dari setup-edge.sh)
+# Baca konfigurasi node sebagai DATA (jangan `source`: node.conf bisa berisi input operator).
 NODE_CONF="/etc/dnsdist/node.conf"
+_load_node_conf() {
+    local file=$1 line key val
+    [ -f "$file" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in SAVED_[A-Z_]*=\"*\") ;; *) continue ;; esac
+        key=${line%%=*}
+        case "$key" in *[!A-Z0-9_]*) continue ;; esac
+        val=${line#*=}; val=${val#\"}; val=${val%\"}
+        val=${val//\\\"/\"}
+        val=${val//\\\$/$}
+        val=${val//\\\`/\`}
+        val=${val//\\\\/\\}
+        printf -v "$key" '%s' "$val"
+    done < "$file"
+    return 0
+}
 if [ -f "$NODE_CONF" ]; then
-    # shellcheck source=/dev/null
-    . "$NODE_CONF"
+    _load_node_conf "$NODE_CONF"
     [ -n "$SAVED_CENTRAL_DB_URL" ] && CENTRAL_DB_URLS="${CENTRAL_DB_URLS:-$SAVED_CENTRAL_DB_URL}"
     [ -n "$SAVED_CDB_SOURCES" ] && CENTRAL_DB_URLS="$SAVED_CDB_SOURCES"
     [ -n "$SAVED_CDB_TOKEN" ] && CDB_TOKEN="${CDB_TOKEN:-$SAVED_CDB_TOKEN}"

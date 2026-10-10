@@ -11,6 +11,37 @@ set -e
 SCRIPT_VERSION="3.2.0"
 SELF_UPDATE_URL="${SELF_UPDATE_URL:-https://github.com/Santainetwork/dnsdist-edge/releases/latest/download/setup-edge.sh}"
 
+# --- node.conf: data, bukan kode. JANGAN pernah `source` file ini. ---
+# Ditulis sebagai SAVED_KEY="value" dengan escape \ " $ `, dibaca sebagai DATA.
+_sq_escape() {
+    local v=$1
+    # Buang kontrol (termasuk newline) agar tidak memecah struktur file.
+    v=$(printf '%s' "$v" | LC_ALL=C tr -d '[:cntrl:]')
+    v=${v//\\/\\\\}
+    v=${v//\"/\\\"}
+    v=${v//\$/\\\$}
+    v=${v//\`/\\\`}
+    printf '%s' "$v"
+}
+
+# Baca SAVED_* sebagai data. Hanya baris SAVED_KEY="..." diambil; isi lain diabaikan.
+_load_node_conf() {
+    local file=$1 line key val
+    [ -f "$file" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in SAVED_[A-Z_]*=\"*\") ;; *) continue ;; esac
+        key=${line%%=*}
+        case "$key" in *[!A-Z0-9_]*) continue ;; esac
+        val=${line#*=}; val=${val#\"}; val=${val%\"}
+        val=${val//\\\"/\"}
+        val=${val//\\\$/$}
+        val=${val//\\\`/\`}
+        val=${val//\\\\/\\}
+        printf -v "$key" '%s' "$val"
+    done < "$file"
+    return 0
+}
+
 # --- Path Standar Produksi (Sumber Kebenaran Tunggal) ---
 CONF_DIR="/etc/dnsdist"
 CERTS_DIR="${CONF_DIR}/certs"
@@ -162,25 +193,25 @@ save_config() {
 # Trust-NG Edge Node - Saved Config (auto-generated)
 # Jangan edit manual kecuali Anda tahu apa yang Anda lakukan.
 SAVED_VERSION="$SCRIPT_VERSION"
-SAVED_CENTRAL_DB_URL="$CENTRAL_DB_URL"
-SAVED_CDB_SOURCES="${CDB_SOURCES:-}"
-SAVED_UPSTREAM_DNS="$UPSTREAM_DNS"
-SAVED_BLOCK_MODE="${CHOSEN_MODE:-rpz}"
-SAVED_RPZ_IPS="$RPZ_IPS"
-SAVED_CERT_MODE="${CERT_MODE:-3}"
-SAVED_CERT_DOMAIN="${CERT_DOMAIN:-}"
-SAVED_CERT_EMAIL="${CERT_EMAIL:-}"
-SAVED_WEBSERVER_PASSWORD="${WEBSERVER_PASSWORD}"
-SAVED_WEBSERVER_APIKEY="${WEBSERVER_APIKEY}"
-SAVED_MASTER_URL="${MASTER_URL:-}"
-SAVED_ENROLL_TOKEN="${ENROLL_TOKEN:-}"
-SAVED_WITH_BLOCKPAGE="${WITH_BLOCKPAGE:-false}"
-SAVED_BLOCKPAGE_ADDR="${BLOCKPAGE_ADDR:-}"
-SAVED_BLOCKPAGE_WEBROOT="${BLOCKPAGE_WEBROOT:-}"
-SAVED_NODE_NAME="${NODE_NAME:-}"
-SAVED_TRANSPARENT_MODE="${TRANSPARENT_MODE:-off}"
-SAVED_TRANSPARENT_INTERFACE="${TRANSPARENT_INTERFACE:-}"
-SAVED_TRANSPARENT_SUBNET="${TRANSPARENT_SUBNET:-}"
+SAVED_CENTRAL_DB_URL="$(_sq_escape "$CENTRAL_DB_URL")"
+SAVED_CDB_SOURCES="$(_sq_escape "${CDB_SOURCES:-}")"
+SAVED_UPSTREAM_DNS="$(_sq_escape "$UPSTREAM_DNS")"
+SAVED_BLOCK_MODE="$(_sq_escape "${CHOSEN_MODE:-rpz}")"
+SAVED_RPZ_IPS="$(_sq_escape "$RPZ_IPS")"
+SAVED_CERT_MODE="$(_sq_escape "${CERT_MODE:-3}")"
+SAVED_CERT_DOMAIN="$(_sq_escape "${CERT_DOMAIN:-}")"
+SAVED_CERT_EMAIL="$(_sq_escape "${CERT_EMAIL:-}")"
+SAVED_WEBSERVER_PASSWORD="$(_sq_escape "${WEBSERVER_PASSWORD}")"
+SAVED_WEBSERVER_APIKEY="$(_sq_escape "${WEBSERVER_APIKEY}")"
+SAVED_MASTER_URL="$(_sq_escape "${MASTER_URL:-}")"
+SAVED_ENROLL_TOKEN="$(_sq_escape "${ENROLL_TOKEN:-}")"
+SAVED_WITH_BLOCKPAGE="$(_sq_escape "${WITH_BLOCKPAGE:-false}")"
+SAVED_BLOCKPAGE_ADDR="$(_sq_escape "${BLOCKPAGE_ADDR:-}")"
+SAVED_BLOCKPAGE_WEBROOT="$(_sq_escape "${BLOCKPAGE_WEBROOT:-}")"
+SAVED_NODE_NAME="$(_sq_escape "${NODE_NAME:-}")"
+SAVED_TRANSPARENT_MODE="$(_sq_escape "${TRANSPARENT_MODE:-off}")"
+SAVED_TRANSPARENT_INTERFACE="$(_sq_escape "${TRANSPARENT_INTERFACE:-}")"
+SAVED_TRANSPARENT_SUBNET="$(_sq_escape "${TRANSPARENT_SUBNET:-}")"
 SAVED_INSTALL_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 EOF
     echo -e "${GREEN}[✓] Konfigurasi disimpan ke $CONFIG_SAVE_FILE (v${SCRIPT_VERSION})${NC}"
@@ -197,8 +228,7 @@ load_config() {
         echo ""
         read -p "Gunakan konfigurasi yang tersimpan ini? (Y/n): " use_saved
         if [ -z "$use_saved" ] || [ "$use_saved" = "Y" ] || [ "$use_saved" = "y" ]; then
-            # shellcheck source=/dev/null
-            source "$CONFIG_SAVE_FILE"
+            _load_node_conf "$CONFIG_SAVE_FILE"
             [ -n "$SAVED_CENTRAL_DB_URL" ] && [ "$URL_EXPLICIT" != true ] && CENTRAL_DB_URL="$SAVED_CENTRAL_DB_URL"
             [ -n "$SAVED_CDB_SOURCES" ] && CDB_SOURCES="$SAVED_CDB_SOURCES"
             [ -n "$SAVED_UPSTREAM_DNS" ] && UPSTREAM_DNS="$SAVED_UPSTREAM_DNS"
@@ -228,8 +258,7 @@ load_config() {
 # --- Baca konfigurasi yang disimpan secara senyap (tanpa prompt) ---
 load_config_silent() {
     if [ -f "$CONFIG_SAVE_FILE" ]; then
-        # shellcheck source=/dev/null
-        source "$CONFIG_SAVE_FILE"
+        _load_node_conf "$CONFIG_SAVE_FILE"
         [ -n "$SAVED_CENTRAL_DB_URL" ] && CENTRAL_DB_URL="$SAVED_CENTRAL_DB_URL"
         [ -n "$SAVED_CDB_SOURCES" ] && CDB_SOURCES="$SAVED_CDB_SOURCES"
         [ -n "$SAVED_UPSTREAM_DNS" ] && UPSTREAM_DNS="$SAVED_UPSTREAM_DNS"
@@ -339,8 +368,7 @@ do_upgrade() {
     # Cek versi lama
     local old_version="unknown"
     if [ -f "$CONFIG_SAVE_FILE" ]; then
-        # shellcheck source=/dev/null
-        source "$CONFIG_SAVE_FILE"
+        _load_node_conf "$CONFIG_SAVE_FILE"
         old_version="${SAVED_VERSION:-unknown}"
     fi
     echo "[*] Versi terpasang : v${old_version}"
@@ -664,8 +692,7 @@ do_check_config() {
     # Versi
     local installed_version="unknown"
     if [ -f "$CONFIG_SAVE_FILE" ]; then
-        # shellcheck source=/dev/null
-        source "$CONFIG_SAVE_FILE"
+        _load_node_conf "$CONFIG_SAVE_FILE"
         installed_version="${SAVED_VERSION:-unknown}"
     fi
     echo "Versi Terpasang: v${installed_version} (script: v${SCRIPT_VERSION})"
@@ -902,12 +929,7 @@ do_set_cdb_sources() {
     fi
     echo -e "${CYAN}[*] Mengatur daftar sumber CDB...${NC}"
     echo "[*] Sumber: $CDB_SOURCES"
-    # Update/append SAVED_CDB_SOURCES di node.conf
-    if grep -q "^SAVED_CDB_SOURCES=" "$CONFIG_SAVE_FILE" 2>/dev/null; then
-        sed -i "s|^SAVED_CDB_SOURCES=.*|SAVED_CDB_SOURCES=\"$CDB_SOURCES\"|" "$CONFIG_SAVE_FILE"
-    else
-        echo "SAVED_CDB_SOURCES=\"$CDB_SOURCES\"" >> "$CONFIG_SAVE_FILE"
-    fi
+    # save_config menulis ulang node.conf lengkap dengan nilai ter-escape.
     save_config
     echo -e "${GREEN}[✓] Sumber CDB disimpan. Jalankan sinkronisasi: update-blacklist.sh --force-update${NC}"
 }
