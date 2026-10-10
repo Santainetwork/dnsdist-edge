@@ -1299,6 +1299,7 @@ func main() {
 	mux.HandleFunc("/api/rpz", auth(handleRPZ))
 	mux.HandleFunc("/api/upstream", auth(handleUpstream))
 	mux.HandleFunc("/api/safesearch", auth(handleSafeSearch))
+	mux.HandleFunc("/api/localblock", auth(handleLocalBlock))
 	mux.HandleFunc("/api/dotdoh", auth(handleDoTDoH))
 	mux.HandleFunc("/api/settings", auth(handleSettings))
 	mux.HandleFunc("/api/blockpage", auth(handleBlockpage))
