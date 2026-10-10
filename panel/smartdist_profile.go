@@ -282,6 +282,38 @@ func (s *SmartDistProfileStore) Assign(nodeID, profileID string) error {
 	return nil
 }
 
+// AssignMany menugaskan profil ke banyak node secara atomik: semua node dan
+// profil divalidasi dulu, baru satu kali tulis. Gagal -> tidak ada yang berubah.
+func (s *SmartDistProfileStore) AssignMany(nodeIDs []string, profileID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.profiles[profileID]; !ok {
+		return errSmartDistNotFound
+	}
+	prev := make(map[string]string, len(nodeIDs))
+	for _, id := range nodeIDs {
+		if v, had := s.assign[id]; had {
+			prev[id] = v
+		} else {
+			prev[id] = "\x00"
+		}
+	}
+	for _, id := range nodeIDs {
+		s.assign[id] = profileID
+	}
+	if err := s.saveLocked(); err != nil {
+		for id, v := range prev {
+			if v == "\x00" {
+				delete(s.assign, id)
+			} else {
+				s.assign[id] = v
+			}
+		}
+		return fmt.Errorf("%w: %v", errSmartDistStorage, err)
+	}
+	return nil
+}
+
 // ProfileForNode mengembalikan id dan hash profil yang di-assign ke node.
 func (s *SmartDistProfileStore) ProfileForNode(nodeID string) (string, string, bool) {
 	s.mu.RLock()
@@ -440,37 +472,45 @@ func handleSmartDistAssign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		NodeID    string `json:"node_id"`
-		ProfileID string `json:"profile_id"`
+		NodeID    string   `json:"node_id"`
+		NodeIDs   []string `json:"node_ids"`
+		ProfileID string   `json:"profile_id"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
 		jsonErr(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
-	req.NodeID = strings.TrimSpace(req.NodeID)
 	req.ProfileID = strings.TrimSpace(req.ProfileID)
-	if req.NodeID == "" {
+	ids := req.NodeIDs
+	if len(ids) == 0 && strings.TrimSpace(req.NodeID) != "" {
+		ids = []string{req.NodeID}
+	}
+	for i := range ids {
+		ids[i] = strings.TrimSpace(ids[i])
+	}
+	if len(ids) == 0 || ids[0] == "" {
 		jsonErr(w, http.StatusBadRequest, "node_id wajib")
 		return
 	}
 	nodes, _ := getClusterStorage().ListNodes()
-	found := false
+	known := make(map[string]bool, len(nodes))
 	for _, n := range nodes {
-		if n.ID == req.NodeID {
-			found = true
-			break
+		known[n.ID] = true
+	}
+	for _, id := range ids {
+		if id == "" || !known[id] {
+			jsonErr(w, http.StatusNotFound, "node tidak ditemukan: "+id)
+			return
 		}
 	}
-	if !found {
-		jsonErr(w, http.StatusNotFound, "node tidak ditemukan")
+	if err := getSmartDistStore().AssignMany(ids, req.ProfileID); err != nil {
+		if errors.Is(err, errSmartDistNotFound) {
+			jsonErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		jsonErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	switch err := getSmartDistStore().Assign(req.NodeID, req.ProfileID); {
-	case err == nil:
-		jsonOK(w)
-	case errors.Is(err, errSmartDistNotFound):
-		jsonErr(w, http.StatusBadRequest, err.Error())
-	default:
-		jsonErr(w, http.StatusInternalServerError, err.Error())
-	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"assigned": ids})
 }
