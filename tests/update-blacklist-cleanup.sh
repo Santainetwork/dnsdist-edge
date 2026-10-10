@@ -5,7 +5,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 DB_DIR="$TMP/db"
 BIN="$TMP/bin"
-mkdir -p "$DB_DIR" "$BIN"
+mkdir -p "$DB_DIR" "$BIN" "$TMP/www"
 
 printf '%2048s' active > "$DB_DIR/source.db"
 OLD_SHA=$(printf old | sha256sum | awk '{print $1}')
@@ -29,6 +29,7 @@ ID
 chmod +x "$BIN/id"
 
 PATH="$BIN:$PATH" DB_DIR="$DB_DIR" DB_FILE="$DB_DIR/blacklist.db" TEST_SOURCE="$DB_DIR/source.db" CENTRAL_DB_URLS="http://example.test/trust.db" \
+  STATUS_WEBROOT="$TMP/www" \
   bash "$ROOT/setup/update-blacklist.sh" >/dev/null
 
 [ -L "$DB_DIR/blacklist.db" ]

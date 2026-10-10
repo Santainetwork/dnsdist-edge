@@ -38,6 +38,7 @@ chmod +x "$tmp/bin/id"
 url='http://rpz-master.example:8080/files/trust.db'
 PATH="$tmp/bin:$PATH" DB_DIR="$tmp/db" DB_FILE="$tmp/db/blacklist.db" \
   TEST_SOURCE="$tmp/source.db" CAPTURE="$tmp/aria.args" CENTRAL_DB_URLS="$url" \
+  STATUS_WEBROOT="$tmp/www" \
   bash "$ROOT/setup/update-blacklist.sh" >/dev/null
 
 grep -Fq -- "$url" "$tmp/aria.args"

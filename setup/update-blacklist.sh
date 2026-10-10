@@ -158,13 +158,14 @@ rm -f "$FORCE_FLAG"
 
 # --- Generate halaman status HTML ---
 generate_status_html() {
-    [ ! -d "/var/www/html" ] && return
-    mkdir -p /var/www/html/status
+    local webroot="${STATUS_WEBROOT:-/var/www/html}"
+    [ ! -d "$webroot" ] && return
+    mkdir -p "$webroot/status"
     local time_now file_size
     time_now=$(date +"%Y-%m-%d %H:%M:%S")
     file_size="0 KB"
     [ -f "$DB_FILE" ] && file_size=$(du -h "$DB_FILE" | awk '{print $1}')
-    cat > /var/www/html/status/index.html <<EOF
+    cat > "$webroot/status/index.html" <<EOF
 <!DOCTYPE html>
 <html>
 <head>
