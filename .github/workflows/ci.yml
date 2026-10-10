@@ -127,6 +127,7 @@ jobs:
           for test_file in tests/*.sh; do
             bash "$test_file"
           done
+          # setup-edge.sh --upgrade requires root (check_root); runner is ephemeral.
           for test_file in tools/test-*.sh; do
-            bash "$test_file"
+            sudo -E bash "$test_file"
           done
