@@ -120,6 +120,8 @@ jobs:
         run: |
           bash -n setup/setup-edge.sh setup/setup-master.sh setup/update-blacklist.sh
           bash -n tests/*.sh
+      - name: Install Lua 5.1 (setup-edge-webserver-escape.sh)
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
       - name: Run regression tests
         run: |
           for test_file in tests/*.sh; do
