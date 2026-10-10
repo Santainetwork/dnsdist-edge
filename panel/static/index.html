@@ -1420,6 +1420,41 @@ input:checked + .slider::before { transform: translateX(20px); background: var(-
       </div>
     </div>
 
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> Terapkan Profil SmartDist</h3>
+          <p>Pilih beberapa node lalu terapkan satu profil secara sekaligus</p>
+        </div>
+        <button class="btn btn-secondary" onclick="fetchSmartDistAssign()">
+          <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>Segarkan</span>
+        </button>
+      </div>
+      <div class="dtable-wrap">
+        <table class="dtable">
+          <thead>
+            <tr>
+              <th style="width:2.5rem"><input type="checkbox" id="smartdist-assign-all" onclick="toggleSmartDistAssignAll(this)"></th>
+              <th>Nama Node</th><th>IP</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="smartdist-assign-tbody">
+            <tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada edge node yang terhubung.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;padding:0.9rem;flex-wrap:wrap">
+        <label for="smartdist-assign-profile" style="font-size:0.8rem;color:var(--text-sub)">Profil</label>
+        <select id="smartdist-assign-profile" style="max-width:18rem;padding:0.5rem 0.6rem;background:var(--card);border:1px solid var(--input);border-radius:0.5rem;color:var(--foreground);font-size:0.8rem">
+          <option value="">Memuat profil…</option>
+        </select>
+        <button class="btn btn-primary" id="smartdist-assign-apply" onclick="applySmartDistAssign()">
+          <span>Terapkan</span>
+        </button>
+      </div>
+    </div>
+
     <div class="split-2">
       <div class="panel">
         <div class="panel-head">
@@ -1780,7 +1815,7 @@ function nav(page, el) {
     if (masterPoller) { clearInterval(masterPoller); masterPoller = null; }
   }
   if (page === 'cluster') {
-    fetchClusterNodes();
+    fetchClusterNodes().then(fetchSmartDistAssign);
     if (!clusterPoller) clusterPoller = setInterval(fetchClusterNodes, 5000);
   } else {
     if (clusterPoller) { clearInterval(clusterPoller); clusterPoller = null; }
@@ -2275,6 +2310,66 @@ async function deleteClusterNode(id) {
     fetchClusterNodes();
   } catch (e) {
     toast('Gagal menghapus node: ' + e.message, 'error');
+  }
+}
+
+// ── Bulk assign profil SmartDist ──
+let smartDistProfiles = [];
+
+function toggleSmartDistAssignAll(cb) {
+  document.querySelectorAll('#smartdist-assign-tbody .smartdist-node-check')
+    .forEach(el => { el.checked = cb.checked; });
+}
+
+function smartDistSelectedNodeIDs() {
+  return Array.from(document.querySelectorAll('#smartdist-assign-tbody .smartdist-node-check'))
+    .filter(el => el.checked)
+    .map(el => el.value);
+}
+
+async function fetchSmartDistAssign() {
+  const tbody = document.getElementById('smartdist-assign-tbody');
+  try {
+    if (!currentClusterNodes.length) await fetchClusterNodes();
+    const d = await api('/api/cluster/profiles');
+    smartDistProfiles = d.profiles || [];
+    const sel = document.getElementById('smartdist-assign-profile');
+    sel.innerHTML = '<option value="">(Lepas profil)</option>' + smartDistProfiles.map(p =>
+      `<option value="${esc(p.id)}">${esc(p.name)} (${p.rules} rule)</option>`).join('');
+    if (!currentClusterNodes.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada edge node yang terhubung.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = currentClusterNodes.map(n => {
+      const status = esc(n.status || 'offline');
+      return `<tr>
+        <td><input type="checkbox" class="smartdist-node-check" value="${esc(n.id)}"></td>
+        <td style="font-weight:600">${esc(n.name || n.id)}</td>
+        <td class="mono">${esc(n.ip || '-')}</td>
+        <td>${status}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--rose);padding:1.5rem">Gagal memuat daftar node.</td></tr>';
+  }
+}
+
+async function applySmartDistAssign() {
+  const ids = smartDistSelectedNodeIDs();
+  if (!ids.length) { toast('Pilih minimal satu node', 'error'); return; }
+  const profileId = document.getElementById('smartdist-assign-profile').value;
+  if (!profileId && !confirm('Lepas profil SmartDist dari node terpilih?')) return;
+  const btn = document.getElementById('smartdist-assign-apply');
+  btn.disabled = true;
+  try {
+    const d = await api('/api/cluster/profile/assign', 'POST', { node_ids: ids, profile_id: profileId });
+    const assigned = d.assigned || ids;
+    toast(`Profil diterapkan ke ${assigned.length} node`);
+    await fetchSmartDistAssign();
+  } catch (e) {
+    toast('Gagal menerapkan profil: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
   }
 }
 
