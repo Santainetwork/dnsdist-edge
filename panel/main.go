@@ -788,16 +788,39 @@ func validIP(s string) bool {
 		if end < 0 {
 			return false
 		}
+		if rest := s[end+1:]; rest != "" && !validPortSuffix(rest) {
+			return false
+		}
 		s = s[1:end]
 	} else if strings.Count(s, ":") == 1 {
 		// IPv4:port
-		host, _, err := net.SplitHostPort(s)
-		if err != nil {
+		host, port, err := net.SplitHostPort(s)
+		if err != nil || !validPortDigits(port) {
 			return false
 		}
 		s = host
 	}
 	return net.ParseIP(s) != nil
+}
+
+// validPortSuffix menerima ":N" dengan N digit murni 1..65535.
+func validPortSuffix(s string) bool {
+	return strings.HasPrefix(s, ":") && validPortDigits(s[1:])
+}
+
+// validPortDigits: hanya digit ASCII, tanpa tanda/spasi, nilai 1..65535.
+func validPortDigits(p string) bool {
+	if p == "" || len(p) > 5 {
+		return false
+	}
+	n := 0
+	for _, c := range p {
+		if c < '0' || c > '9' {
+			return false
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n >= 1 && n <= 65535
 }
 
 func jsonOK(w http.ResponseWriter) {

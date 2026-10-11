@@ -12,7 +12,8 @@ func TestValidIPAcceptsScriptFormats(t *testing.T) {
 			t.Errorf("validIP(%q) = false, setup-edge.sh menerimanya", s)
 		}
 	}
-	bad := []string{"1.1.1.1;id", "$(id)", "8.8.8.8`id`", "example.com", ""}
+	bad := []string{"1.1.1.1;id", "$(id)", "8.8.8.8`id`", "example.com", "",
+		"1.1.1.1:99999", "1.1.1.1:0", "1.1.1.1: 53", "1.1.1.1:+53", "1.1.1.1:", "1.1.1.1:-1", "[::1]:99999"}
 	for _, s := range bad {
 		if validIP(s) {
 			t.Errorf("validIP(%q) = true, harus false", s)
