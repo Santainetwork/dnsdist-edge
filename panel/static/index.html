@@ -1502,6 +1502,7 @@ input:checked + .slider::before { transform: translateX(20px); background: var(-
           <button class="btn btn-primary" id="smartdist-profile-save" onclick="saveSmartDistProfile()"><span>Simpan profil</span></button>
         </div>
         <div id="smartdist-profile-list" style="font-size:0.8rem"></div>
+        <div id="smartdist-history-panel" style="font-size:0.8rem;color:var(--text-sub)"></div>
       </div>
     </div>
 
@@ -2525,7 +2526,7 @@ async function fetchSmartDistAssign() {
         <td style="font-weight:600">${esc(n.name || n.id)}</td>
         <td class="mono">${esc(n.ip || '-')}</td>
         <td>${status}</td>
-        <td>${n.profile_sync === 'synced' ? '<span class="badge badge-online">synced</span>' : n.profile_sync === 'pending' ? '<span class="badge badge-offline">pending</span>' : '<span style="color:var(--outline)">-</span>'}</td>
+        <td><button class="btn btn-secondary" onclick="showSmartDistHistory('${esc(n.id)}')"><span>Riwayat</span></button> ${n.profile_sync === 'synced' ? '<span class="badge badge-online">synced</span>' : n.profile_sync === 'pending' ? '<span class="badge badge-offline">pending</span>' : '<span style="color:var(--outline)">-</span>'}</td>
       </tr>`;
     }).join('');
   } catch (e) {
@@ -2558,6 +2559,19 @@ async function deleteSmartDistProfile(id) {
     await fetchSmartDistAssign();
   } catch (e) {
     toast('Gagal menghapus profil: ' + e.message, 'error');
+  }
+}
+
+// F5.3: tampilkan riwayat perubahan penugasan profil satu node.
+async function showSmartDistHistory(nodeID) {
+  const box = document.getElementById('smartdist-history-panel');
+  try {
+    const d = await api('/api/cluster/profiles?history=' + encodeURIComponent(nodeID));
+    const rows = (d.history || []).slice().reverse().map(e =>
+      `<div>${esc(new Date(e.at).toLocaleString())} &nbsp; ${esc(e.from || '(tanpa profil)')} &rarr; ${esc(e.to || '(lepas)')}</div>`).join('');
+    box.innerHTML = `<strong>Riwayat ${esc(nodeID)}</strong>` + (rows || '<div>Belum ada perubahan.</div>');
+  } catch (e) {
+    box.innerHTML = 'Gagal memuat riwayat: ' + esc(e.message);
   }
 }
 
