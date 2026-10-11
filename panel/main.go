@@ -1013,6 +1013,13 @@ func handleSafeSearch(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w)
 }
 
+// validTLSPath: path absolut, hanya [A-Za-z0-9/._-]. Aman untuk literal Lua.
+var tlsPathRe = regexp.MustCompile(`^/[A-Za-z0-9/._-]{1,255}$`)
+
+func validTLSPath(p string) bool {
+	return tlsPathRe.MatchString(p) && !strings.Contains(p, "..")
+}
+
 func handleDoTDoH(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonErr(w, http.StatusMethodNotAllowed, "POST only")
@@ -1034,6 +1041,12 @@ func handleDoTDoH(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Key == "" {
 		body.Key = filepath.Join(cd, "certs", "server.key")
+	}
+	// cert/key masuk ke literal Lua di dotdoh.conf (dieksekusi dnsdist). Hanya
+	// path absolut dengan karakter aman yang diterima; selain itu ditolak.
+	if !validTLSPath(body.Cert) || !validTLSPath(body.Key) {
+		jsonErr(w, http.StatusBadRequest, "cert/key harus path absolut dengan karakter aman")
+		return
 	}
 	if err := writeDoTDoH(body.DoT, body.DoH, body.Cert, body.Key); err != nil {
 		jsonErr(w, http.StatusInternalServerError, err.Error())
