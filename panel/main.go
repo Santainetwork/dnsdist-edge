@@ -849,6 +849,9 @@ func cors(next http.Handler) http.Handler {
 	})
 }
 
+// maxJSONBody membatasi body request JSON (login dan endpoint admin).
+const maxJSONBody = 1 << 20
+
 func auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		hdr := r.Header.Get("Authorization")
@@ -861,6 +864,9 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 			jsonErr(w, http.StatusUnauthorized, err.Error())
 			return
 		}
+		// Cap request bodies so an authenticated caller cannot exhaust memory
+		// by streaming an unbounded payload into a JSON decoder.
+		r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 		next(w, r)
 	}
 }
@@ -886,6 +892,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Password string `json:"password"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonErr(w, http.StatusBadRequest, "invalid json")
 		return
