@@ -62,3 +62,12 @@ func TestDoTDoHRejectsLuaInjection(t *testing.T) {
 func jsonQuote(s string) string {
 	return `"` + strings.ReplaceAll(strings.ReplaceAll(s, `\`, `\\`), `"`, `\"`) + `"`
 }
+
+// Path default (dari DNSDIST_CONF) yang sah harus tetap lolos validasi.
+func TestDefaultCertPathsPassValidation(t *testing.T) {
+	for _, p := range []string{"/etc/dnsdist/certs/server.crt", "/etc/dnsdist/certs/server.key"} {
+		if !validTLSPath(p) {
+			t.Errorf("default %q ditolak", p)
+		}
+	}
+}
