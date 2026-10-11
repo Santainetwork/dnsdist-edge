@@ -214,30 +214,66 @@ func (cs *ClusterStore) ValidateAndConsumeToken(tok string) bool {
 	return true
 }
 
-func clientIP(r *http.Request) string {
-	// Check X-Forwarded-For first
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		ip := strings.TrimSpace(parts[0])
-		if net.ParseIP(ip) != nil {
-			return ip
+// trustedProxyNets: CIDR proxy yang boleh menetapkan X-Forwarded-For / X-Real-IP.
+// Default kosong: tidak ada header yang dipercaya (anti-spoof).
+var trustedProxyNets []*net.IPNet
+
+// setTrustedProxies mengisi daftar proxy tepercaya dari string CIDR/IP dipisah koma.
+func setTrustedProxies(spec string) error {
+	var nets []*net.IPNet
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if !strings.Contains(part, "/") {
+			ip := net.ParseIP(part)
+			if ip == nil {
+				return fmt.Errorf("proxy tepercaya bukan IP/CIDR: %q", part)
+			}
+			bits := 32
+			if ip.To4() == nil {
+				bits = 128
+			}
+			part = fmt.Sprintf("%s/%d", part, bits)
+		}
+		_, n, err := net.ParseCIDR(part)
+		if err != nil {
+			return fmt.Errorf("CIDR proxy tepercaya tidak valid: %q", part)
+		}
+		nets = append(nets, n)
+	}
+	trustedProxyNets = nets
+	return nil
+}
+
+func ipInTrustedProxies(ip net.IP) bool {
+	for _, n := range trustedProxyNets {
+		if n.Contains(ip) {
+			return true
 		}
 	}
-	// Check X-Real-IP
-	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
-		if net.ParseIP(xrip) != nil {
+	return false
+}
+
+// clientIP: X-Forwarded-For / X-Real-IP hanya dipakai bila koneksi langsung
+// berasal dari proxy tepercaya. Selain itu, pakai RemoteAddr.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return strings.TrimSpace(r.RemoteAddr)
+	}
+	if ip := net.ParseIP(host); ip != nil && ipInTrustedProxies(ip) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if fip := strings.TrimSpace(strings.Split(xff, ",")[0]); net.ParseIP(fip) != nil {
+				return fip
+			}
+		}
+		if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" && net.ParseIP(xrip) != nil {
 			return xrip
 		}
 	}
-	// RemoteAddr fallback
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil && net.ParseIP(host) != nil {
-		return host
-	}
-	if ip := net.ParseIP(r.RemoteAddr); ip != nil {
-		return r.RemoteAddr
-	}
-	return r.RemoteAddr
+	return host
 }
 
 func validateMasterURL(raw string) (string, error) {

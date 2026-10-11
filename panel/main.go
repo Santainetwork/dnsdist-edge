@@ -109,6 +109,7 @@ var (
 	flagMaster            = flag.Bool("master", envBool("PANEL_MASTER", false), "Enable Central Master mode (CDB builder & publisher)")
 	flagSourceMode        = flag.String("source-mode", envOr("PANEL_SOURCE_MODE", "feeds"), "Master data source mode: feeds or rpz-slave")
 	flagFilesDir          = flag.String("files-dir", envOr("PANEL_FILES_DIR", "/var/www/html/files"), "Directory to serve /files/ from (trust.db, manifest.json)")
+	flagTrustedProxies    = flag.String("trusted-proxies", envOr("PANEL_TRUSTED_PROXIES", ""), "CIDR/IP reverse proxy tepercaya (koma). Kosong = tidak percaya X-Forwarded-For/X-Real-IP")
 	flagSourcesFile       = flag.String("sources-file", envOr("PANEL_SOURCES_FILE", "/etc/dnsdist-master/sources.txt"), "Path to sources.txt for master compilation")
 	flagWhitelistFile     = flag.String("whitelist-file", envOr("PANEL_WHITELIST_FILE", "/etc/dnsdist-master/whitelist.txt"), "Path to whitelist.txt")
 	flagCustomBLFile      = flag.String("custom-bl-file", envOr("PANEL_CUSTOM_BL_FILE", "/etc/dnsdist-master/custom-blacklist.txt"), "Path to custom-blacklist.txt")
@@ -1302,6 +1303,9 @@ func masterAutoBuildEnabled(master bool, sourceMode string, interval time.Durati
 func main() {
 	flag.Parse()
 	log.SetPrefix("[panel] ")
+	if err := setTrustedProxies(*flagTrustedProxies); err != nil {
+		log.Fatalf("[panel] -trusted-proxies: %v", err)
+	}
 	if err := validateSourceMode(*flagSourceMode); err != nil {
 		log.Fatal(err)
 	}
