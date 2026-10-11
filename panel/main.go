@@ -977,6 +977,13 @@ func handleUpstream(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusBadRequest, "servers required")
 		return
 	}
+	// Setiap server harus IP (opsional :port). Input lain tidak boleh sampai ke script.
+	for _, s := range body.Servers {
+		if !validIP(s) {
+			jsonErr(w, http.StatusBadRequest, "server upstream tidak valid: "+s)
+			return
+		}
+	}
 	out, err := runSetupSh("--set-upstream", strings.Join(body.Servers, ","))
 	if err != nil {
 		log.Printf("[panel] --set-upstream error: %v\n%s", err, out)
