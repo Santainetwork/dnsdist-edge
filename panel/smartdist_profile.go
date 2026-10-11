@@ -357,7 +357,8 @@ func (s *SmartDistProfileStore) recordLocked(nodeID, from, to string) {
 func (s *SmartDistProfileStore) History(nodeID string) []SmartDistAssignEvent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]SmartDistAssignEvent(nil), s.history[nodeID]...)
+	// Selalu non-nil: JSON "[]" bukan "null" untuk node tanpa riwayat.
+	return append([]SmartDistAssignEvent{}, s.history[nodeID]...)
 }
 
 // ProfileForNode mengembalikan id dan hash profil yang di-assign ke node.
