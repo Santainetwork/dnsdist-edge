@@ -1495,6 +1495,14 @@ input:checked + .slider::before { transform: translateX(20px); background: var(-
           <span>Terapkan</span>
         </button>
       </div>
+      <div style="padding:0.9rem;display:flex;flex-direction:column;gap:0.5rem">
+        <label for="smartdist-profile-json" style="font-size:0.8rem;color:var(--text-sub)">Buat / perbarui profil (JSON)</label>
+        <textarea id="smartdist-profile-json" rows="6" class="mono" style="padding:0.5rem;background:var(--card);border:1px solid var(--input);border-radius:0.5rem;color:var(--foreground);font-size:0.8rem" placeholder='{"id":"config-a","name":"Config A","smartdist":{"enabled":true,"rules":[]}}'></textarea>
+        <div>
+          <button class="btn btn-primary" id="smartdist-profile-save" onclick="saveSmartDistProfile()"><span>Simpan profil</span></button>
+        </div>
+        <div id="smartdist-profile-list" style="font-size:0.8rem"></div>
+      </div>
     </div>
 
     <div class="split-2">
@@ -2503,6 +2511,9 @@ async function fetchSmartDistAssign() {
     const sel = document.getElementById('smartdist-assign-profile');
     sel.innerHTML = '<option value="">(Lepas profil)</option>' + smartDistProfiles.map(p =>
       `<option value="${esc(p.id)}">${esc(p.name)} (${p.rules} rule)</option>`).join('');
+    const list = document.getElementById('smartdist-profile-list');
+    if (list) list.innerHTML = smartDistProfiles.map(p =>
+      `<div style="display:flex;gap:0.5rem;align-items:center"><span class="mono">${esc(p.id)}</span> ${esc(p.name)} <button class="btn btn-secondary" onclick="deleteSmartDistProfile('${esc(p.id)}')"><span>Hapus</span></button></div>`).join('');
     if (!currentClusterNodes.length) {
       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada edge node yang terhubung.</td></tr>';
       return;
@@ -2518,6 +2529,34 @@ async function fetchSmartDistAssign() {
     }).join('');
   } catch (e) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--rose);padding:1.5rem">Gagal memuat daftar node.</td></tr>';
+  }
+}
+
+async function saveSmartDistProfile() {
+  const ta = document.getElementById('smartdist-profile-json');
+  const btn = document.getElementById('smartdist-profile-save');
+  let body;
+  try { body = ta.value; JSON.parse(body); } catch (e) { toast('JSON profil tidak valid: ' + e.message, 'error'); return; }
+  btn.disabled = true;
+  try {
+    const d = await api('/api/cluster/profiles', 'POST', JSON.parse(body));
+    toast('Profil "' + (d.name || d.id) + '" disimpan');
+    await fetchSmartDistAssign();
+  } catch (e) {
+    toast('Gagal menyimpan profil: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteSmartDistProfile(id) {
+  if (!confirm('Hapus profil "' + id + '"?')) return;
+  try {
+    await api('/api/cluster/profiles?id=' + encodeURIComponent(id), 'DELETE');
+    toast('Profil dihapus');
+    await fetchSmartDistAssign();
+  } catch (e) {
+    toast('Gagal menghapus profil: ' + e.message, 'error');
   }
 }
 
