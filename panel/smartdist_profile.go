@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Profil SmartDist: dokumen JSON yang disimpan panel dan ditunjuk ke node
@@ -98,6 +99,17 @@ func smartDistCanonHash(b []byte) string {
 	return hex.EncodeToString(s[:])
 }
 
+// maxHistory: batas riwayat perubahan penugasan per node (F5.3). Disimpan
+// hanya di memori; tidak ikut disk format agar tidak perlu migrasi.
+const maxHistory = 50
+
+// SmartDistAssignEvent mencatat satu perubahan penugasan profil pada node.
+type SmartDistAssignEvent struct {
+	At   time.Time `json:"at"`
+	From string    `json:"from"`
+	To   string    `json:"to"`
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 type smartDistEntry struct {
@@ -120,6 +132,7 @@ type SmartDistProfileStore struct {
 	filePath string
 	profiles map[string]smartDistEntry
 	assign   map[string]string
+	history  map[string][]SmartDistAssignEvent
 }
 
 type smartDistDiskFormat struct {
@@ -132,6 +145,7 @@ func newSmartDistProfileStore(filePath string) *SmartDistProfileStore {
 		filePath: filePath,
 		profiles: make(map[string]smartDistEntry),
 		assign:   make(map[string]string),
+		history:  make(map[string][]SmartDistAssignEvent),
 	}
 	s.load()
 	return s
@@ -279,6 +293,7 @@ func (s *SmartDistProfileStore) Assign(nodeID, profileID string) error {
 		}
 		return fmt.Errorf("%w: %v", errSmartDistStorage, err)
 	}
+	s.recordLocked(nodeID, prevOf(prev, had), profileID)
 	return nil
 }
 
@@ -311,7 +326,38 @@ func (s *SmartDistProfileStore) AssignMany(nodeIDs []string, profileID string) e
 		}
 		return fmt.Errorf("%w: %v", errSmartDistStorage, err)
 	}
+	for _, id := range nodeIDs {
+		s.recordLocked(id, prevOf(prev[id], prev[id] != "\x00"), profileID)
+	}
 	return nil
+}
+
+// prevOf: nilai penugasan sebelumnya ("" bila tidak ada).
+func prevOf(prev string, had bool) string {
+	if !had || prev == "\x00" {
+		return ""
+	}
+	return prev
+}
+
+// recordLocked menambah satu entri riwayat bila nilai benar-benar berubah.
+// Harus dipanggil dengan s.mu terkunci.
+func (s *SmartDistProfileStore) recordLocked(nodeID, from, to string) {
+	if from == to {
+		return
+	}
+	h := append(s.history[nodeID], SmartDistAssignEvent{At: time.Now().UTC(), From: from, To: to})
+	if len(h) > maxHistory {
+		h = h[len(h)-maxHistory:]
+	}
+	s.history[nodeID] = h
+}
+
+// History mengembalikan salinan riwayat penugasan satu node (terlama dulu).
+func (s *SmartDistProfileStore) History(nodeID string) []SmartDistAssignEvent {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return append([]SmartDistAssignEvent(nil), s.history[nodeID]...)
 }
 
 // ProfileForNode mengembalikan id dan hash profil yang di-assign ke node.
@@ -425,6 +471,11 @@ func handleSmartDistProfiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		w.Header().Set("Content-Type", "application/json")
+		// F5.3: ?history=<node_id> mengembalikan riwayat perubahan penugasan node itu.
+		if nid := strings.TrimSpace(r.URL.Query().Get("history")); nid != "" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"node_id": nid, "history": st.History(nid)})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"profiles": st.List()})
 	case http.MethodPost:
 		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
