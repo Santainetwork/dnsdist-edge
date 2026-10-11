@@ -1478,11 +1478,11 @@ input:checked + .slider::before { transform: translateX(20px); background: var(-
           <thead>
             <tr>
               <th style="width:2.5rem"><input type="checkbox" id="smartdist-assign-all" onclick="toggleSmartDistAssignAll(this)"></th>
-              <th>Nama Node</th><th>IP</th><th>Status</th>
+              <th>Nama Node</th><th>IP</th><th>Status</th><th>Profil</th>
             </tr>
           </thead>
           <tbody id="smartdist-assign-tbody">
-            <tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada edge node yang terhubung.</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada edge node yang terhubung.</td></tr>
           </tbody>
         </table>
       </div>
@@ -2515,7 +2515,7 @@ async function fetchSmartDistAssign() {
     if (list) list.innerHTML = smartDistProfiles.map(p =>
       `<div style="display:flex;gap:0.5rem;align-items:center"><span class="mono">${esc(p.id)}</span> ${esc(p.name)} <button class="btn btn-secondary" onclick="deleteSmartDistProfile('${esc(p.id)}')"><span>Hapus</span></button></div>`).join('');
     if (!currentClusterNodes.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada edge node yang terhubung.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--outline);padding:1.5rem">Belum ada edge node yang terhubung.</td></tr>';
       return;
     }
     tbody.innerHTML = currentClusterNodes.map(n => {
@@ -2525,10 +2525,11 @@ async function fetchSmartDistAssign() {
         <td style="font-weight:600">${esc(n.name || n.id)}</td>
         <td class="mono">${esc(n.ip || '-')}</td>
         <td>${status}</td>
+        <td>${n.profile_sync === 'synced' ? '<span class="badge badge-online">synced</span>' : n.profile_sync === 'pending' ? '<span class="badge badge-offline">pending</span>' : '<span style="color:var(--outline)">-</span>'}</td>
       </tr>`;
     }).join('');
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--rose);padding:1.5rem">Gagal memuat daftar node.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--rose);padding:1.5rem">Gagal memuat daftar node.</td></tr>';
   }
 }
 

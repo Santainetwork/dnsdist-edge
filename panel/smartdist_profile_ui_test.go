@@ -17,6 +17,8 @@ func TestSmartDistProfileUIMarkup(t *testing.T) {
 		"onclick=\"saveSmartDistProfile()\"",
 		"api('/api/cluster/profiles?id=' + encodeURIComponent(id), 'DELETE')",
 		"/api/cluster/profiles",
+		"n.profile_sync === 'synced'",
+		"<th>Profil</th>",
 	} {
 		if !strings.Contains(page, marker) {
 			t.Fatalf("panel HTML missing SmartDist profile CRUD marker %q", marker)

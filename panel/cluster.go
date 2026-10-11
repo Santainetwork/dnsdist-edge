@@ -22,25 +22,28 @@ import (
 
 // NodeRecord stores latest state & telemetry of an edge node.
 type NodeRecord struct {
-	ID             string    `json:"id"`
-	Key            string    `json:"key,omitempty"` // Auth key for heartbeats
-	Name           string    `json:"name"`
-	IP             string    `json:"ip"`
-	Version        string    `json:"version"`
-	Status         string    `json:"status"` // "online", "degraded", "offline"
-	FirstSeenAt    time.Time `json:"first_seen_at"`
-	LastSeenAt     time.Time `json:"last_seen_at"`
-	QPS            int64     `json:"qps"`
-	QueriesTotal   int64     `json:"queries_total"`
-	BlockedTotal   int64     `json:"blocked_total"`
-	CacheHitPct    float64   `json:"cache_hit_pct"`
-	CPUPct         float64   `json:"cpu_pct"`
-	MemUsedMB      uint64    `json:"mem_used_mb"`
-	MemTotalMB     uint64    `json:"mem_total_mb"`
-	UptimeSec      int64     `json:"uptime_sec"`
-	DnsdistRunning bool      `json:"dnsdist_running"`
-	DBHash         string    `json:"db_hash"`
-	DBUpdatedAt    string    `json:"db_updated_at"`
+	ID                 string    `json:"id"`
+	Key                string    `json:"key,omitempty"` // Auth key for heartbeats
+	Name               string    `json:"name"`
+	IP                 string    `json:"ip"`
+	Version            string    `json:"version"`
+	Status             string    `json:"status"` // "online", "degraded", "offline"
+	FirstSeenAt        time.Time `json:"first_seen_at"`
+	LastSeenAt         time.Time `json:"last_seen_at"`
+	QPS                int64     `json:"qps"`
+	QueriesTotal       int64     `json:"queries_total"`
+	BlockedTotal       int64     `json:"blocked_total"`
+	CacheHitPct        float64   `json:"cache_hit_pct"`
+	CPUPct             float64   `json:"cpu_pct"`
+	MemUsedMB          uint64    `json:"mem_used_mb"`
+	MemTotalMB         uint64    `json:"mem_total_mb"`
+	UptimeSec          int64     `json:"uptime_sec"`
+	DnsdistRunning     bool      `json:"dnsdist_running"`
+	DBHash             string    `json:"db_hash"`
+	DBUpdatedAt        string    `json:"db_updated_at"`
+	AppliedProfileHash string    `json:"applied_profile_hash,omitempty"`
+	ProfileID          string    `json:"profile_id,omitempty"`
+	ProfileSync        string    `json:"profile_sync,omitempty"` // "synced"|"pending"|""
 }
 
 // ClusterAggregate provides summary metrics over all active nodes.
@@ -85,6 +88,8 @@ type HeartbeatRequest struct {
 	DnsdistRunning bool    `json:"dnsdist_running"`
 	DBHash         string  `json:"db_hash"`
 	DBUpdatedAt    string  `json:"db_updated_at"`
+	// AppliedProfileHash: hash profil yang sudah diterapkan agent. Kosong = agent lama.
+	AppliedProfileHash string `json:"applied_profile_hash,omitempty"`
 }
 
 type HeartbeatResponse struct {
@@ -316,6 +321,7 @@ func (cs *ClusterStore) ProcessHeartbeat(req HeartbeatRequest, remoteIP string) 
 	rec.DnsdistRunning = req.DnsdistRunning
 	rec.DBHash = req.DBHash
 	rec.DBUpdatedAt = req.DBUpdatedAt
+	rec.AppliedProfileHash = req.AppliedProfileHash
 
 	cs.refreshNodeStatus(rec, now)
 	_ = cs.save()
@@ -366,7 +372,32 @@ func (cs *ClusterStore) ListNodes() ([]*NodeRecord, ClusterAggregate) {
 		agg.AvgCacheHitPct = math.Round((cacheSum/float64(activeCount))*10) / 10
 	}
 
+	// isi status sinkron profil per node (F5.2): bandingkan hash yang
+	// diterapkan node dengan hash profil yang ditugaskan panel.
+	st := getSmartDistStore()
+	if st != nil {
+		for _, n := range list {
+			pid, phash, ok := st.ProfileForNode(n.ID)
+			if ok {
+				n.ProfileID = pid
+				n.ProfileSync = profileSyncState(phash, n.AppliedProfileHash)
+			}
+		}
+	}
+
 	return list, agg
+}
+
+// profileSyncState: "" tanpa profil, "synced" bila hash cocok,
+// "pending" bila node belum menerapkan hash yang ditugaskan.
+func profileSyncState(assignedHash, appliedHash string) string {
+	if assignedHash == "" {
+		return ""
+	}
+	if assignedHash == appliedHash {
+		return "synced"
+	}
+	return "pending"
 }
 
 // DeleteNode removes a node from the cluster
@@ -778,6 +809,7 @@ func (a *EdgeClusterAgent) sendHeartbeat() error {
 	nodeID := a.state.NodeID
 	nodeKey := a.state.NodeKey
 	nodeName := a.state.Name
+	appliedProfileHash := a.state.ProfileHash
 	a.mu.RUnlock()
 
 	if masterURL == "" || nodeID == "" || nodeKey == "" {
@@ -808,6 +840,8 @@ func (a *EdgeClusterAgent) sendHeartbeat() error {
 		DnsdistRunning: dnsdistRunning(),
 		DBHash:         dbHash,
 		DBUpdatedAt:    dbUpdated,
+		// F5.2: hash profil yang benar-benar diterapkan agent (siklus sebelumnya).
+		AppliedProfileHash: appliedProfileHash,
 	}
 
 	b, err := json.Marshal(hbReq)
