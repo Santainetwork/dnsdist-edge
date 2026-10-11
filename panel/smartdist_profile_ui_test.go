@@ -13,7 +13,7 @@ func TestSmartDistProfileUIMarkup(t *testing.T) {
 		`id="smartdist-profile-json"`,
 		`id="smartdist-profile-save"`,
 		"saveSmartDistProfile()",
-		"onclick=\"deleteSmartDistProfile(",
+		"data-act=\"deleteSmartDistProfile\"",
 		"onclick=\"saveSmartDistProfile()\"",
 		"api('/api/cluster/profiles?id=' + encodeURIComponent(id), 'DELETE')",
 		"/api/cluster/profiles",

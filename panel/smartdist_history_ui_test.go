@@ -13,7 +13,7 @@ func TestSmartDistHistoryUIMarkup(t *testing.T) {
 		`id="smartdist-history-panel"`,
 		"showSmartDistHistory(",
 		"/api/cluster/profiles?history=",
-		"onclick=\"showSmartDistHistory(",
+		"data-act=\"showSmartDistHistory\"",
 	} {
 		if !strings.Contains(page, marker) {
 			t.Fatalf("panel HTML missing SmartDist history marker %q", marker)
