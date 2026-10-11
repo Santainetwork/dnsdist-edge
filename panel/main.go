@@ -849,6 +849,22 @@ func cors(next http.Handler) http.Handler {
 	})
 }
 
+// filesHandler menyajikan direktori publik di bawah /files/. Dotfile dan
+// dotdir (mis. .cache, cache feed sumber mentah) ditolak agar tidak bisa
+// diunduh atau di-list. Hanya file publik (trust.db, manifest.json) yang lolos.
+func filesHandler(dir string) http.Handler {
+	fs := http.StripPrefix("/files/", http.FileServer(http.Dir(dir)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, seg := range strings.Split(strings.TrimPrefix(r.URL.Path, "/files/"), "/") {
+			if strings.HasPrefix(seg, ".") && seg != "" {
+				http.NotFound(w, r)
+				return
+			}
+		}
+		fs.ServeHTTP(w, r)
+	})
+}
+
 // maxJSONBody membatasi body request JSON (login dan endpoint admin).
 const maxJSONBody = 1 << 20
 
@@ -1412,11 +1428,11 @@ func main() {
 	mux.HandleFunc("/api/dnstap/top", auth(handleDnstapTop))
 
 	// File Publisher (for Master Mode: serves trust.db, manifest.json)
-	fs := http.FileServer(http.Dir(*flagFilesDir))
+	fs := filesHandler(*flagFilesDir)
 	mux.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Cache-Control", "public, must-revalidate, proxy-revalidate")
-		http.StripPrefix("/files/", fs).ServeHTTP(w, r)
+		fs.ServeHTTP(w, r)
 	})
 
 	// Master Auto-Build Cron Ticker
