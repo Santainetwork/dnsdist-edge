@@ -2427,7 +2427,7 @@ async function fetchClusterNodes() {
 
     // Update aggregate cards
     document.getElementById('cl-nodes').textContent = `${agg.online_nodes || 0} / ${agg.total_nodes || 0}`;
-    document.getElementById('cl-nodes-sub').textContent = `${agg.online_nodes || 0} online, ${agg.offline_nodes || 0} offline${agg.degraded_nodes ? ', ' + agg.degraded_nodes + ' degraded' : ''}`;
+    document.getElementById('cl-nodes-sub').textContent = `${agg.online_nodes || 0} online, ${agg.offline_nodes || 0} offline${agg.degraded_nodes ? ', ' + agg.degraded_nodes + ' degraded' : ''}${(agg.synced_nodes || agg.pending_nodes) ? `, ${agg.synced_nodes || 0} synced / ${agg.pending_nodes || 0} pending` : ''}`;
     document.getElementById('cl-qps').textContent = fmtNum(agg.total_qps || 0);
     document.getElementById('cl-queries').textContent = fmtNum(agg.total_queries || 0);
     document.getElementById('cl-blocked-sub').textContent = `${fmtNum(agg.total_blocked || 0)} diblokir`;

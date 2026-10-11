@@ -48,10 +48,13 @@ type NodeRecord struct {
 
 // ClusterAggregate provides summary metrics over all active nodes.
 type ClusterAggregate struct {
-	TotalNodes     int     `json:"total_nodes"`
-	OnlineNodes    int     `json:"online_nodes"`
-	DegradedNodes  int     `json:"degraded_nodes"`
-	OfflineNodes   int     `json:"offline_nodes"`
+	TotalNodes    int `json:"total_nodes"`
+	OnlineNodes   int `json:"online_nodes"`
+	DegradedNodes int `json:"degraded_nodes"`
+	OfflineNodes  int `json:"offline_nodes"`
+	// F5.1: node yang profilnya sudah/tak tersinkron.
+	SyncedNodes    int     `json:"synced_nodes"`
+	PendingNodes   int     `json:"pending_nodes"`
 	TotalQPS       int64   `json:"total_qps"`
 	TotalQueries   int64   `json:"total_queries"`
 	TotalBlocked   int64   `json:"total_blocked"`
@@ -381,6 +384,12 @@ func (cs *ClusterStore) ListNodes() ([]*NodeRecord, ClusterAggregate) {
 			if ok {
 				n.ProfileID = pid
 				n.ProfileSync = profileSyncState(phash, n.AppliedProfileHash)
+				switch n.ProfileSync {
+				case "synced":
+					agg.SyncedNodes++
+				case "pending":
+					agg.PendingNodes++
+				}
 			}
 		}
 	}
