@@ -18,7 +18,7 @@ import (
 var dnsdistProfilePath = "/etc/dnsdist/dnsdist-profile.lua"
 
 // dnsdistBaseConf: dnsdist.conf yang memuat profil. Check-config dijalankan
-// terhadapnya agar hook dofile ikut diuji.
+// terhadapnya agar hook dofile ikut diuji. Diisi dari -config saat startup.
 var dnsdistBaseConf = "/etc/dnsdist/dnsdist.conf"
 
 // checkDnsdistConfigFn: seam agar tes tidak memanggil dnsdist sungguhan.
@@ -73,6 +73,12 @@ func applyDnsdistProfile(body []byte) error {
 	}
 	if err := os.Rename(newPath, dnsdistProfilePath); err != nil {
 		return fmt.Errorf("rename gagal: %w", err)
+	}
+
+	// -dnsdist-restart=false: node sandbox tidak boleh me-restart dnsdist nyata.
+	// Ditulis tapi tidak di-restart: 'pending restart'.
+	if !*flagDnsdistRestart {
+		return nil
 	}
 
 	if err := restartDnsdistFn(); err != nil {
