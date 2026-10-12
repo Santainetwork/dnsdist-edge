@@ -1,6 +1,6 @@
 # Desain: Profil v1 (dnsdist.conf penuh) — PRD §13.1, P1
 
-Status: **DRAFT untuk review.** Belum ada kode. Basis: `main` @ `03a1264`.
+Status: **Diimplementasi** (commit `2e520d4`, `4228599`; binary `b772399`). Basis awal: `main` @ `03a1264`. Verifikasi nyata di `192.168.109.221` (dnsdist 1.7.3); lihat §9b dan §11.
 
 ## 1. Keputusan yang diusulkan
 
@@ -157,3 +157,19 @@ syntax dan sebagian error semantik.
 3. **`dnsdist --check-config` tersedia di semua node?** Kalau tidak, validasi
    sebelum penerapan jadi lemah.
 4. Target node awal (PRD §13.2) untuk menentukan batas array dan uji skala.
+
+## 11. Status implementasi (2026-10-12)
+
+Terverifikasi:
+- Validasi section, generator, gerbang apply (.new, .lkg, skip isi sama), hook agent: tes Go + mutasi.
+- E2E dalam proses: master -> heartbeat -> agent -> dnsdist-profile.lua -> synced (`profile_v1_e2e_test.go`).
+- dnsdist 1.7.3 asli memuat sampel generator; BLOCK_MODE dan SINKHOLE berubah sesuai profil.
+- Regresi: tanpa profil, conf baru identik dengan HEAD (BLOCK=rpz, SINKHOLE baseline, 2 server).
+- ACL last-wins terukur lewat query DNS.
+
+Belum terverifikasi (jangan diklaim):
+- Rollback `.lkg` saat restart GAGAL di dnsdist nyata: hanya diuji dengan mock.
+- ECS, QPS, TCP: tidak ada getter di 1.7.3, hanya terbukti "tidak error".
+- Node kedua lintas-mesin: belum dijalankan. Path profil dan restart belum bisa dioverride, sehingga node sandbox di host sama berisiko menimpa `/etc/dnsdist`.
+- `getACL` TIDAK ada di dnsdist 1.7.3 (koreksi: sebelumnya tercatat ada).
+
