@@ -121,13 +121,32 @@ pemisahan state di Lua yang belum ada.
 - Multi-user / RBAC (PRD §12.5).
 - Diff visual antar versi profil.
 
-## 9b. Asumsi yang belum diverifikasi
+## 9b. Verifikasi mekanisme (2026-10-12, server test)
 
-- `dnsdist --check-config` dipakai di `setup/setup-edge.sh:746`,
-  `tools/dnsdist-health.sh:53`, dan `addons/dnsdist-tproxy.sh:294`. Repo
-  mengandalkannya, tapi **dnsdist tidak terpasang di host pengembangan ini**
-  (`which dnsdist` gagal), sehingga perilakunya belum diuji di sini.
-  Uji sebelum implementasi.
+Diverifikasi di server test `192.168.109.221` (Debian 12, dnsdist 1.7.3,
+instance terisolasi port 15353, tidak menyentuh produksi):
+
+- `dnsdist --check-config -C <conf>` **mengeksekusi `dofile`**: syntax error di
+  dalam file yang di-dofile → rc=1; config valid → rc=0. Warning (modul tak
+  ada, password plaintext) **tidak** menggagalkan (`rc` tetap 0). Jadi
+  check-config bisa dipakai sebagai gerbang validasi profil (§6).
+- Tulis ulang file yang dimuat lewat `dofile` **tanpa restart** tidak mengubah
+  listener aktif (diuji: `addLocal 15353` → tulis `+15354` → tetap hanya
+  15353). Setelah restart → 15353 dan 15354 aktif. Ini membenarkan §5
+  (restart = mekanisme penerapan di v1).
+- Instance dnsdist membaca konsol dari stdin; jika stdin EOF ia keluar (exit 0).
+  Untuk penerapan, gunakan `systemctl restart dnsdist` (seperti
+  `restartDnsdist()` di `panel/main.go:764`), bukan spawn manual.
+- `restartDnsdist` gagal → kembalikan `.lkg` (rencana §6) tetap perlu diuji
+  saat implementasi agent; belum ada kode.
+
+Bukti mentah: output uji di review notes run ini.
+
+**Batas check-config (penting, diukur):** ia bukan validator semantik penuh.
+`addLocal("127.0.0.1:99999")` → rc=1 dan `setACL({"not-an-ip"})` → rc=1,
+tetapi `setECSSourcePrefixV4(99)` → **rc=0** (lolos). Jadi rentang nilai tetap
+**wajib** divalidasi di sisi panel (§3); check-config hanya gerbang kedua untuk
+syntax dan sebagian error semantik.
 
 ## 10. Pertanyaan yang butuh jawaban Anda
 
