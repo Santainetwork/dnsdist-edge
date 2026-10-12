@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -36,6 +37,8 @@ type SmartDistProfile struct {
 	ID        string            `json:"id"`
 	Name      string            `json:"name"`
 	Smartdist SmartDistSettings `json:"smartdist"`
+	// Dnsdist: section profil v1 (docs/PROFILE-V1-DESIGN.md). nil = profil lama.
+	Dnsdist *DnsdistSettings `json:"dnsdist,omitempty"`
 }
 
 type SmartDistSettings struct {
@@ -56,6 +59,94 @@ type SmartDistRuleSpec struct {
 	Exclude string   `json:"exclude,omitempty"`
 }
 
+// DnsdistSettings: subset dnsdist.conf yang dikelola profil v1. Semua field
+// opsional; field kosong = pakai baseline dnsdist.conf.
+type DnsdistSettings struct {
+	BlockMode     string            `json:"block_mode,omitempty"`
+	SinkholeV4    []string          `json:"sinkhole_v4,omitempty"`
+	SinkholeV6    []string          `json:"sinkhole_v6,omitempty"`
+	ACL           []string          `json:"acl,omitempty"`
+	Upstreams     []DnsdistUpstream `json:"upstreams,omitempty"`
+	ECSv4         *int              `json:"ecs_v4,omitempty"`
+	ECSv6         *int              `json:"ecs_v6,omitempty"`
+	MaxQPSPerIP   *int              `json:"max_qps_per_ip,omitempty"`
+	TCPMaxConns   *int              `json:"tcp_max_conns,omitempty"`
+	TCPMaxQueries *int              `json:"tcp_max_queries,omitempty"`
+}
+
+type DnsdistUpstream struct {
+	Name    string `json:"name"`
+	Address string `json:"address"`
+	Pool    string `json:"pool"`
+}
+
+var dnsdistNameRe = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
+
+// validDnsdistSection memvalidasi rentang nilai. Fail closed: error = profil ditolak.
+func validDnsdistSection(d *DnsdistSettings) error {
+	if d == nil {
+		return nil
+	}
+	if d.BlockMode != "" && d.BlockMode != "adguard" && d.BlockMode != "rpz" {
+		return fmt.Errorf("block_mode %q harus adguard atau rpz", d.BlockMode)
+	}
+	for _, ip := range d.SinkholeV4 {
+		if a, err := netip.ParseAddr(ip); err != nil || !a.Is4() {
+			return fmt.Errorf("sinkhole_v4 %q bukan IPv4", ip)
+		}
+	}
+	for _, ip := range d.SinkholeV6 {
+		if a, err := netip.ParseAddr(ip); err != nil || !a.Is6() {
+			return fmt.Errorf("sinkhole_v6 %q bukan IPv6", ip)
+		}
+	}
+	if len(d.ACL) > 256 {
+		return errors.New("acl maksimal 256 entri")
+	}
+	for _, c := range d.ACL {
+		if _, err := netip.ParsePrefix(c); err != nil {
+			return fmt.Errorf("acl %q bukan CIDR", c)
+		}
+	}
+	if len(d.Upstreams) > 64 {
+		return errors.New("upstreams maksimal 64 entri")
+	}
+	for _, u := range d.Upstreams {
+		if !dnsdistNameRe.MatchString(u.Name) {
+			return fmt.Errorf("upstream name %q harus [a-z0-9-]{1,40}", u.Name)
+		}
+		if !dnsdistNameRe.MatchString(u.Pool) {
+			return fmt.Errorf("upstream pool %q harus [a-z0-9-]{1,40}", u.Pool)
+		}
+		if _, err := netip.ParseAddrPort(u.Address); err != nil {
+			return fmt.Errorf("upstream address %q bukan ip:port", u.Address)
+		}
+	}
+	if err := rangeInt("ecs_v4", d.ECSv4, 0, 32); err != nil {
+		return err
+	}
+	if err := rangeInt("ecs_v6", d.ECSv6, 0, 128); err != nil {
+		return err
+	}
+	if err := rangeInt("max_qps_per_ip", d.MaxQPSPerIP, 1, 100000); err != nil {
+		return err
+	}
+	if err := rangeInt("tcp_max_conns", d.TCPMaxConns, 1, 10000); err != nil {
+		return err
+	}
+	return rangeInt("tcp_max_queries", d.TCPMaxQueries, 1, 100000)
+}
+
+func rangeInt(name string, v *int, lo, hi int) error {
+	if v == nil {
+		return nil
+	}
+	if *v < lo || *v > hi {
+		return fmt.Errorf("%s %d di luar %d..%d", name, *v, lo, hi)
+	}
+	return nil
+}
+
 // parseSmartDistProfile memvalidasi input dan mengembalikan bytes canonical.
 func parseSmartDistProfile(raw []byte) (SmartDistProfile, []byte, error) {
 	var p SmartDistProfile
@@ -69,6 +160,9 @@ func parseSmartDistProfile(raw []byte) (SmartDistProfile, []byte, error) {
 	}
 	if strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 {
 		return p, nil, errors.New("name wajib diisi, maksimal 200 byte")
+	}
+	if err := validDnsdistSection(p.Dnsdist); err != nil {
+		return p, nil, err
 	}
 	if p.Smartdist.Rules == nil {
 		p.Smartdist.Rules = []SmartDistRuleSpec{}

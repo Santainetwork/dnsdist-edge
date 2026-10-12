@@ -98,6 +98,12 @@ func (a *EdgeClusterAgent) syncSmartDistProfileInner(profileID, wantHash string)
 		return fmt.Errorf("tulis profil gagal: %w", err)
 	}
 
+	// Section dnsdist (profil v1) dari body yang sama. Gagal = hash tidak naik,
+	// sehingga heartbeat berikutnya mencoba lagi.
+	if err := applyDnsdistProfile(body); err != nil {
+		return fmt.Errorf("apply dnsdist gagal: %w", err)
+	}
+
 	a.setProfileHash(gotHash)
 	log.Printf("[smartdist] profil %s tersinkron (%d byte)", profileID, len(lua))
 	return nil
