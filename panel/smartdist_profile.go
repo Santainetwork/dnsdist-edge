@@ -138,6 +138,8 @@ type SmartDistProfileStore struct {
 type smartDistDiskFormat struct {
 	Profiles map[string]json.RawMessage `json:"profiles"`
 	Assign   map[string]string          `json:"assign"`
+	// History opsional (F5.3 persisten). File lama tanpa field ini tetap terbaca.
+	History map[string][]SmartDistAssignEvent `json:"history,omitempty"`
 }
 
 func newSmartDistProfileStore(filePath string) *SmartDistProfileStore {
@@ -177,6 +179,12 @@ func (s *SmartDistProfileStore) load() {
 			s.assign[node] = pid
 		}
 	}
+	for node, hist := range d.History {
+		if len(hist) > maxHistory {
+			hist = hist[len(hist)-maxHistory:]
+		}
+		s.history[node] = append([]SmartDistAssignEvent{}, hist...)
+	}
 }
 
 // saveLocked harus dipanggil dengan s.mu terkunci.
@@ -187,6 +195,9 @@ func (s *SmartDistProfileStore) saveLocked() error {
 	d := smartDistDiskFormat{
 		Profiles: make(map[string]json.RawMessage, len(s.profiles)),
 		Assign:   s.assign,
+	}
+	if len(s.history) > 0 {
+		d.History = s.history
 	}
 	for id, e := range s.profiles {
 		d.Profiles[id] = e.raw
@@ -294,6 +305,7 @@ func (s *SmartDistProfileStore) Assign(nodeID, profileID string) error {
 		return fmt.Errorf("%w: %v", errSmartDistStorage, err)
 	}
 	s.recordLocked(nodeID, prevOf(prev, had), profileID)
+	s.persistHistoryLocked()
 	return nil
 }
 
@@ -329,7 +341,16 @@ func (s *SmartDistProfileStore) AssignMany(nodeIDs []string, profileID string) e
 	for _, id := range nodeIDs {
 		s.recordLocked(id, prevOf(prev[id], prev[id] != "\x00"), profileID)
 	}
+	s.persistHistoryLocked()
 	return nil
+}
+
+// persistHistoryLocked menyimpan riwayat setelah recordLocked. Penugasan sudah
+// tersimpan sebelumnya; kegagalan di sini hanya dicatat, tidak membatalkan assign.
+func (s *SmartDistProfileStore) persistHistoryLocked() {
+	if err := s.saveLocked(); err != nil {
+		log.Printf("[smartdist] simpan riwayat gagal: %v", err)
+	}
 }
 
 // prevOf: nilai penugasan sebelumnya ("" bila tidak ada).
