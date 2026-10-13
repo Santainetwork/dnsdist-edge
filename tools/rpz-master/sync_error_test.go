@@ -4,6 +4,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -159,5 +160,51 @@ func TestSyncRejectsForeignOpeningSOAWithLocalRecords(t *testing.T) {
 	}
 	if _, err := os.Stat(cfg.RawDomainFile); err == nil {
 		t.Fatal("raw file ditulis walau transfer ditolak")
+	}
+}
+
+// Serial wrap RFC 1982: state lokal hampir max, upstream kecil tapi "lebih
+// baru" secara wrap -> harus minta AXFR (bukan IXFR yang salah hitung).
+func TestSyncSerialWrapRequestsAXFR(t *testing.T) {
+	zone := "rpz.trustpositif."
+	var lastQtype atomic.Uint32
+	addr := startTransferServer(t, func(w dns.ResponseWriter, r *dns.Msg) {
+		response := new(dns.Msg)
+		response.SetReply(r)
+		soa := transferSOA(zone, 5)
+		lastQtype.Store(uint32(r.Question[0].Qtype))
+		if r.Question[0].Qtype == dns.TypeAXFR {
+			response.Answer = []dns.RR{soa, transferCNAME("x."+zone, "b."), soa}
+		} else {
+			response.Answer = []dns.RR{soa}
+		}
+		_ = w.WriteMsg(response)
+	})
+	cfg, state := syncConfig(t, addr)
+	// raw file HARUS ada, kalau tidak Sync() mereset snapshot.Serial ke 0
+	// dan cabang wrap tidak pernah diuji.
+	if err := os.WriteFile(cfg.RawDomainFile, []byte("stale.example\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	state.Serial = ^uint32(0) - 1 // hampir max; upstream 5 adalah "lebih baru" via wrap
+	if err := NewApp(cfg, state).Sync(); err != nil {
+		t.Fatal(err)
+	}
+	if got := uint16(lastQtype.Load()); got != dns.TypeAXFR {
+		t.Fatalf("qtype transfer = %s, want AXFR (serial wrap harus paksa AXFR)", dns.TypeToString[got])
+	}
+	if state.Serial != 5 {
+		t.Fatalf("serial = %d, want 5", state.Serial)
+	}
+}
+
+// Upstream tidak dapat dihubungi -> error, state tidak berubah.
+func TestSyncUpstreamUnreachable(t *testing.T) {
+	cfg, state := syncConfig(t, "127.0.0.1:1") // port mati
+	if err := NewApp(cfg, state).Sync(); err == nil {
+		t.Fatal("upstream mati diterima")
+	}
+	if state.Serial != 0 {
+		t.Fatalf("state berubah: serial=%d", state.Serial)
 	}
 }
