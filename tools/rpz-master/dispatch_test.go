@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/miekg/dns"
 )
 
 // LoadState: file hilang -> State kosong (bukan error); valid -> terbaca;
@@ -95,5 +98,62 @@ func TestRunFlagOverridesConfig(t *testing.T) {
 	// Override zone invalid harus ditolak validasi.
 	if err := run([]string{"-action", "build-cdb", "-c", cfgPath, "-zone", "bad..zone"}, &bytes.Buffer{}); err == nil {
 		t.Fatal("zone override invalid diterima")
+	}
+}
+
+// refuseTransfer harus mengirim REFUSED (bukan diam atau rcode lain).
+func TestRefuseTransferSendsRefused(t *testing.T) {
+	request := new(dns.Msg)
+	request.SetAxfr("rpz.example.")
+	writer := &testResponseWriter{remote: &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}}
+	refuseTransfer(writer, request)
+	if writer.msg == nil {
+		t.Fatal("refuseTransfer tidak mengirim pesan")
+	}
+	if writer.msg.Rcode != dns.RcodeRefused {
+		t.Fatalf("rcode = %s, want REFUSED", dns.RcodeToString[writer.msg.Rcode])
+	}
+}
+
+// Jalur penuh ServeDNS: AXFR dari IP di luar ACL harus dijawab REFUSED.
+func TestServeDNSRefusesTransferOutsideACL(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Zone = "rpz.example."
+	cfg.TransferACL = []string{"192.0.2.0/24"}
+	srv := NewRPZServer(cfg, &State{Serial: 5})
+	request := new(dns.Msg)
+	request.SetAxfr(cfg.Zone)
+	writer := &testResponseWriter{remote: &net.TCPAddr{IP: net.ParseIP("198.51.100.9")}}
+	srv.ServeDNS(writer, request)
+	if writer.msg == nil || writer.msg.Rcode != dns.RcodeRefused {
+		t.Fatalf("AXFR dari luar ACL = %#v, want REFUSED", writer.msg)
+	}
+}
+
+// Zone tidak cocok juga harus REFUSED.
+func TestServeDNSRefusesUnknownZone(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Zone = "rpz.example."
+	srv := NewRPZServer(cfg, &State{Serial: 5})
+	request := new(dns.Msg)
+	request.SetQuestion("other.example.", dns.TypeSOA)
+	writer := &testResponseWriter{remote: &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}}
+	srv.ServeDNS(writer, request)
+	if writer.msg == nil || writer.msg.Rcode != dns.RcodeRefused {
+		t.Fatalf("zone lain = %#v, want REFUSED", writer.msg)
+	}
+}
+
+// Qtype yang tidak didukung (A) harus NOTIMP, bukan crash/diam.
+func TestServeDNSNotImplementedForUnsupportedType(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Zone = "rpz.example."
+	srv := NewRPZServer(cfg, &State{Serial: 5})
+	request := new(dns.Msg)
+	request.SetQuestion("rpz.example.", dns.TypeA)
+	writer := &testResponseWriter{remote: &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}}
+	srv.ServeDNS(writer, request)
+	if writer.msg == nil || writer.msg.Rcode != dns.RcodeNotImplemented {
+		t.Fatalf("qtype A = %#v, want NOTIMP", writer.msg)
 	}
 }
