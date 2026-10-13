@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -62,6 +66,7 @@ func TestHTTPServerGracefulShutdown(t *testing.T) {
 type responseRecorder struct {
 	header http.Header
 	status int
+	body   bytes.Buffer
 }
 
 func (r *responseRecorder) Header() http.Header { return r.header }
@@ -69,6 +74,79 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 	if r.status == 0 {
 		r.status = http.StatusOK
 	}
-	return len(p), nil
+	return r.body.Write(p)
 }
 func (r *responseRecorder) WriteHeader(status int) { r.status = status }
+
+// /health harus 200 + {"status":"healthy"}.
+func TestHTTPHealthEndpoint(t *testing.T) {
+	srv := NewHTTPServer(DefaultConfig(), &State{}, nil)
+	request, _ := http.NewRequest(http.MethodGet, "/health", nil)
+	response := &responseRecorder{header: make(http.Header)}
+	srv.Handler().ServeHTTP(response, request)
+	if response.status != http.StatusOK {
+		t.Fatalf("health status = %d", response.status)
+	}
+	if !strings.Contains(response.body.String(), "healthy") {
+		t.Fatalf("health body = %q", response.body.String())
+	}
+}
+
+// /trust.db harus menyajikan file CDB dengan ETag = sha256, dan 404 bila
+// file belum dibuat (fail jelas, bukan 200 kosong).
+func TestHTTPCDBEndpointServesFileWithETag(t *testing.T) {
+	dir := t.TempDir()
+	cdbPath := filepath.Join(dir, "trust.db")
+	if err := os.WriteFile(cdbPath, []byte("fake-cdb-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.CDBPath = cdbPath
+	state := &State{Serial: 5, CDBSHA256: "abc123"}
+	srv := NewHTTPServer(cfg, state, nil)
+
+	request, _ := http.NewRequest(http.MethodGet, "/trust.db", nil)
+	response := &responseRecorder{header: make(http.Header)}
+	srv.Handler().ServeHTTP(response, request)
+	if response.status != http.StatusOK {
+		t.Fatalf("trust.db status = %d", response.status)
+	}
+	if got := response.header.Get("ETag"); got != `"abc123"` {
+		t.Fatalf("ETag = %q, want \"abc123\"", got)
+	}
+	if !strings.Contains(response.body.String(), "fake-cdb-bytes") {
+		t.Fatalf("isi CDB tidak disajikan: %q", response.body.String())
+	}
+}
+
+func TestHTTPCDBEndpoint404WhenMissing(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.CDBPath = filepath.Join(t.TempDir(), "absent.db")
+	srv := NewHTTPServer(cfg, &State{}, nil)
+	request, _ := http.NewRequest(http.MethodGet, "/trust.db", nil)
+	response := &responseRecorder{header: make(http.Header)}
+	srv.Handler().ServeHTTP(response, request)
+	if response.status != http.StatusNotFound {
+		t.Fatalf("CDB hilang status = %d, want 404", response.status)
+	}
+}
+
+// /manifest.json harus memuat field kontrak yang dipakai edge.
+func TestHTTPManifestFields(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.CDBPath = "/var/lib/dnsdist/trust.db"
+	state := &State{Serial: 77, TotalDomains: 9, CDBSHA256: "hash"}
+	srv := NewHTTPServer(cfg, state, nil)
+	request, _ := http.NewRequest(http.MethodGet, "/manifest.json", nil)
+	response := &responseRecorder{header: make(http.Header)}
+	srv.Handler().ServeHTTP(response, request)
+	if response.status != http.StatusOK {
+		t.Fatalf("manifest status = %d", response.status)
+	}
+	body := response.body.String()
+	for _, want := range []string{`"serial":77`, `"total_domains":9`, `"sha256":"hash"`, `"status":"ok"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("manifest tidak memuat %s: %s", want, body)
+		}
+	}
+}
