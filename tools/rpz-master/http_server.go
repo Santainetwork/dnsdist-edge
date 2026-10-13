@@ -59,6 +59,35 @@ func (s *HTTPServer) Handler() http.Handler {
 	mux.HandleFunc("/trust.db", cdbHandler)
 	mux.HandleFunc("/files/trust.db", cdbHandler)
 
+	rawHandler := func(w http.ResponseWriter, r *http.Request) {
+		s.stateMu.RLock()
+		rawPath := s.cfg.RawDomainFile
+		last := s.state.LastUpdate
+		s.stateMu.RUnlock()
+		st, err := os.Stat(rawPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				http.Error(w, "raw domain file belum dibuat", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "raw domain file tidak tersedia", http.StatusInternalServerError)
+			return
+		}
+		etag := fmt.Sprintf("\"%d-%d\"", st.Size(), st.ModTime().UnixNano())
+		if r.Header.Get("If-None-Match") == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Last-Modified", st.ModTime().UTC().Format(http.TimeFormat))
+		w.Header().Set("X-RPZ-Last-Update", last.UTC().Format(time.RFC3339))
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.ServeFile(w, r, rawPath)
+	}
+	mux.HandleFunc("/domains", rawHandler)
+	mux.HandleFunc("/files/domains", rawHandler)
+	mux.HandleFunc("/raw-domains", rawHandler)
+
 	manifestHandler := func(w http.ResponseWriter, _ *http.Request) {
 		s.stateMu.RLock()
 		manifest := map[string]interface{}{
