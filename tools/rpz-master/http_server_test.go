@@ -6,12 +6,107 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestHTTPRawDomainsETagAndRange(t *testing.T) {
+	dir := t.TempDir()
+	raw := filepath.Join(dir, "domains.txt")
+	if err := os.WriteFile(raw, []byte("example.com\nsub.example.net\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.RawDomainFile = raw
+	st := &State{LastUpdate: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)}
+	srv := NewHTTPServer(cfg, st, nil)
+	request := httptest.NewRequest(http.MethodGet, "/domains", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, request)
+	if rec.Code != http.StatusOK || rec.Body.String() != "example.com\nsub.example.net\n" {
+		t.Fatalf("raw response: status=%d body=%q", rec.Code, rec.Body.String())
+	}
+	etag := rec.Header().Get("ETag")
+	if etag == "" || rec.Header().Get("Last-Modified") == "" || rec.Header().Get("X-RPZ-Last-Update") == "" {
+		t.Fatalf("raw metadata missing: %v", rec.Header())
+	}
+	request = httptest.NewRequest(http.MethodGet, "/domains", nil)
+	request.Header.Set("If-None-Match", etag)
+	rec = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, request)
+	if rec.Code != http.StatusNotModified {
+		t.Fatalf("conditional raw response: %d, want 304", rec.Code)
+	}
+	request = httptest.NewRequest(http.MethodGet, "/domains", nil)
+	request.Header.Set("Range", "bytes=0-6")
+	rec = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, request)
+	if rec.Code != http.StatusPartialContent || rec.Body.String() != "example" {
+		t.Fatalf("range raw response: status=%d body=%q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHTTPRawDomainsConditionalResponsePreservesETag(t *testing.T) {
+	dir := t.TempDir()
+	raw := filepath.Join(dir, "domains.txt")
+	if err := os.WriteFile(raw, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.RawDomainFile = raw
+	srv := NewHTTPServer(cfg, &State{}, nil)
+
+	first := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/domains", nil))
+	etag := first.Header().Get("ETag")
+	if first.Code != http.StatusOK || etag == "" {
+		t.Fatalf("initial raw response: status=%d etag=%q", first.Code, etag)
+	}
+
+	conditional := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/domains", nil)
+	request.Header.Set("If-None-Match", etag)
+	srv.Handler().ServeHTTP(conditional, request)
+	if conditional.Code != http.StatusNotModified {
+		t.Fatalf("conditional raw response: status=%d, want 304", conditional.Code)
+	}
+	if got := conditional.Header().Get("ETag"); got != etag {
+		t.Fatalf("conditional raw response ETag=%q, want %q", got, etag)
+	}
+}
+
+func TestHTTPRawDomainsRejectsDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "internal.txt"), []byte("must not be listed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.RawDomainFile = dir
+	srv := NewHTTPServer(cfg, &State{}, nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/domains", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("directory raw response: status=%d, want 500", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "internal.txt") {
+		t.Fatalf("directory listing leaked through raw endpoint: %q", rec.Body.String())
+	}
+}
+
+func TestHTTPRawDomainsMissing(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.RawDomainFile = filepath.Join(t.TempDir(), "missing.txt")
+	srv := NewHTTPServer(cfg, &State{}, nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/domains", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing raw response: %d, want 404", rec.Code)
+	}
+}
 
 func TestHTTPHandlerDoesNotExposeSync(t *testing.T) {
 	cfg := DefaultConfig()
