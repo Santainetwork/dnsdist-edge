@@ -87,12 +87,6 @@ func (c *SlaveClient) transferRequest() *dns.Msg {
 	return m
 }
 
-// isSOARecord reports whether rr is an SOA record.
-func isSOARecord(rr dns.RR) bool {
-	_, ok := rr.(*dns.SOA)
-	return ok
-}
-
 // SyncIXFR performs AXFR for empty state and IXFR otherwise. Upstreams may
 // answer IXFR with a full AXFR, which is detected from the second record and
 // streamed to disk instead of being buffered in memory.
@@ -149,7 +143,7 @@ func (c *SlaveClient) SyncIXFR(upstreamSerial uint32) (*Delta, error) {
 	}
 
 	var delta *Delta
-	if isSOARecord(head[1]) {
+	if isIXFRResponse(head) {
 		// Respons IXFR: akumulasi delta (biasanya kecil; tetap dibatasi).
 		records := head
 		for env := range envelopes {
@@ -182,6 +176,25 @@ func (c *SlaveClient) SyncIXFR(upstreamSerial uint32) (*Delta, error) {
 		return nil, fmt.Errorf("serial transfer %d tidak cocok dengan SOA %d", delta.ToSerial, upstreamSerial)
 	}
 	return delta, nil
+}
+
+// isIXFRResponse distinguishes an IXFR response from a full AXFR one using the
+// first two records: an IXFR starts with new-SOA followed by old-SOA, where the
+// serials differ. An empty zone transferred by AXFR is [SOA, SOA] with the SAME
+// serial (opening SOA repeated as closing SOA) and must be treated as AXFR.
+func isIXFRResponse(head []dns.RR) bool {
+	if len(head) < 2 {
+		return false
+	}
+	first, ok := head[0].(*dns.SOA)
+	if !ok {
+		return false
+	}
+	second, ok := head[1].(*dns.SOA)
+	if !ok {
+		return false
+	}
+	return second.Serial != first.Serial
 }
 
 // streamAXFRFromEnvelopes writes the owner domains of a full AXFR response to a
