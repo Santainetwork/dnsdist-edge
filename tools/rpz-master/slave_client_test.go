@@ -219,3 +219,29 @@ func TestTSIGSecretEmptyWhenNoSecret(t *testing.T) {
 		t.Fatal("secret tanpa key harus nil")
 	}
 }
+
+// sign(): dengan TSIG -> pesan ditandatangani (SetTsig); tanpa TSIG -> tidak.
+func TestSignAppliesTSIGOnlyWhenConfigured(t *testing.T) {
+	plain := &SlaveClient{cfg: Config{}}
+	msg := new(dns.Msg)
+	msg.SetQuestion("rpz.example.", dns.TypeSOA)
+	plain.sign(msg)
+	if msg.IsTsig() != nil {
+		t.Fatal("tanpa TSIGKey harusnya tidak ada TSIG")
+	}
+
+	signed := &SlaveClient{cfg: Config{TSIGKey: "rpz-key.", TSIGAlgorithm: "hmac-sha256.", TSIGSecret: "c2VjcmV0"}}
+	msg2 := new(dns.Msg)
+	msg2.SetQuestion("rpz.example.", dns.TypeSOA)
+	signed.sign(msg2)
+	tsig := msg2.IsTsig()
+	if tsig == nil {
+		t.Fatal("dengan TSIGKey pesan harus ditandatangani")
+	}
+	if tsig.Hdr.Name != "rpz-key." {
+		t.Fatalf("nama TSIG = %q", tsig.Hdr.Name)
+	}
+	if tsig.Algorithm != "hmac-sha256." {
+		t.Fatalf("algoritma TSIG = %q", tsig.Algorithm)
+	}
+}
