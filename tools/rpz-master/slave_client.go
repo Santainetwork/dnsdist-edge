@@ -13,6 +13,8 @@ import (
 	"github.com/miekg/dns"
 )
 
+// maxTransferRecords: batas default bila config tidak mengisi
+// max_transfer_records. Nilai efektif diambil dari config.
 const maxTransferRecords = 10_000_000
 
 type SlaveClient struct {
@@ -85,8 +87,15 @@ func (c *SlaveClient) transferRequest() *dns.Msg {
 	return m
 }
 
+// isSOARecord reports whether rr is an SOA record.
+func isSOARecord(rr dns.RR) bool {
+	_, ok := rr.(*dns.SOA)
+	return ok
+}
+
 // SyncIXFR performs AXFR for empty state and IXFR otherwise. Upstreams may
-// answer IXFR with a full AXFR, which parseTransferRecords handles explicitly.
+// answer IXFR with a full AXFR, which is detected from the second record and
+// streamed to disk instead of being buffered in memory.
 func (c *SlaveClient) SyncIXFR(upstreamSerial uint32) (*Delta, error) {
 	request := c.transferRequest()
 	// miekg/dns terminates IXFR early using a plain uint32 comparison across
@@ -106,27 +115,175 @@ func (c *SlaveClient) SyncIXFR(upstreamSerial uint32) (*Delta, error) {
 	if err != nil {
 		return nil, fmt.Errorf("gagal inisiasi transfer: %w", err)
 	}
-	records := make([]dns.RR, 0, 1024)
-	for envelope := range envelopes {
-		if envelope.Error != nil {
-			return nil, fmt.Errorf("error stream transfer: %w", envelope.Error)
-		}
-		if len(records)+len(envelope.RR) > maxTransferRecords {
-			return nil, fmt.Errorf("transfer melebihi batas %d record", maxTransferRecords)
-		}
-		records = append(records, envelope.RR...)
+
+	limit := c.cfg.MaxTransferRecords
+	if limit <= 0 {
+		limit = maxTransferRecords
 	}
-	delta, err := parseTransferRecords(records, c.cfg.Zone, c.state.Serial)
-	if err != nil {
-		return nil, err
+	zone := strings.ToLower(dns.Fqdn(c.cfg.Zone))
+
+	// Buffer hanya cukup untuk memutuskan AXFR vs IXFR (2 record pertama).
+	var head []dns.RR
+	for len(head) < 2 {
+		env, ok := <-envelopes
+		if !ok {
+			break
+		}
+		if env.Error != nil {
+			return nil, fmt.Errorf("error stream transfer: %w", env.Error)
+		}
+		head = append(head, env.RR...)
+	}
+	if len(head) == 0 {
+		return nil, errors.New("transfer kosong")
+	}
+	first, ok := head[0].(*dns.SOA)
+	if !ok || !strings.EqualFold(first.Hdr.Name, zone) {
+		return nil, errors.New("transfer tidak diawali SOA zone")
+	}
+	if len(head) == 1 {
+		if c.state.Serial == first.Serial {
+			return nil, nil
+		}
+		return nil, errors.New("transfer terpotong setelah SOA awal")
+	}
+
+	var delta *Delta
+	if isSOARecord(head[1]) {
+		// Respons IXFR: akumulasi delta (biasanya kecil; tetap dibatasi).
+		records := head
+		for env := range envelopes {
+			if env.Error != nil {
+				return nil, fmt.Errorf("error stream transfer: %w", env.Error)
+			}
+			if len(records)+len(env.RR) > limit {
+				return nil, fmt.Errorf("transfer melebihi batas %d record", limit)
+			}
+			records = append(records, env.RR...)
+		}
+		delta, err = parseTransferRecords(records, c.cfg.Zone, c.state.Serial)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Respons AXFR (atau IXFR yang dijawab AXFR penuh): stream ke disk.
+		delta, err = c.streamAXFRFromEnvelopes(head, envelopes, limit)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if delta == nil {
 		return nil, nil
 	}
 	if upstreamSerial != 0 && delta.ToSerial != upstreamSerial {
+		if delta.StagedRaw != "" {
+			_ = os.Remove(delta.StagedRaw)
+		}
 		return nil, fmt.Errorf("serial transfer %d tidak cocok dengan SOA %d", delta.ToSerial, upstreamSerial)
 	}
 	return delta, nil
+}
+
+// streamAXFRFromEnvelopes writes the owner domains of a full AXFR response to a
+// staging file next to raw_domain_file, one normalized domain per line. Memory
+// stays bounded by a single envelope chunk, so multi-million-record zones do
+// not require RAM proportional to the zone size. head[1:] is the portion
+// already buffered for AXFR/IXFR detection; head[0] is the validated opening SOA.
+func (c *SlaveClient) streamAXFRFromEnvelopes(head []dns.RR, envelopes <-chan *dns.Envelope, limit int) (*Delta, error) {
+	zone := strings.ToLower(dns.Fqdn(c.cfg.Zone))
+	firstSerial := head[0].(*dns.SOA).Serial
+	rawDir := filepath.Dir(c.cfg.RawDomainFile)
+	if err := os.MkdirAll(rawDir, 0o700); err != nil {
+		return nil, err
+	}
+	staged, err := os.CreateTemp(rawDir, ".axfr-stage-*")
+	if err != nil {
+		return nil, err
+	}
+	stagedPath := staged.Name()
+	w := bufio.NewWriterSize(staged, 1<<20)
+	fail := func(err error) (*Delta, error) {
+		_ = staged.Close()
+		_ = os.Remove(stagedPath)
+		return nil, err
+	}
+
+	var gotLast bool
+	total := 0
+	process := func(rr dns.RR) error {
+		total++
+		if total > limit {
+			return fmt.Errorf("transfer melebihi batas %d record", limit)
+		}
+		owner := strings.ToLower(dns.Fqdn(rr.Header().Name))
+		if soa, ok := rr.(*dns.SOA); ok {
+			if !strings.EqualFold(soa.Hdr.Name, zone) {
+				return errors.New("SOA di luar zone")
+			}
+			if soa.Serial != firstSerial {
+				return errors.New("AXFR tidak ditutup SOA yang cocok")
+			}
+			gotLast = true
+			return nil
+		}
+		if gotLast {
+			return errors.New("record setelah SOA penutup AXFR")
+		}
+		if !dns.IsSubDomain(zone, owner) {
+			return fmt.Errorf("owner record di luar zone RPZ: %s", owner)
+		}
+		if owner == zone {
+			return nil
+		}
+		switch rr.Header().Rrtype {
+		case dns.TypeCNAME, dns.TypeA, dns.TypeAAAA:
+		default:
+			return nil
+		}
+		domain := strings.TrimSuffix(strings.TrimSuffix(owner, zone), ".")
+		clean, err := normalizePolicyDomain(domain)
+		if err != nil {
+			return fmt.Errorf("owner RPZ %q: %w", owner, err)
+		}
+		_, err = w.WriteString(clean + "\n")
+		return err
+	}
+
+	for _, rr := range head[1:] {
+		if err := process(rr); err != nil {
+			return fail(err)
+		}
+	}
+	for env := range envelopes {
+		if env.Error != nil {
+			return fail(fmt.Errorf("error stream transfer: %w", env.Error))
+		}
+		for _, rr := range env.RR {
+			if err := process(rr); err != nil {
+				return fail(err)
+			}
+		}
+	}
+	if !gotLast {
+		return fail(errors.New("AXFR tidak lengkap: SOA penutup tidak ditemukan"))
+	}
+	if err := w.Flush(); err != nil {
+		return fail(err)
+	}
+	if err := staged.Sync(); err != nil {
+		return fail(err)
+	}
+	if err := staged.Close(); err != nil {
+		_ = os.Remove(stagedPath)
+		return nil, err
+	}
+	return &Delta{
+		FromSerial: c.state.Serial,
+		ToSerial:   firstSerial,
+		Timestamp:  time.Now(),
+		Full:       true,
+		StagedRaw:  stagedPath,
+	}, nil
 }
 
 func parseTransferRecords(records []dns.RR, zone string, currentSerial uint32) (*Delta, error) {

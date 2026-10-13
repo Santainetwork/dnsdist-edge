@@ -162,9 +162,15 @@ func (a *App) Sync() error {
 		}
 		a.stateMu.Lock()
 		next := *a.state
-		next.Deltas = append(append([]Delta(nil), a.state.Deltas...), *delta)
-		if len(next.Deltas) > 20 {
-			next.Deltas = next.Deltas[len(next.Deltas)-20:]
+		// Delta Full tidak menyimpan daftar domain (bisa jutaan). IXFR delta
+		// tetap disimpan sebagai riwayat untuk fallback IXFR ke klien.
+		if !delta.Full {
+			stored := *delta
+			stored.StagedRaw = ""
+			next.Deltas = append(append([]Delta(nil), a.state.Deltas...), stored)
+			if len(next.Deltas) > 20 {
+				next.Deltas = next.Deltas[len(next.Deltas)-20:]
+			}
 		}
 		next.Serial = upstreamSerial
 		next.TotalDomains = res.TotalEntries

@@ -216,33 +216,44 @@ func PublishDelta(cfg Config, delta *Delta) (*BuildResult, error) {
 	if err := os.MkdirAll(rawDir, 0o700); err != nil {
 		return nil, err
 	}
-	stagedRaw, err := os.CreateTemp(rawDir, ".domains-stage-*")
-	if err != nil {
-		return nil, err
-	}
-	stagedRawPath := stagedRaw.Name()
-	defer os.Remove(stagedRawPath)
-	if !delta.Full {
-		current, err := os.Open(cfg.RawDomainFile)
+	var stagedRawPath string
+	if delta.Full && delta.StagedRaw != "" {
+		// AXFR besar: isi sudah ditulis streaming ke file staging oleh
+		// SlaveClient. Pakai langsung, tanpa menahan daftar di memori.
+		stagedRawPath = delta.StagedRaw
+		defer os.Remove(stagedRawPath) // no-op bila sudah di-rename
+		if _, err := os.Stat(stagedRawPath); err != nil {
+			return nil, fmt.Errorf("file staging AXFR tidak terbaca: %w", err)
+		}
+	} else {
+		stagedRaw, err := os.CreateTemp(rawDir, ".domains-stage-*")
 		if err != nil {
-			_ = stagedRaw.Close()
 			return nil, err
 		}
-		if _, err := io.Copy(stagedRaw, current); err != nil {
-			_ = current.Close()
-			_ = stagedRaw.Close()
+		stagedRawPath = stagedRaw.Name()
+		defer os.Remove(stagedRawPath)
+		if !delta.Full {
+			current, err := os.Open(cfg.RawDomainFile)
+			if err != nil {
+				_ = stagedRaw.Close()
+				return nil, err
+			}
+			if _, err := io.Copy(stagedRaw, current); err != nil {
+				_ = current.Close()
+				_ = stagedRaw.Close()
+				return nil, err
+			}
+			if err := current.Close(); err != nil {
+				_ = stagedRaw.Close()
+				return nil, err
+			}
+		}
+		if err := stagedRaw.Close(); err != nil {
 			return nil, err
 		}
-		if err := current.Close(); err != nil {
-			_ = stagedRaw.Close()
+		if err := ApplyDeltaToFile(stagedRawPath, delta); err != nil {
 			return nil, err
 		}
-	}
-	if err := stagedRaw.Close(); err != nil {
-		return nil, err
-	}
-	if err := ApplyDeltaToFile(stagedRawPath, delta); err != nil {
-		return nil, err
 	}
 
 	cdbDir := filepath.Dir(cfg.CDBPath)

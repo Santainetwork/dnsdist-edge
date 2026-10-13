@@ -19,8 +19,9 @@ Dokumen ini cukup untuk mengadopsi tool ini di lingkungan lain dari nol, tanpa m
 9. [Endpoint HTTP](#9-endpoint-http)
 10. [Jebakan & batasan penting](#10-jebakan--batasan-penting)
 11. [Integrasi dnsdist](#11-integrasi-dnsdist)
-12. [Operasional & pemecahan masalah](#12-operasional--pemecahan-masalah)
-13. [Struktur kode](#13-struktur-kode)
+12. [Allowlist slave (siapa yang boleh transfer dari rpz-master)](#12-allowlist-slave-siapa-yang-boleh-transfer-dari-rpz-master)
+13. [Operasional & pemecahan masalah](#13-operasional--pemecahan-masalah)
+14. [Struktur kode](#14-struktur-kode)
 
 ---
 
@@ -207,6 +208,7 @@ File JSON. Decoder memakai `DisallowUnknownFields` — **field tak dikenal = err
 | `tsig_algorithm` | `hmac-sha256.` | tidak | FQDN; harus sama di kedua sisi |
 | `check_interval` | `15m` | tidak | Interval `periodicSync` di `serve` |
 | `max_transfers` | `10` | tidak | Batas transfer keluar konkuren |
+| `max_transfer_records` | `40000000` | tidak | Batas RR per transfer masuk. Zona RPZ nasional > 10 juta didukung; naikkan bila perlu, turunkan bila RAM ketat |
 | `raw_domain_file` | `/var/lib/dnsdist/domains_isp.txt` | ya | Daftar domain, 1 per baris |
 | `transfer_acl` | `["127.0.0.0/8","::1/128"]` | ya | **Tidak boleh kosong**; CIDR |
 
@@ -352,17 +354,18 @@ curl -s http://master:8088/trust.db -o trust.db    # unduh CDB
 
 Bagian ini yang paling menentukan keberhasilan adopsi. Dibaca dulu sebelum produksi.
 
-### 10.1 Batas record transfer keras (10 juta)
+### 10.1 Batas record transfer (kini bisa dikonfigurasi)
 
-Konstanta `maxTransferRecords = 10_000_000` di `slave_client.go`. Transfer AXFR/IXFR yang melebihi batas ini **ditolak**:
+Batas jumlah RR per transfer masuk diatur `max_transfer_records` (default **40.000.000**). Transfer yang melebihi batas ditolak:
 
 ```
-sync IXFR: transfer melebihi batas 10000000 record
+sync IXFR: transfer melebihi batas 40000000 record
 ```
 
-- **Tidak ada flag/config** untuk mengubahnya — harus edit konstanta + rebuild.
-- Untuk zona besar (>10 juta RR), AXFR penuh **selalu** kena limit.
-- Memori: kode menahan **semua** record di slice `records` sebelum parse → RAM sebanding jumlah record. Transfer 10 juta RR bisa beberapa GB RAM. Cek `free -m` sebelum menaikkan batas.
+- Zona RPZ nasional > 10 juta record **didukung**. Respons AXFR di-stream langsung ke file staging (`.axfr-stage-*`) dengan memori terbatas (~1 envelope), bukan ditahan sebagai daftar di RAM. Uji nyata: 10,5 juta record, sync 28 detik, RSS puncak ~190 MB.
+- Turunkan `max_transfer_records` bila ingin pagar lebih ketat (mis. di host RAM kecil); naikkan bila zona Anda lebih besar.
+- Respons IXFR (delta) masih diakumulasi di memori — tapi delta biasanya kecil; batas tetap berlaku.
+- Bila transfer dibatalkan di tengah (limit/putus), file staging dihapus dan data lama tidak tersentuh.
 
 ### 10.2 Perangkap serial = 0 di mode `rpz-slave`
 
@@ -454,7 +457,97 @@ addAction(
 
 ---
 
-## 12. Operasional & pemecahan masalah
+## 12. Allowlist slave (siapa yang boleh transfer dari rpz-master)
+
+Dua lapis pertahanan — pakai **keduanya**:
+
+1. **Di rpz-master**: `transfer_acl` (daftar CIDR). Hanya IP di daftar yang boleh AXFR/IXFR. Bila `tsig_key` diisi, TSIG juga wajib valid.
+2. **Di dnsdist** (bila dnsdist di depan rpz-master): tolak AXFR/IXFR dari luar netmask yang diizinkan, karena rpz-master melihat IP sumber = dnsdist (bukan IP klien asli).
+
+### 12.1 Sisi rpz-master
+
+```json
+{
+  "transfer_acl": ["192.168.0.0/16", "10.8.0.0/24", "2001:db8::/32"]
+}
+```
+
+- Daftar CIDR; boleh IPv4 dan IPv6 bercampur; **tidak boleh kosong**.
+- IP di luar daftar ditolak (REFUSED) untuk AXFR/IXFR. SOA dan kueri lain tidak dibatasi oleh ACL ini.
+- `127.0.0.0/8` wajib ada bila dnsdist (di host yang sama) yang meneruskan transfer.
+- Untuk keamanan lebih: isi `tsig_key` + `tsig_secret_file` — transfer tanpa tanda tangan yang valid ditolak.
+
+### 12.2 Sisi dnsdist (contoh khusus allowlist)
+
+Karena dnsdist menjadi gerbang, allowlist asli harus ditegakkan di sini. Contoh lengkap dan minimal:
+
+```lua
+-- 1. Backend rpz-master di loopback. Transfer selalu TCP.
+newServer({address="127.0.0.1:5354", name="rpz-master", pool="rpz-master", tcpOnly=true})
+
+-- 2. Jangan cache jawaban AXFR/IXFR (cegah cache bocor ke klien lain).
+addAction(OrRule({QTypeRule(DNSQType.AXFR), QTypeRule(DNSQType.IXFR)}), SetSkipCacheAction())
+
+-- 3. ALLOWLIST: netmask yang boleh meminta transfer.
+local transferAllowed = newNMG()
+transferAllowed:addMask("192.168.0.0/16")   -- rekanan/ISP Anda
+transferAllowed:addMask("10.8.0.0/24")
+transferAllowed:addMask("2001:db8::/32")
+
+-- 4. Tolak AXFR/IXFR dari luar allowlist. WAJIB di atas rule pool.
+addAction(
+  AndRule({
+    OrRule({QTypeRule(DNSQType.AXFR), QTypeRule(DNSQType.IXFR)}),
+    NotRule(NetmaskGroupRule(transferAllowed))
+  }),
+  RCodeAction(DNSRCode.REFUSED)
+)
+
+-- 5. Route SOA/AXFR/IXFR zone kita ke rpz-master.
+addAction(
+  AndRule({
+    QNameRule("trustpositifkominfo."),
+    OrRule({QTypeRule(DNSQType.SOA), QTypeRule(DNSQType.AXFR), QTypeRule(DNSQType.IXFR)})
+  }),
+  PoolAction("rpz-master")
+)
+```
+
+**Urutan penting:** rule tolak (4) harus **sebelum** rule pool (5). dnsdist memproses `addAction` berurutan.
+
+Bila hanya satu rekanan, bisa lebih sederhana:
+
+```lua
+addAction(AndRule({OrRule({QTypeRule(DNSQType.AXFR), QTypeRule(DNSQType.IXFR)}), NotRule(NetmaskGroupRule("203.0.113.10/32"))}), RCodeAction(DNSRCode.REFUSED))
+```
+
+### 12.3 Bukti perilaku (terukur)
+
+Diuji dengan dnsdist + rpz-master nyata:
+
+| Skenario | Hasil |
+|---|---|
+| IP **di** allowlist minta AXFR | Sukses (zona terkirim) |
+| IP **di luar** allowlist minta AXFR | Gagal/ditolak (REFUSED) |
+| SOA dari IP di luar allowlist | Tetap NOERROR (rule tolak hanya AXFR/IXFR) |
+| rpz-master tanpa IP di `transfer_acl` | REFUSED |
+
+Verifikasi cepat sebelum produksi:
+
+```bash
+# check-config dulu
+sudo dnsdist --check-config -C /etc/dnsdist/dnsdist.conf
+
+# dari host yang TIDAK di allowlist -> harus gagal
+dig +tcp @<dnsdist-ip> trustpositifkominfo. AXFR
+
+# dari host yang di allowlist -> harus sukses
+dig +tcp @<dnsdist-ip> trustpositifkominfo. AXFR | head
+```
+
+---
+
+## 13. Operasional & pemecahan masalah
 
 ### Verifikasi hasil
 
@@ -508,7 +601,7 @@ WantedBy=multi-user.target
 
 ---
 
-## 13. Struktur kode
+## 14. Struktur kode
 
 | File | Isi |
 |---|---|

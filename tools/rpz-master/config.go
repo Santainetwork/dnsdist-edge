@@ -17,23 +17,26 @@ import (
 )
 
 type Config struct {
-	SourceMode      string   `json:"source_mode" yaml:"source_mode"`
-	Zone            string   `json:"zone" yaml:"zone"`
-	ListenDNS       string   `json:"listen_dns" yaml:"listen_dns"`
-	ListenHTTP      string   `json:"listen_http" yaml:"listen_http"`
-	CNAMETarget     string   `json:"cname_target" yaml:"cname_target"`
-	CDBPath         string   `json:"cdb_path" yaml:"cdb_path"`
-	StatePath       string   `json:"state_path" yaml:"state_path"`
-	SourceDomainURL string   `json:"source_domain_url" yaml:"source_domain_url"`
-	UpstreamMaster  string   `json:"upstream_master" yaml:"upstream_master"`
-	TSIGKey         string   `json:"tsig_key" yaml:"tsig_key"`
-	TSIGSecret      string   `json:"tsig_secret" yaml:"tsig_secret"`
-	TSIGSecretFile  string   `json:"tsig_secret_file" yaml:"tsig_secret_file"`
-	TSIGAlgorithm   string   `json:"tsig_algorithm" yaml:"tsig_algorithm"`
-	CheckInterval   string   `json:"check_interval" yaml:"check_interval"`
-	MaxTransfers    int      `json:"max_transfers" yaml:"max_transfers"`
-	RawDomainFile   string   `json:"raw_domain_file" yaml:"raw_domain_file"`
-	TransferACL     []string `json:"transfer_acl" yaml:"transfer_acl"`
+	SourceMode      string `json:"source_mode" yaml:"source_mode"`
+	Zone            string `json:"zone" yaml:"zone"`
+	ListenDNS       string `json:"listen_dns" yaml:"listen_dns"`
+	ListenHTTP      string `json:"listen_http" yaml:"listen_http"`
+	CNAMETarget     string `json:"cname_target" yaml:"cname_target"`
+	CDBPath         string `json:"cdb_path" yaml:"cdb_path"`
+	StatePath       string `json:"state_path" yaml:"state_path"`
+	SourceDomainURL string `json:"source_domain_url" yaml:"source_domain_url"`
+	UpstreamMaster  string `json:"upstream_master" yaml:"upstream_master"`
+	TSIGKey         string `json:"tsig_key" yaml:"tsig_key"`
+	TSIGSecret      string `json:"tsig_secret" yaml:"tsig_secret"`
+	TSIGSecretFile  string `json:"tsig_secret_file" yaml:"tsig_secret_file"`
+	TSIGAlgorithm   string `json:"tsig_algorithm" yaml:"tsig_algorithm"`
+	CheckInterval   string `json:"check_interval" yaml:"check_interval"`
+	MaxTransfers    int    `json:"max_transfers" yaml:"max_transfers"`
+	// MaxTransferRecords: batas jumlah RR per transfer masuk (AXFR/IXFR).
+	// Zona RPZ nasional bisa > 10 juta RR. 0 = pakai default.
+	MaxTransferRecords int      `json:"max_transfer_records" yaml:"max_transfer_records"`
+	RawDomainFile      string   `json:"raw_domain_file" yaml:"raw_domain_file"`
+	TransferACL        []string `json:"transfer_acl" yaml:"transfer_acl"`
 }
 
 func DefaultConfig() Config {
@@ -52,8 +55,11 @@ func DefaultConfig() Config {
 		TSIGAlgorithm:   "hmac-sha256.",
 		CheckInterval:   "15m",
 		MaxTransfers:    10,
-		RawDomainFile:   "/var/lib/dnsdist/domains_isp.txt",
-		TransferACL:     []string{"127.0.0.0/8", "::1/128"},
+		// 40 juta: headroom untuk zona RPZ nasional terbesar saat ini
+		// (~9,8 juta) plus pertumbuhan, tanpa membuka memori tak terbatas.
+		MaxTransferRecords: 40_000_000,
+		RawDomainFile:      "/var/lib/dnsdist/domains_isp.txt",
+		TransferACL:        []string{"127.0.0.0/8", "::1/128"},
 	}
 }
 
@@ -100,6 +106,9 @@ func (c Config) Validate() error {
 	}
 	if c.MaxTransfers <= 0 {
 		return fmt.Errorf("max_transfers must be positive")
+	}
+	if c.MaxTransferRecords <= 0 {
+		return fmt.Errorf("max_transfer_records must be positive")
 	}
 	if c.CDBPath == "" || c.StatePath == "" || c.RawDomainFile == "" {
 		return errors.New("cdb_path, state_path, and raw_domain_file are required")
@@ -197,6 +206,10 @@ type Delta struct {
 	Full       bool      `json:"full,omitempty"`
 	Added      []string  `json:"added"`
 	Deleted    []string  `json:"deleted"`
+	// StagedRaw: path file staging berisi seluruh domain (hanya transfer Full).
+	// Tidak diserialisasi: PublishDelta memakainya agar daftar domain tidak
+	// perlu ditahan di memori untuk zona besar (>10 juta).
+	StagedRaw string `json:"-"`
 }
 
 type State struct {
