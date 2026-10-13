@@ -50,6 +50,53 @@ func TestHTTPRawDomainsETagAndRange(t *testing.T) {
 	}
 }
 
+func TestHTTPRawDomainsConditionalResponsePreservesETag(t *testing.T) {
+	dir := t.TempDir()
+	raw := filepath.Join(dir, "domains.txt")
+	if err := os.WriteFile(raw, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.RawDomainFile = raw
+	srv := NewHTTPServer(cfg, &State{}, nil)
+
+	first := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/domains", nil))
+	etag := first.Header().Get("ETag")
+	if first.Code != http.StatusOK || etag == "" {
+		t.Fatalf("initial raw response: status=%d etag=%q", first.Code, etag)
+	}
+
+	conditional := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/domains", nil)
+	request.Header.Set("If-None-Match", etag)
+	srv.Handler().ServeHTTP(conditional, request)
+	if conditional.Code != http.StatusNotModified {
+		t.Fatalf("conditional raw response: status=%d, want 304", conditional.Code)
+	}
+	if got := conditional.Header().Get("ETag"); got != etag {
+		t.Fatalf("conditional raw response ETag=%q, want %q", got, etag)
+	}
+}
+
+func TestHTTPRawDomainsRejectsDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "internal.txt"), []byte("must not be listed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.RawDomainFile = dir
+	srv := NewHTTPServer(cfg, &State{}, nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/domains", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("directory raw response: status=%d, want 500", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "internal.txt") {
+		t.Fatalf("directory listing leaked through raw endpoint: %q", rec.Body.String())
+	}
+}
+
 func TestHTTPRawDomainsMissing(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.RawDomainFile = filepath.Join(t.TempDir(), "missing.txt")

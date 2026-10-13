@@ -64,7 +64,7 @@ func (s *HTTPServer) Handler() http.Handler {
 		rawPath := s.cfg.RawDomainFile
 		last := s.state.LastUpdate
 		s.stateMu.RUnlock()
-		st, err := os.Stat(rawPath)
+		file, err := os.Open(rawPath)
 		if err != nil {
 			if os.IsNotExist(err) {
 				http.Error(w, "raw domain file belum dibuat", http.StatusNotFound)
@@ -73,16 +73,21 @@ func (s *HTTPServer) Handler() http.Handler {
 			http.Error(w, "raw domain file tidak tersedia", http.StatusInternalServerError)
 			return
 		}
-		etag := fmt.Sprintf("\"%d-%d\"", st.Size(), st.ModTime().UnixNano())
-		if r.Header.Get("If-None-Match") == etag {
-			w.WriteHeader(http.StatusNotModified)
+		defer file.Close()
+		st, err := file.Stat()
+		if err != nil {
+			http.Error(w, "raw domain file tidak tersedia", http.StatusInternalServerError)
 			return
 		}
+		if !st.Mode().IsRegular() {
+			http.Error(w, "raw domain file bukan regular file", http.StatusInternalServerError)
+			return
+		}
+		etag := fmt.Sprintf("\"%d-%d\"", st.Size(), st.ModTime().UnixNano())
 		w.Header().Set("ETag", etag)
-		w.Header().Set("Last-Modified", st.ModTime().UTC().Format(http.TimeFormat))
 		w.Header().Set("X-RPZ-Last-Update", last.UTC().Format(time.RFC3339))
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		http.ServeFile(w, r, rawPath)
+		http.ServeContent(w, r, filepath.Base(rawPath), st.ModTime(), file)
 	}
 	mux.HandleFunc("/domains", rawHandler)
 	mux.HandleFunc("/files/domains", rawHandler)

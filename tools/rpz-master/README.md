@@ -338,6 +338,7 @@ Aktif only bila `listen_http` tidak kosong.
 | Path | Isi |
 |---|---|
 | `/blacklist.db`, `/trust.db`, `/files/trust.db` | File CDB. Mengirim `ETag` (sha256), `Content-Type: application/octet-stream`, `Content-Disposition: attachment`. |
+| `/domains`, `/files/domains`, `/raw-domains` | Snapshot domain mentah, satu domain per baris. Mengirim `ETag`, `Last-Modified`, `X-RPZ-Last-Update`, mendukung conditional GET (`If-None-Match`/`If-Modified-Since`), `HEAD`, dan byte `Range`. Mengembalikan `404` bila snapshot belum ada. |
 | `/manifest.json`, `/files/manifest.json`, `/status` | JSON: `{status, serial, last_update, total_domains, sha256, cdb_file}` |
 | `/health` | `{"status":"healthy"}` |
 
@@ -346,7 +347,14 @@ Contoh konsumsi edge:
 curl -s http://master:8088/manifest.json          # baca serial & sha256
 curl -s http://master:8088/trust.db -o trust.db    # unduh CDB
 # verifikasi sha256(trust.db) == manifest.sha256, lalu pasang atomik
+curl -fsSL http://master:8088/raw-domains -o domains.txt  # relay snapshot mentah
 ```
+
+Ketiga path raw-domain adalah alias untuk snapshot yang sama. Konsumen relay
+dapat memakai `If-None-Match` atau `If-Modified-Since` untuk menghindari
+download ulang; `Range` tersedia untuk melanjutkan download besar. Snapshot
+ditulis atomik oleh publisher sehingga pembaca memperoleh file regular yang
+konsisten.
 
 ---
 
