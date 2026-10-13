@@ -381,7 +381,7 @@ Akibat: setelah bootstrap di mode `rpz-slave`, `state.serial` tetap **0**. Lalu 
 ```go
 if c.state.Serial == 0 { m.SetAxfr(zone) } else { m.SetIxfr(...) }
 ```
-→ `serial == 0` memaksa **AXFR penuh** (bukan IXFR delta) → kena limit 10 juta.
+→ `serial == 0` memaksa **AXFR penuh** (bukan IXFR delta). Sejak dukungan zona besar, AXFR penuh ini di-stream ke staging (RAM tetap rendah), tapi tetap mengunduh seluruh zona — bukan delta.
 
 **Artinya: bootstrap + sync = masih AXFR penuh.** Untuk memakai IXFR, `state.serial` harus ≠ 0.
 
@@ -566,7 +566,7 @@ curl -s http://127.0.0.1:8088/manifest.json
 |---|---|---|
 | `respons SOA tidak dapat digunakan: rcode=REFUSED` | Upstream menolak query SOA | Cek `zone`, `upstream_master`, allow-IP, TSIG |
 | `gagal query SOA ke ...` | Tidak bisa reach upstream | Cek jaringan/port/firewall |
-| `transfer melebihi batas 10000000 record` | Transfer > 10 juta RR | Naikkan konstanta + rebuild, atau hindari `sync` |
+| `transfer melebihi batas N record` | Transfer melebihi `max_transfer_records` | Naikkan `max_transfer_records`, atau hindari `sync` bila zona sangat besar |
 | `upstream_master is required in rpz-slave mode` | `serve` tanpa `upstream_master` | Isi config |
 | `tsig_key and tsig_secret_file must be configured together` | TSIG setengah | Isi keduanya atau kosongkan keduanya |
 | `tsig_secret_file must be regular and inaccessible...` | Permission/tipe file secret salah | `chmod 600`, pastikan file reguler |
