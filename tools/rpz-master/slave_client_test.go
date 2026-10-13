@@ -167,3 +167,55 @@ func TestApplyDeltaFailurePreservesRawFile(t *testing.T) {
 		t.Fatalf("raw file changed after failure: %q", got)
 	}
 }
+
+// NewSlaveClient: state nil ditolak; tanpa TSIG jalan; TSIG valid -> secret
+// termuat dari file; TSIG file rusak -> error (fail-closed).
+func TestNewSlaveClientTSIGHandling(t *testing.T) {
+	cfg := DefaultConfig()
+	if _, err := NewSlaveClient(cfg, nil); err == nil {
+		t.Fatal("state nil diterima")
+	}
+
+	client, err := NewSlaveClient(cfg, &State{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.tsigSecret() != nil {
+		t.Fatal("tanpa TSIG harus nil")
+	}
+
+	secretPath := filepath.Join(t.TempDir(), "secret")
+	if err := os.WriteFile(secretPath, []byte("dGVzdHNlY3JldA==\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg.TSIGKey = "rpz-key."
+	cfg.TSIGSecretFile = secretPath
+	client, err = NewSlaveClient(cfg, &State{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := client.tsigSecret()
+	if got["rpz-key."] != "dGVzdHNlY3JldA==" {
+		t.Fatalf("secret TSIG = %v", got)
+	}
+
+	// File terbuka ke group/other -> harus ditolak.
+	if err := os.Chmod(secretPath, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewSlaveClient(cfg, &State{}); err == nil {
+		t.Fatal("TSIG secret world-readable diterima")
+	}
+}
+
+// tsigSecret: key ada tapi secret kosong -> nil (tidak kirim TSIG kosong).
+func TestTSIGSecretEmptyWhenNoSecret(t *testing.T) {
+	client := &SlaveClient{cfg: Config{TSIGKey: "k."}}
+	if client.tsigSecret() != nil {
+		t.Fatal("key tanpa secret harus nil")
+	}
+	client = &SlaveClient{cfg: Config{TSIGSecret: "s"}}
+	if client.tsigSecret() != nil {
+		t.Fatal("secret tanpa key harus nil")
+	}
+}
